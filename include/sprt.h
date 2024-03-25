@@ -13,4 +13,9 @@ enum {
 	TESTERRRUN,
 };
 
+enum {
+	TESTTYPESPRT,
+	TESTTYPEELO,
+};
+
 #endif

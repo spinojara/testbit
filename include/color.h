@@ -21,10 +21,13 @@ struct colors {
 	struct color border;
 	struct color bordershadow;
 	struct color shadow;
+	struct color error;
+	struct color errorhl;
 
 	struct color text;
 	struct color texthl;
 	struct color textdim;
+	struct color textblue;
 };
 
 extern struct colors cs;

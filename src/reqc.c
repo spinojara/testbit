@@ -6,17 +6,18 @@
 
 #include "req.h"
 #include "sprt.h"
+#include "oldtest.h"
 
 const double eps = 1e-6;
 
 static inline int inrange(double x, double a, double b) {
-	return a < x && x < b;
+	return a <= x && x <= b;
 }
 
 int handle_new_test(struct connection *con, sqlite3 *db) {
 	con->test.branch = con->test.commit = NULL;
 	int r = 0;
-	if ((r = recvf(con->ssl, "cLLDDDDDss", &con->test.type,
+	if ((r = recvf(con->ssl, "cDDDDDDDss", &con->test.type,
 				          &con->test.maintime,
 					  &con->test.increment,
 					  &con->test.alpha,
@@ -27,11 +28,13 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 					  &con->test.branch,
 					  &con->test.commit)))
 		goto error;
+
 	double zero = eps;
 	double one = 1.0 - eps;
 	if ((r = !inrange(con->test.alpha, zero, one) ||
 			!inrange(con->test.beta, zero, one) ||
-			con->test.eloe < zero))
+			con->test.maintime <= 0.1 || con->test.increment < 0.0 ||
+			(con->test.type == TESTTYPEELO && con->test.eloe < zero)))
 		goto error;
 
 	sqlite3_stmt *stmt;
@@ -42,18 +45,18 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 			-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, con->test.type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);
-	sqlite3_bind_int(stmt, 3, con->test.maintime);
-	sqlite3_bind_int(stmt, 4, con->test.increment);
+	sqlite3_bind_double(stmt, 3, con->test.maintime);
+	sqlite3_bind_double(stmt, 4, con->test.increment);
 	sqlite3_bind_double(stmt, 5, con->test.alpha);
 	sqlite3_bind_double(stmt, 6, con->test.beta);
 	sqlite3_bind_double(stmt, 7, con->test.elo0);
 	sqlite3_bind_double(stmt, 8, con->test.elo1);
 	sqlite3_bind_double(stmt, 9, con->test.eloe);
 
+	sqlite3_bind_double(stmt, 10, 0.0 / 0.0);
 	sqlite3_bind_double(stmt, 11, 0.0 / 0.0);
-	sqlite3_bind_double(stmt, 12, 0.0 / 0.0);
-	sqlite3_bind_text(stmt, 13, con->test.branch, -1, NULL);
-	sqlite3_bind_text(stmt, 14, con->test.commit, -1, NULL);
+	sqlite3_bind_text(stmt, 12, con->test.branch, -1, NULL);
+	sqlite3_bind_text(stmt, 13, con->test.commit, -1, NULL);
 	sqlite3_step(stmt);
 	con->test.id = sqlite3_column_int(stmt, 0);
 	sqlite3_step(stmt);
@@ -62,11 +65,11 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	char path[4096];
 	sprintf(path, "/var/lib/bitbit/patch/%ld.patch", con->test.id);
 	int fd;
-	if ((fd = open(path, O_WRONLY | O_CREAT, 0644) < 0)) {
+	if ((fd = open(path, O_WRONLY | O_CREAT, 0444)) < 0) {
 		fprintf(stderr, "Failed to open file %s\n", path);
 		exit(9);
 	}
-	if (recvfile(con->ssl, fd)) {
+	if ((r = recvf(con->ssl, "f", fd))) {
 		/* Delete the file. */
 		sqlite3_prepare_v2(db, "DELETE FROM test WHERE id = ?;", -1, &stmt, NULL);
 		sqlite3_bind_int(stmt, 1, con->test.id);
@@ -80,7 +83,118 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 error:
 	free(con->test.branch);
 	free(con->test.commit);
+	sendf(con->ssl, "c", r ? RESPONSEFAIL : RESPONSEOK);
 	return r;
+}
+
+int handle_log_test(struct connection *con, sqlite3 *db) {
+	return 0;
+}
+
+int handle_log_tests(struct connection *con, sqlite3 *db) {
+	char request;
+	if (recvf(con->ssl, "c", &request))
+		return 1;
+
+	int filter[5];
+	sqlite3_stmt *stmt;
+	switch (request) {
+	case OLDTESTACTIVE:
+		filter[0] = filter[1] = filter[2] = filter[3] = TESTQUEUE;
+		filter[4] = TESTRUN;
+		break;
+	case OLDTESTDONE:
+		filter[0] = filter[1] = filter[2] = filter[3] = filter[4] = TESTDONE;
+		break;
+	case OLDTESTCANCELLED:
+		filter[0] = filter[1] = filter[2] = filter[3] = filter[4] = TESTCANCEL;
+		break;
+	case OLDTESTFAILED:
+		filter[0] = TESTERRBRANCH;
+		filter[1] = TESTERRCOMMIT;
+		filter[2] = TESTERRPATCH;
+		filter[3] = TESTERRMAKE;
+		filter[4] = TESTERRRUN;
+		break;
+	case OLDTESTSINGLE:
+		return handle_log_test(con, db);
+	default:
+		return 1;
+	}
+
+	int64_t min, max;
+
+	if (recvf(con->ssl, "qq", &min, &max))
+		return 1;
+
+	sqlite3_prepare_v2(db,
+			"SELECT id, type, status, maintime, increment, alpha, beta, llh, "
+			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
+			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4 "
+			"FROM test WHERE status = ? or status = ? "
+			"or status = ? or status = ? or status = ? "
+			"ORDER BY queuetime ASC;",
+			-1, &stmt, NULL);
+	sqlite3_bind_int(stmt, 1, filter[0]);
+	sqlite3_bind_int(stmt, 2, filter[1]);
+	sqlite3_bind_int(stmt, 3, filter[2]);
+	sqlite3_bind_int(stmt, 4, filter[3]);
+	sqlite3_bind_int(stmt, 5, filter[4]);
+
+	int error = 0;
+
+	for (int i = 0; i < max; i++) {
+		if (sqlite3_step(stmt) != SQLITE_ROW)
+			break;
+
+		if (i < min)
+			continue;
+
+		int64_t id = sqlite3_column_int64(stmt, 0);
+		char type = sqlite3_column_int(stmt, 1);
+		char status = sqlite3_column_int(stmt, 2);
+		double maintime = sqlite3_column_double(stmt, 3);
+		double increment = sqlite3_column_double(stmt, 4);
+		double alpha = sqlite3_column_double(stmt, 5);
+		double beta = sqlite3_column_double(stmt, 6);
+		double llh = sqlite3_column_double(stmt, 7);
+		double elo0 = sqlite3_column_double(stmt, 8);
+		double elo1 = sqlite3_column_double(stmt, 9);
+		double eloe = sqlite3_column_double(stmt, 10);
+		double elo = sqlite3_column_double(stmt, 11);
+		double pm = sqlite3_column_double(stmt, 12);
+		const char *branch = (const char *)sqlite3_column_text(stmt, 13);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 14);
+		int64_t qtime = sqlite3_column_int64(stmt, 15);
+		int64_t stime = sqlite3_column_int64(stmt, 16);
+		int64_t dtime = sqlite3_column_int64(stmt, 17);
+		uint32_t t0 = sqlite3_column_int(stmt, 18);
+		uint32_t t1 = sqlite3_column_int(stmt, 19);
+		uint32_t t2 = sqlite3_column_int(stmt, 20);
+		uint32_t p0 = sqlite3_column_int(stmt, 21);
+		uint32_t p1 = sqlite3_column_int(stmt, 22);
+		uint32_t p2 = sqlite3_column_int(stmt, 23);
+		uint32_t p3 = sqlite3_column_int(stmt, 24);
+		uint32_t p4 = sqlite3_column_int(stmt, 25);
+
+		/* Send information that a row was found. */
+		if (sendf(con->ssl, "c", 0)) {
+			error = 1;
+			break;
+		}
+		/* Send the data. */
+		if (sendf(con->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
+				id, type, status, maintime, increment, alpha, beta, llh,
+				elo0, elo1, eloe, elo, pm, branch, commit, qtime, stime, dtime,
+				t0, t1, t2, p0, p1, p2, p3, p4)) {
+			error = 1;
+			break;
+		}
+	}
+
+	sqlite3_finalize(stmt);
+
+	return error || sendf(con->ssl, "c", 1);
 }
 
 int handle_mod_test(struct connection *con, sqlite3 *db) {
@@ -98,9 +212,12 @@ int handle_client_request(struct connection *con, sqlite3 *db, const char passwo
 	case REQUESTPRIVILEGE:
 		return handle_password(con, password);
 	case REQUESTNEWTEST:
-		return handle_new_test(con, db);
+		return con->privileged ? handle_new_test(con, db) : 1;
 	case REQUESTMODTEST:
-		return handle_mod_test(con, db);
+		return con->privileged ? handle_mod_test(con, db) : 1;
+	case REQUESTLOGTEST:
+		return handle_log_tests(con, db);
+	default:
+		return 1;
 	}
-	return 0;
 }

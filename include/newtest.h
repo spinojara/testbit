@@ -3,24 +3,16 @@
 
 #include <ncurses.h>
 
-struct menustate;
-struct windows;
+#include "state.h"
 
-enum {
-	NEWTESTTIME,
-	NEWTESTELO0,
-	NEWTESTELO1,
-	NEWTESTALPHA,
-	NEWTESTBETA,
-	NEWTESTELOE,
+void handle_newtest(struct newteststate *ns, chtype ch);
 
-	NEWTESTCOUNT,
+void draw_newtest(struct newteststate *ns);
 
-	NEWTESTSEND,
-};
+void init_newtest(struct newteststate *ns);
 
-#include "win.h"
+void resize_prompts(struct newteststate *ns);
 
-void newtest_key(chtype ch, struct windows *wins, struct menustate *ms);
+void term_newtest(struct newteststate *ns);
 
 #endif

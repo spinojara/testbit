@@ -265,9 +265,10 @@ int sendfile(SSL *ssl, int fd) {
 		return 1;
 	char buf[BUFSIZ];
 	ssize_t n;
-	while ((n = read(fd, buf, sizeof(buf))) > 0)
+	while ((n = read(fd, buf, sizeof(buf))) > 0) {
 		if (sendexact(ssl, buf, n))
 			return 1;
+	}
 	return n < 0;
 }
 
@@ -278,10 +279,10 @@ int recvfile(SSL *ssl, int fd) {
 	if (recvu64(ssl, &len) || len > 16777216)
 		return 1;
 	char c;
-	while (rec < len && recvexact(ssl, &c, 1) > 0) {
+	while (rec < len && !recvexact(ssl, &c, 1)) {
 		rec++;
-		if (write(fd, &c, 1))
-			return 1;
+		if (write(fd, &c, 1) != 1)
+			exit(19);
 	}
 	return rec < len;
 }

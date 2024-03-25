@@ -18,10 +18,13 @@ void set_theme(void) {
 	COLOR(cs.border,       COLOR_WHITE, COLOR_WHITE, A_BOLD);
 	COLOR(cs.bordershadow, COLOR_BLACK, COLOR_WHITE, A_NORMAL);
 	COLOR(cs.shadow,       COLOR_BLACK, COLOR_BLACK, A_NORMAL);
+	COLOR(cs.error,        COLOR_RED,   COLOR_WHITE, A_NORMAL);
+	COLOR(cs.errorhl,      COLOR_RED,   COLOR_WHITE, A_BOLD);
 
 	COLOR(cs.text,         COLOR_BLACK, COLOR_WHITE, A_NORMAL);
 	COLOR(cs.texthl,       COLOR_WHITE, COLOR_BLUE,  A_NORMAL | A_BOLD);
 	COLOR(cs.textdim,      COLOR_WHITE, COLOR_WHITE, A_DIM);
+	COLOR(cs.textblue,     COLOR_BLUE,  COLOR_WHITE, A_NORMAL);
 }
 
 void make_color(struct color *c) {
@@ -36,10 +39,13 @@ void make_colors(void) {
 	make_color(&cs.border);
 	make_color(&cs.bordershadow);
 	make_color(&cs.shadow);
+	make_color(&cs.error);
+	make_color(&cs.errorhl);
 
 	make_color(&cs.text);
 	make_color(&cs.texthl);
 	make_color(&cs.textdim);
+	make_color(&cs.textblue);
 }
 
 void init_colors(void) {

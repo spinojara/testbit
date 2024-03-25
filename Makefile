@@ -7,7 +7,7 @@ CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) -Iinclude
 LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm -lssl -lcrypto
 
-SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c win.c newtest.c prompt.c
+SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c
 SRC_TESTBITN = testbitn.c con.c ssl.c binary.c sprt.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c sprt.c
 SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD)
@@ -33,7 +33,7 @@ obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-testbit:  LDLIBS += -lncurses -ltinfo
+testbit:  LDLIBS += -lncurses -ltinfo -lpanel -lmenu -lform
 testbitd: LDLIBS += -lsqlite3
 
 dep/%.d: src/%.c Makefile
@@ -59,7 +59,12 @@ clean:
 	rm -rf obj dep
 	rm -f $(BIN)
 
+doc: doc/maximumlikelihood.pdf doc/elo.pdf
+
+doc/%.pdf: doc/src/%.tex doc/src/%.bib
+	latexmk -pdf -cd $< -output-directory=../../doc
+
 -include $(DEP)
 
 .PRECIOUS: dep/%.d
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall doc

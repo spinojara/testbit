@@ -15,14 +15,14 @@ enum {
 	STATUSCANCEL,
 };
 
-struct test {
+struct contest {
 	char status;
 	int64_t id;
 
 	char type;
 
-	uint32_t maintime;
-	uint32_t increment;
+	double maintime;
+	double increment;
 	double alpha;
 	double beta;
 	double elo0;
@@ -37,7 +37,7 @@ struct connection {
 	char type;
 	char privileged;
 	
-	struct test test;
+	struct contest test;
 
 	SSL *ssl;
 };
