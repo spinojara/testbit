@@ -320,8 +320,7 @@ void queue_test(struct newteststate *ns) {
 	draw_newtest(ns);
 
 	char response = RESPONSEPERMISSIONDENIED;
-	sendf(ns->ssl, "c", REQUESTPRIVILEGE);
-	sendf(ns->ssl, "s", passphrase);
+	sendf(ns->ssl, "cs", REQUESTPRIVILEGE, passphrase);
 	recvf(ns->ssl, "c", &response);
 
 	if (response != RESPONSEOK) {

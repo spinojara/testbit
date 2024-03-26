@@ -6,13 +6,10 @@
 #include "con.h"
 #include "tui.h"
 
-int main(int argc, char **argv) {
+int main(void) {
 	setlocale(LC_ALL, "");
 	signal(SIGPIPE, SIG_IGN);
-	(void)argc;
-	(void)argv;
 
-#if 1
 	int sockfd;
 	SSL *ssl;
 	SSL_CTX *ctx;
@@ -29,16 +26,10 @@ int main(int argc, char **argv) {
 
 	sendf(ssl, "c", TYPECLIENT);
 
-#else
-	void *ssl = NULL
-#endif
-
 	tuiloop(ssl);
 
-#if 1
 	ssl_close(ssl);
 	SSL_CTX_free(ctx);
-#endif
 
 	return 0;
 }
