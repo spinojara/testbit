@@ -8,8 +8,9 @@ LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm -lssl -lcrypto
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
-	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c
-SRC_TESTBITN = testbitn.c con.c ssl.c binary.c sprt.c node.c util.c
+	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c \
+	       active.c done.c single.c
+SRC_TESTBITN = testbitn.c con.c ssl.c binary.c setup.c sprt.c node.c util.c elo.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c
 SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD)
 
@@ -34,23 +35,23 @@ obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-testbit:  LDLIBS += -lncurses -ltinfo -lpanel -lmenu -lform
+testbit:  LDLIBS += -lncurses -ltinfo
 testbitd: LDLIBS += -lsqlite3
 
 dep/%.d: src/%.c Makefile
 	@mkdir -p dep
 	@$(CC) -MM -MT "$@ $(<:src/%.c=obj/%.o)" $(CFLAGS) $< -o $@
 
-install: #all
+install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
-	#cp -f testbit $(DESTDIR)$(BINDIR)/testbit
-	#chmod 755 $(DESTDIR)$(BINDIR)/testbit
-	#cp -f testbitn $(DESTDIR)$(BINDIR)/testbitn
-	#chmod 755 $(DESTDIR)$(BINDIR)/testbitn
-	#cp -f testbitd $(DESTDIR)$(BINDIR)/testbitd
-	#chmod 755 $(DESTDIR)$(BINDIR)/testbitd
+	cp -f testbit $(DESTDIR)$(BINDIR)/testbit
+	chmod 755 $(DESTDIR)$(BINDIR)/testbit
+	cp -f testbitn $(DESTDIR)$(BINDIR)/testbitn
+	chmod 755 $(DESTDIR)$(BINDIR)/testbitn
+	cp -f testbitd $(DESTDIR)$(BINDIR)/testbitd
+	chmod 755 $(DESTDIR)$(BINDIR)/testbitd
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/{testbit,testbitn,testbitd}

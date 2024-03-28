@@ -23,6 +23,8 @@ struct colors {
 	struct color shadow;
 	struct color error;
 	struct color errorhl;
+	struct color yellow;
+	struct color green;
 
 	struct color text;
 	struct color texthl;

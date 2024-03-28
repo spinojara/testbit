@@ -8,6 +8,7 @@
 #include "sprt.h"
 #include "req.h"
 #include "infobox.h"
+#include "util.h"
 
 enum {
 	PROMPTTIME,
@@ -206,7 +207,6 @@ void queue_test(struct newteststate *ns) {
 	struct prompt *p;
 	char *str, *c, *err, *err2 = NULL;
 
-	const double eps = 1e-4;
 	const double zero = eps;
 	const double one = 1.0 - zero;
 

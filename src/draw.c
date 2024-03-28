@@ -59,10 +59,10 @@ void draw_all(struct state *st) {
 	draw_main(stdscr);
 	draw_menu(st);
 	draw_newtest(&st->ns);
-	draw_oldtest(&st->as, 0, 0);
-	draw_oldtest(&st->ds, 0, 0);
-	draw_oldtest(&st->cs, 0, 0);
-	draw_oldtest(&st->fs, 0, 0);
+	draw_oldtest(&st->as, 0, st->selected == MENUACTIVE);
+	draw_oldtest(&st->ds, 0, st->selected == MENUDONE);
+	draw_oldtest(&st->cs, 0, st->selected == MENUCANCELLED);
+	draw_oldtest(&st->fs, 0, st->selected == MENUFAILED);
 
 	switch (st->selected) {
 	case MENUNEWTEST:

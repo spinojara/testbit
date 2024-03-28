@@ -27,6 +27,7 @@ void init_fds(struct fds *fds) {
 }
 
 void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
+	printf("connecting to %d\n", newfd);
 	if (fds->fd_count == fds->fd_size) {
 		fds->fd_size *= 2;
 		fds->pfds = realloc(fds->pfds, fds->fd_size * sizeof(*fds->pfds));
@@ -43,12 +44,13 @@ void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
 	fds->cons[fds->fd_count].ssl = ssl;
 	fds->cons[fds->fd_count].privileged = 0;
 	fds->cons[fds->fd_count].type = type;
-	fds->cons[fds->fd_count].test.status = STATUSWAIT;
+	fds->cons[fds->fd_count].status = STATUSWAIT;
 
 	fds->fd_count++;
 }
 
 void del_from_fds(struct fds *fds, int i) {
+	printf("closing %d\n", fds->pfds[i].fd);
 	ssl_close(fds->cons[i].ssl);
 	fds->pfds[i] = fds->pfds[fds->fd_count - 1];
 	fds->cons[i] = fds->cons[fds->fd_count - 1];
@@ -124,10 +126,8 @@ int main(void) {
 		return 7;
 
 	while (1) {
-#if 0
-		if (queue_tests(db, &fds))
+		if (start_tests(db, &fds))
 			return 8;
-#endif
 
 		if (poll(fds.pfds, fds.fd_count, -1) <= 0)
 			return 5;
@@ -148,6 +148,8 @@ int main(void) {
 				break;
 			case TYPENODE:
 				r = handle_node_request(con, db, password);
+				if (r && con->status == STATUSRUN)
+					requeue_test(db, con->id);
 				break;
 			default:
 				fprintf(stderr, "error: bad status\n");

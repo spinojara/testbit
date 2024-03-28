@@ -7,34 +7,31 @@
 #include "req.h"
 #include "sprt.h"
 #include "oldtest.h"
-
-const double eps = 1e-6;
+#include "util.h"
 
 static inline int inrange(double x, double a, double b) {
 	return a <= x && x <= b;
 }
 
 int handle_new_test(struct connection *con, sqlite3 *db) {
-	con->test.branch = con->test.commit = NULL;
+	char type;
+	double maintime, increment;
+	double alpha, beta;
+	double elo0, elo1, eloe;
+	char *branch = NULL, *commit = NULL;
 	int r = 0;
-	if ((r = recvf(con->ssl, "cDDDDDDDss", &con->test.type,
-				          &con->test.maintime,
-					  &con->test.increment,
-					  &con->test.alpha,
-					  &con->test.beta,
-					  &con->test.elo0,
-					  &con->test.elo1,
-					  &con->test.eloe,
-					  &con->test.branch,
-					  &con->test.commit)))
+	if ((r = recvf(con->ssl, "cDDDDDDDss",
+					&type, &maintime, &increment, &alpha,
+					&beta, &elo0, &elo1, &eloe,
+					&branch, &commit)))
 		goto error;
 
 	double zero = eps;
 	double one = 1.0 - eps;
-	if ((r = !inrange(con->test.alpha, zero, one) ||
-			!inrange(con->test.beta, zero, one) ||
-			con->test.maintime <= 0.1 || con->test.increment < 0.0 ||
-			(con->test.type == TESTTYPEELO && con->test.eloe < zero)))
+	if ((r = !inrange(alpha, zero, one) ||
+			!inrange(beta, zero, one) ||
+			maintime <= 0.1 || increment < 0.0 ||
+			(type == TESTTYPEELO && eloe < zero)))
 		goto error;
 
 	sqlite3_stmt *stmt;
@@ -43,36 +40,36 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash) VALUES "
 			"(?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?) RETURNING id;",
 			-1, &stmt, NULL);
-	sqlite3_bind_int(stmt, 1, con->test.type);
+	sqlite3_bind_int(stmt, 1, type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);
-	sqlite3_bind_double(stmt, 3, con->test.maintime);
-	sqlite3_bind_double(stmt, 4, con->test.increment);
-	sqlite3_bind_double(stmt, 5, con->test.alpha);
-	sqlite3_bind_double(stmt, 6, con->test.beta);
-	sqlite3_bind_double(stmt, 7, con->test.elo0);
-	sqlite3_bind_double(stmt, 8, con->test.elo1);
-	sqlite3_bind_double(stmt, 9, con->test.eloe);
+	sqlite3_bind_double(stmt, 3, maintime);
+	sqlite3_bind_double(stmt, 4, increment);
+	sqlite3_bind_double(stmt, 5, alpha);
+	sqlite3_bind_double(stmt, 6, beta);
+	sqlite3_bind_double(stmt, 7, elo0);
+	sqlite3_bind_double(stmt, 8, elo1);
+	sqlite3_bind_double(stmt, 9, eloe);
 
 	sqlite3_bind_double(stmt, 10, 0.0 / 0.0);
 	sqlite3_bind_double(stmt, 11, 0.0 / 0.0);
-	sqlite3_bind_text(stmt, 12, con->test.branch, -1, NULL);
-	sqlite3_bind_text(stmt, 13, con->test.commit, -1, NULL);
+	sqlite3_bind_text(stmt, 12, branch, -1, NULL);
+	sqlite3_bind_text(stmt, 13, commit, -1, NULL);
 	sqlite3_step(stmt);
-	con->test.id = sqlite3_column_int(stmt, 0);
+	con->id = sqlite3_column_int(stmt, 0);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 
 	char path[4096];
-	sprintf(path, "/var/lib/bitbit/patch/%ld.patch", con->test.id);
+	sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
 	int fd;
-	if ((fd = open(path, O_WRONLY | O_CREAT, 0444)) < 0) {
+	if ((fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0444)) < 0) {
 		fprintf(stderr, "Failed to open file %s\n", path);
 		exit(9);
 	}
 	if ((r = recvf(con->ssl, "f", fd))) {
 		/* Delete the file. */
 		sqlite3_prepare_v2(db, "DELETE FROM test WHERE id = ?;", -1, &stmt, NULL);
-		sqlite3_bind_int(stmt, 1, con->test.id);
+		sqlite3_bind_int(stmt, 1, con->id);
 		sqlite3_step(stmt);
 		sqlite3_finalize(stmt);
 		close(fd);
@@ -81,13 +78,64 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	}
 	close(fd);
 error:
-	free(con->test.branch);
-	free(con->test.commit);
+	free(branch);
+	free(commit);
 	sendf(con->ssl, "c", r ? RESPONSEFAIL : RESPONSEOK);
 	return r;
 }
 
 int handle_log_test(struct connection *con, sqlite3 *db) {
+	int64_t id;
+	if (recvf(con->ssl, "q", &id))
+		return 1;
+
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,
+			"SELECT type, status, maintime, increment, alpha, beta, llr, "
+			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
+			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4 "
+			"FROM test WHERE id = ?;",
+			-1, &stmt, NULL);
+	sqlite3_bind_int64(stmt, 1, id);
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
+		sendf(con->ssl, "c", 0);
+		char type = sqlite3_column_int(stmt, 0);
+		char status = sqlite3_column_int(stmt, 1);
+		double maintime = sqlite3_column_double(stmt, 2);
+		double increment = sqlite3_column_double(stmt, 3);
+		double alpha = sqlite3_column_double(stmt, 4);
+		double beta = sqlite3_column_double(stmt, 5);
+		double llr = sqlite3_column_double(stmt, 6);
+		double elo0 = sqlite3_column_double(stmt, 7);
+		double elo1 = sqlite3_column_double(stmt, 8);
+		double eloe = sqlite3_column_double(stmt, 9);
+		double elo = sqlite3_column_double(stmt, 10);
+		double pm = sqlite3_column_double(stmt, 11);
+		const char *branch = (const char *)sqlite3_column_text(stmt, 12);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 13);
+		int64_t qtime = sqlite3_column_int64(stmt, 14);
+		int64_t stime = sqlite3_column_int64(stmt, 15);
+		int64_t dtime = sqlite3_column_int64(stmt, 16);
+		uint32_t t0 = sqlite3_column_int(stmt, 17);
+		uint32_t t1 = sqlite3_column_int(stmt, 18);
+		uint32_t t2 = sqlite3_column_int(stmt, 19);
+		uint32_t p0 = sqlite3_column_int(stmt, 20);
+		uint32_t p1 = sqlite3_column_int(stmt, 21);
+		uint32_t p2 = sqlite3_column_int(stmt, 22);
+		uint32_t p3 = sqlite3_column_int(stmt, 23);
+		uint32_t p4 = sqlite3_column_int(stmt, 24);
+		sendf(con->ssl, "ccDDDDDDDDDDssqqqLLLLLLLL",
+				type, status, maintime, increment, alpha, beta, llr,
+				elo0, elo1, eloe, elo, pm, branch, commit, qtime, stime, dtime,
+				t0, t1, t2, p0, p1, p2, p3, p4);
+
+	}
+	else {
+		sendf(con->ssl, "c", 1);
+	}
+	
+	sqlite3_finalize(stmt);
+
 	return 0;
 }
 
@@ -104,7 +152,10 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		filter[4] = TESTRUN;
 		break;
 	case OLDTESTDONE:
-		filter[0] = filter[1] = filter[2] = filter[3] = filter[4] = TESTDONE;
+		filter[0] = filter[1] = TESTINCONCLUSIVE;
+		filter[2] = TESTH0;
+		filter[3] = TESTH1;
+		filter[4] = TESTELO;
 		break;
 	case OLDTESTCANCELLED:
 		filter[0] = filter[1] = filter[2] = filter[3] = filter[4] = TESTCANCEL;
@@ -128,7 +179,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		return 1;
 
 	sqlite3_prepare_v2(db,
-			"SELECT id, type, status, maintime, increment, alpha, beta, llh, "
+			"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
 			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
 			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4 "
 			"FROM test WHERE status = ? or status = ? "
@@ -157,7 +208,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		double increment = sqlite3_column_double(stmt, 4);
 		double alpha = sqlite3_column_double(stmt, 5);
 		double beta = sqlite3_column_double(stmt, 6);
-		double llh = sqlite3_column_double(stmt, 7);
+		double llr = sqlite3_column_double(stmt, 7);
 		double elo0 = sqlite3_column_double(stmt, 8);
 		double elo1 = sqlite3_column_double(stmt, 9);
 		double eloe = sqlite3_column_double(stmt, 10);
@@ -184,7 +235,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		}
 		/* Send the data. */
 		if (sendf(con->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
-				id, type, status, maintime, increment, alpha, beta, llh,
+				id, type, status, maintime, increment, alpha, beta, llr,
 				elo0, elo1, eloe, elo, pm, branch, commit, qtime, stime, dtime,
 				t0, t1, t2, p0, p1, p2, p3, p4)) {
 			error = 1;

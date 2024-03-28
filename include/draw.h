@@ -7,8 +7,8 @@
 #include "color.h"
 #include "state.h"
 
-#define LINESMIN 38
-#define COLSMIN 68
+#define LINESMIN 42
+#define COLSMIN 75
 
 void draw_border(WINDOW *win, struct color *bg, struct color *upper, struct color *lower, int fill, int ymin, int xmin, int ysize, int xsize);
 

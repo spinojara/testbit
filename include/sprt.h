@@ -7,7 +7,6 @@
 
 enum {
 	TESTQUEUE,
-	TESTDONE,
 	TESTRUN,
 	TESTCANCEL,
 	TESTERRBRANCH,
@@ -15,6 +14,11 @@ enum {
 	TESTERRPATCH,
 	TESTERRMAKE,
 	TESTERRRUN,
+
+	TESTINCONCLUSIVE,
+	TESTH0,
+	TESTH1,
+	TESTELO,
 };
 
 enum {
@@ -22,16 +26,6 @@ enum {
 	TESTTYPEELO,
 };
 
-enum {
-	HINCONCLUSIVE,
-	H0,
-	H1,
-	HERROR,
-	HCANCEL,
-};
-
-void setup_sprt(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
-		double increment, double alpha, double beta, double elo0,
-		double elo1, double eloe, const char *branch, const char *commit);
+void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe);
 
 #endif

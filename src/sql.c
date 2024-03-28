@@ -1,6 +1,8 @@
 #include "sql.h"
 
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 void sqlite3_errout(sqlite3 *db, const char *file, int line) {
 	fprintf(stderr, "%s:%d: error: %s\n", file, line, sqlite3_errmsg(db));
@@ -27,8 +29,7 @@ int init_db(sqlite3 **db) {
 			"donetime   INTEGER, "
 			"elo        REAL, "
 			"pm         REAL, "
-			"result     INTEGER, "
-			"llh        REAL, "
+			"llr        REAL, "
 			"t0         INTEGER, "
 			"t1         INTEGER, "
 			"t2         INTEGER, "
@@ -67,18 +68,19 @@ int init_db(sqlite3 **db) {
 	return 0;
 }
 
-#if 0
-int queue_tests(sqlite3 *db, struct fds *fds) {
+int start_tests(sqlite3 *db, struct fds *fds) {
+	uint32_t games = 65536;
 	int r;
 	sqlite3_stmt *stmt;
 	for (int i = 0; i < fds->fd_count; i++) {
+		int error = 0;
 		struct connection *con = &fds->cons[i];
-		if (con->status != STATUSNODEWAIT)
+		if (con->type != TYPENODE || con->status != STATUSWAIT || !con->privileged)
 			continue;
 
 		r = sqlite3_prepare_v2(db,
-				"SELECT id, maintime, increment, alpha, beta, "
-				"elo0, elo1, eloerror, testtype, patch, branch, commithash "
+				"SELECT id, type, maintime, increment, alpha, beta, "
+				"elo0, elo1, eloe, branch, commithash "
 				"FROM test WHERE status = ? ORDER BY queuetime ASC LIMIT 1;",
 				-1, &stmt, NULL);
 		if (r != SQLITE_OK) {
@@ -87,34 +89,93 @@ int queue_tests(sqlite3 *db, struct fds *fds) {
 		}
 		sqlite3_bind_int(stmt, 1, TESTQUEUE);
 
-		switch (sqlite3_step(stmt)) {
-		case SQLITE_ROW:
+		r = sqlite3_step(stmt);
+		if (r == SQLITE_DONE)
 			break;
-		case SQLITE_DONE:
-			i = fds->fd_count;
-			break;
-		default:
-			sqlite3_errout(db, __FILE__, __LINE__);
-			return 1;
+
+		con->status = STATUSRUN;
+
+		con->id = sqlite3_column_int64(stmt, 0);
+		char type = sqlite3_column_int(stmt, 1);
+		double maintime = sqlite3_column_double(stmt, 2);
+		double increment = sqlite3_column_double(stmt, 3);
+		double alpha = sqlite3_column_double(stmt, 4);
+		double beta = sqlite3_column_double(stmt, 5);
+		double elo0 = sqlite3_column_double(stmt, 6);
+		double elo1 = sqlite3_column_double(stmt, 7);
+		double eloe = sqlite3_column_double(stmt, 8);
+
+		const char *branch = (const char *)sqlite3_column_text(stmt, 9);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 10);
+
+		char path[4096];
+		sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
+		int fd;
+
+		if ((fd = open(path, O_RDONLY, 0)) < 0) {
+			fprintf(stderr, "Failed to open %s\n", path);
+			exit(10);
 		}
 
-		con->status = STATUSNODERUN;
+		if (sendf(con->ssl, "cDDDDDDDLssf",
+				type, maintime, increment,
+				alpha, beta, elo0, elo1, eloe,
+				games, branch, commit, fd))
+			error = 1;
 
-		con->id = sqlite3_column_int(stmt, 0);
-		con->maintime = sqlite3_column_int(stmt, 1);
-		con->increment = sqlite3_column_int(stmt, 2);
-		con->alpha = sqlite3_column_double(stmt, 3);
-		con->beta = sqlite3_column_double(stmt, 4);
-		con->elo0 = sqlite3_column_double(stmt, 5);
-		con->elo1 = sqlite3_column_double(stmt, 6);
-		con->eloerror = sqlite3_column_double(stmt, 7);
-		con->testtype = sqlite3_column_int(stmt, 8);
+		sqlite3_finalize(stmt);
+		close(fd);
 
-		con->patch = (const char *)sqlite3_column_text(stmt, 9);
-		con->branch = (const char *)sqlite3_column_text(stmt, 10);
-		con->commit = (const char *)sqlite3_column_text(stmt, 11);
+		if (error)
+			continue;
+
+		sqlite3_prepare_v2(db,
+				"UPDATE test SET starttime = unixepoch(), "
+				"status = ?, t0 = ?, t1 = ?, t2 = ?, "
+				"p0 = ?, p1 = ?, p2 = ?, p3 = ?, p4 = ? "
+				"WHERE id = ?;",
+				-1, &stmt, NULL);
+
+		sqlite3_bind_int(stmt, 1, TESTRUN);
+		sqlite3_bind_int(stmt, 2, 0);
+		sqlite3_bind_int(stmt, 3, 0);
+		sqlite3_bind_int(stmt, 4, 0);
+		sqlite3_bind_int(stmt, 5, 0);
+		sqlite3_bind_int(stmt, 6, 0);
+		sqlite3_bind_int(stmt, 7, 0);
+		sqlite3_bind_int(stmt, 8, 0);
+		sqlite3_bind_int(stmt, 9, 0);
+		sqlite3_bind_int64(stmt, 10, con->id);
+
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
 	}
 
 	return 0;
 }
-#endif
+
+void requeue_test(sqlite3 *db, int64_t id) {
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,
+			"UPDATE test SET status = ? WHERE id = ?;",
+			-1, &stmt, NULL);
+
+	sqlite3_bind_int(stmt, 1, TESTQUEUE);
+	sqlite3_bind_int64(stmt, 2, id);
+
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+}
+
+int start_test(sqlite3 *db, int64_t id) {
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,
+			"UPDATE test SET starttime = unixepoch() WHERE id = ?;",
+			-1, &stmt, NULL);
+
+	sqlite3_bind_int64(stmt, 1, id);
+
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+	return 0;
+}

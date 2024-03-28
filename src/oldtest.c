@@ -9,18 +9,31 @@
 #include "con.h"
 #include "req.h"
 #include "util.h"
+#include "active.h"
+#include "done.h"
+#include "single.h"
 
 const int refresh_interval = 30;
 
 int load_oldtest(struct oldteststate *os);
 
 void handle_oldtest(struct oldteststate *os, chtype ch) {
+	if (os->single) {
+		handle_single(os, ch);
+		return;
+	}
+
 	int update = 0;
 	switch (ch) {
 	case KEY_UP:
 	case 'k':
 		if (os->selected > 0) {
 			os->selected--;
+			update = 1;
+		}
+		else if (os->page > 0) {
+			os->page--;
+			os->selected = os->page_size - 1;
 			update = 1;
 		}
 		break;
@@ -30,24 +43,41 @@ void handle_oldtest(struct oldteststate *os, chtype ch) {
 			os->selected++;
 			update = 1;
 		}
+		else if (os->selected == os->page_size - 1) {
+			os->page++;
+			os->selected = 0;
+			update = 1;
+		}
+		break;
+	case '\n':
+		if (os->tests > 0) {
+			os->single = 1;
+			handle_single(os, 'r');
+			return;
+		}
+		/* fallthrough */
+	case 'r':
+		os->last_loaded = 0;
+		break;
+	default:
 		break;
 	}
 
-	if (update)
+	os->selected_id = os->test[os->selected].id;
+	if (update || time(NULL) - os->last_loaded > refresh_interval)
 		draw_oldtest(os, 1, 1);
 }
 
 /* NULL terminated list of args. */
-void draw_dynamic(struct oldteststate *os, ...) {
-	
+void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststate *os, int i, int j), ...) {
 	va_list ap;
 
 	int tests = os->tests + 1;
 
 	int x = 1;
 
-	va_start(ap, os);
-	while (1) {
+	va_start(ap, attr);
+	for (int j = 0; ; j++) {
 		const char (*strs)[128] = va_arg(ap, const char (*)[128]);
 		if (!strs)
 			break;
@@ -70,8 +100,10 @@ void draw_dynamic(struct oldteststate *os, ...) {
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);
 			if (x == 1)
 				mvwprintw(os->win, y, 1, " %c ", selected ? '*' : ' ');
-			else
+			else {
+				attr(os, i, j);
 				mvwprintw(os->win, y, x + 1 + align_right * (maxlen - len), "%s", strs[i]);
+			}
 			wattrset(os->win, cs.textdim.attr);
 			if (x == 1) {
 				wattrset(os->win, cs.text.attr);
@@ -142,108 +174,8 @@ char *fstr(char *s, double f, int n) {
 	return s;
 }
 
-void draw_active(struct oldteststate *os) {
-	int tests = os->tests + 1;
-
-	char (*select)[128] = calloc(tests, sizeof(*select));
-	char (*id)[128] = calloc(tests, sizeof(*id));
-	char (*tc)[128] = calloc(tests, sizeof(*tc));
-	char (*elo)[128] = calloc(tests, sizeof(*elo));
-	char (*llh)[128] = calloc(tests, sizeof(*llh));
-	char (*ab)[128] = calloc(tests, sizeof(*ab));
-	char (*elo0)[128] = calloc(tests, sizeof(*elo0));
-	char (*elo1)[128] = calloc(tests, sizeof(*elo1));
-	char (*eloe)[128] = calloc(tests, sizeof(*eloe));
-	char (*tri)[128] = calloc(tests, sizeof(*tri));
-	char (*penta)[128] = calloc(tests, sizeof(*penta));
-	char (*qtime)[128] = calloc(tests, sizeof(*qtime));
-	char (*stime)[128] = calloc(tests, sizeof(*stime));
-	char (*branch)[128] = calloc(tests, sizeof(*branch));
-	char (*commit)[128] = calloc(tests, sizeof(*commit));
-
-	sprintf(select[0], " ");
-	sprintf(id[0], "Id");
-	sprintf(tc[0], "TC");
-	sprintf(elo[0], "Elo");
-	sprintf(llh[0], "LLH");
-	sprintf(ab[0], "(A,B)");
-	sprintf(elo0[0], "Elo0");
-	sprintf(elo1[0], "Elo1");
-	sprintf(eloe[0], "EloE");
-	sprintf(tri[0], "Trinomial");
-	sprintf(penta[0], "Pentanomial");
-	sprintf(qtime[0], "Queue Timestamp");
-	sprintf(stime[0], "Start Timestamp");
-	sprintf(branch[0], "Branch");
-	sprintf(commit[0], "Commit");
-
-	char tmp1[128], tmp2[128];
-	for (int i = 1; i < tests; i++) {
-		struct test *test = &os->test[i - 1];
-		test->alpha = test->beta = 0.025;
-		double A = log(test->beta / (1 - test->alpha));
-		double B = log((1 - test->beta) / test->alpha);
-
-		sprintf(id[i], "%ld", test->id);
-		sprintf(tc[i], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
-		/* Both branch[i] and commit[i] will be null terminated since
-		 * they were initialized to 0 by calloc.
-		 */
-		snprintf(branch[i], 127, "%s", test->branch);
-		snprintf(commit[i], 127, "%s", test->commit);
-		sprintf(qtime[i], "%s", iso8601local(tmp1, test->qtime));
-		if (test->status != TESTQUEUE) {
-			sprintf(elo[i], "%.2lf+%.2lf", test->elo, test->pm);
-			sprintf(tri[i], "%u-%u-%u", test->t0, test->t1, test->t2);
-			sprintf(penta[i], "%u-%u-%u-%u-%u", test->p0, test->p1, test->p2, test->p3, test->p4);
-			sprintf(stime[i], "%s", iso8601local(tmp1, test->stime));
-		}
-		else {
-			sprintf(elo[i], "N/A");
-			sprintf(tri[i], "N/A");
-			sprintf(penta[i], "N/A");
-			sprintf(stime[i], "N/A");
-		}
-		if (test->type == TESTTYPESPRT) {
-			if (test->status != TESTQUEUE) {
-				sprintf(llh[i], "%.2lf", test->llh);
-				sprintf(ab[i], "(%.2lf, %.2lf)", A, B);
-			}
-			else {
-				sprintf(llh[i], "N/A");
-				sprintf(ab[i], "N/A");
-			}
-			sprintf(elo0[i], "%.1lf", test->elo0);
-			sprintf(elo1[i], "%.1lf", test->elo1);
-			sprintf(eloe[i], "N/A");
-		}
-		else {
-			sprintf(llh[i], "N/A");
-			sprintf(ab[i], "N/A");
-			sprintf(elo0[i], "N/A");
-			sprintf(elo1[i], "N/A");
-			sprintf(eloe[i], "%.1lf", test->eloe);
-		}
-	}
-	
-	draw_dynamic(os, select, id, tc, elo, tri, penta, llh, ab, elo0, elo1, eloe, qtime, stime, branch, commit, NULL);
-
-	free(id);
-	free(tc);
-	free(elo);
-	free(llh);
-	free(ab);
-	free(elo0);
-	free(elo1);
-	free(eloe);
-	free(tri);
-	free(penta);
-	free(qtime);
-	free(stime);
-}
-
 void draw_oldtest(struct oldteststate *os, int lazy, int load) {
-	if (load && time(NULL) - os->last_loaded > refresh_interval) {
+	if (load && (time(NULL) - os->last_loaded > refresh_interval || os->page_loaded != os->page)) {
 		load_oldtest(os);
 		lazy = 0;
 	}
@@ -254,6 +186,11 @@ void draw_oldtest(struct oldteststate *os, int lazy, int load) {
 	switch (os->type) {
 	case OLDTESTACTIVE:
 		draw_active(os);
+		break;
+	case OLDTESTDONE:
+	case OLDTESTCANCELLED:
+	case OLDTESTFAILED:
+		draw_done(os);
 		break;
 	}
 
@@ -270,6 +207,7 @@ void resize_oldtest(struct oldteststate *os) {
 	}
 
 	os->last_loaded = 0;
+	os->page_loaded = 0;
 	os->tests = 0;
 	os->page = 0;
 	os->page_size = (LINES - 12) / 2;
@@ -283,19 +221,23 @@ void resize_oldtest(struct oldteststate *os) {
 }
 
 int load_oldtest(struct oldteststate *os) {
+	os->last_loaded = time(NULL);
+	os->page_loaded = os->page;
 	int64_t min = os->page_size * os->page;
 	int64_t max = os->page_size + min;
 	if (sendf(os->ssl, "ccqq", REQUESTLOGTEST, os->type, min, max))
 		return 1;
 
 	char done;
-	for (int i = 0; i < max - min; i++) {
+	for (int i = 0; ; i++) {
 		if (recvf(os->ssl, "c", &done))
 			return 1;
-		if (done)
-			break;
 		if (i == 0)
 			os->tests = 0;
+		if (done)
+			break;
+		if (i >= os->page_size)
+			continue;
 		os->tests++;
 
 		struct test *test = &os->test[i];
@@ -303,16 +245,24 @@ int load_oldtest(struct oldteststate *os) {
 		if (recvf(os->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
 					&test->id, &test->type, &test->status,
 					&test->maintime, &test->increment, &test->alpha,
-					&test->beta, &test->llh, &test->elo0,
+					&test->beta, &test->llr, &test->elo0,
 					&test->elo1, &test->eloe, &test->elo,
 					&test->pm, &test->branch, &test->commit,
 					&test->qtime, &test->stime, &test->dtime,
 					&test->t0, &test->t1, &test->t2, &test->p0,
 					&test->p1, &test->p2, &test->p3, &test->p4))
 			return 1;
+
+		if (os->selected_id == test->id)
+			os->selected = i;
 	}
 
-	os->last_loaded = time(NULL);
+	if (!os->tests && os->page > 0) {
+		os->page--;
+		return load_oldtest(os);
+	}
+	os->selected = clamp(os->selected, 0, os->tests - 1);
+	os->selected_id = os->test[os->selected].id;
 
 	return 0;
 }

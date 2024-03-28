@@ -8,6 +8,7 @@
 
 struct test {
 	int64_t id;
+	int fd;
 
 	char type;
 	char status;
@@ -20,7 +21,7 @@ struct test {
 	double elo1;
 	double eloe;
 
-	double llh;
+	double llr;
 	double elo, pm;
 
 	int64_t qtime, stime, dtime;
@@ -38,9 +39,13 @@ struct oldteststate {
 	int type;
 
 	time_t last_loaded;
+	int page_loaded;
 
 	int tests;
 	int selected;
+	int64_t selected_id;
+	int single;
+	struct test singletest;
 	struct test *test;
 	
 	int page_size;

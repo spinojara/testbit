@@ -1,190 +1,196 @@
-#define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 1
 #include "sprt.h"
 
-#include <stdlib.h>
+#include <math.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <fcntl.h>
 
-#include "con.h"
 #include "util.h"
+#include "req.h"
+#include "elo.h"
 
-int git_clone(char *dtemp, const char *branch, const char *commit) {
-	int wstatus;
-	pid_t pid;
+enum {
+	RESULTNONE = -1,
+	RESULTLOSS,
+	RESULTDRAW,
+	RESULTWIN,
+};
 
-	if (chdir("/tmp")) {
-		fprintf(stderr, "error: chdir /tmp\n");
-		exit(7);
+struct game {
+	int done;
+	int result;
+};
+
+void parse_finished_game(char *line, struct game *game) {
+	int n = strtol(line + 14, NULL, 10) - 1;
+
+	int white = n % 2;
+
+	int result = RESULTNONE;
+
+	int error = 0;
+	if (strstr(line, "1-0")) {
+		if (result != RESULTNONE)
+			error = 1;
+		result = white ? RESULTWIN : RESULTLOSS;
+	}
+	if (strstr(line, "0-1")) {
+		if (result != RESULTNONE)
+			error = 1;
+		result = white ? RESULTLOSS : RESULTWIN;
+	}
+	if (strstr(line, "1/2-1/2")) {
+		if (result != RESULTNONE)
+			error = 1;
+		result = RESULTDRAW;
 	}
 
-	if (!mkdtemp(dtemp)) {
-		fprintf(stderr, "error: mkdtemp %s\n", dtemp);
-		exit(8);
-	}
-
-	pid = fork();
-	if (pid == -1)
-		exit(9);
-
-	if (pid == 0) {
-		execlp("git", "git", "clone",
-				"https://github.com/Spinojara/bitbit.git",
-				"--branch", branch,
-				"--single-branch",
-				dtemp, (char *)NULL);
-		fprintf(stderr, "error: exec git clone\n");
-		exit(10);
-	}
-
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(11);
-	}
-
-	if (chdir(dtemp)) {
-		fprintf(stderr, "error: chdir %s\n", dtemp);
-		exit(12);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		fprintf(stderr, "error: git clone\n");
-		return 1;
-	}
-
-	pid = fork();
-	if (pid == -1)
-		exit(13);
-
-	if (pid == 0) {
-		execlp("git", "git", "reset", "--hard", commit, (char *)NULL);
-		fprintf(stderr, "error: exec git reset\n");
-		exit(14);
-	}
-
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(15);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		fprintf(stderr, "error: git reset\n");
-		return 2;
-	}
-
-	return 0;
+	game[n].done = 1;
+	game[n].result = error ? RESULTNONE : result;
 }
 
-int git_patch(void) {
+int run_games(int games, int nthreads, double maintime, double increment, int32_t tri[3], int32_t penta[5]) {
 	int wstatus;
+
+	char gamesstr[1024];
+	char concurrencystr[1024];
+	char tc[1024];
+	sprintf(gamesstr, "%d", games);
+	sprintf(concurrencystr, "%d", nthreads);
+	sprintf(tc, "tc=%lg+%lg", maintime, increment);
+
+	int pipefd[2];
+	if (pipe(pipefd))
+		exit(28);
+
 	pid_t pid = fork();
 	if (pid == -1)
-		exit(21);
+		exit(29);
 
 	if (pid == 0) {
-		execlp("git", "git", "apply", "patch", (char *)NULL);
-		fprintf(stderr, "error: exec git apply\n");
-		exit(22);
+		close(pipefd[0]);
+		close(STDOUT_FILENO);
+
+		dup2(pipefd[1], STDOUT_FILENO);
+
+		execlp("cutechess-cli", "cutechess-cli",
+				"-variant", "standard",
+				"-tournament", "gauntlet",
+				"-draw", "movenumber=80", "movecount=8", "score=20",
+				"-concurrency", concurrencystr,
+				"-each", tc, "proto=uci",
+				"-games", gamesstr,
+				"-openings", "format=epd", "file=etc/book/testbit-50cp5d6m100k.epd", "order=random",
+				"-repeat",
+				"-engine", "cmd=./bitbitold", "name=bitbitold",
+				"-engine", "cmd=./bitbit",
+				(char *)NULL);
+		fprintf(stderr, "error: exec cutechess-cli");
+		exit(30);
 	}
 
 	if (waitpid(pid, &wstatus, 0) == -1) {
 		fprintf(stderr, "error: waitpid\n");
-		exit(23);
+		exit(31);
 	}
 
 	if (WEXITSTATUS(wstatus)) {
-		fprintf(stderr, "error: git apply\n");
+		close(pipefd[0]);
+		close(pipefd[1]);
 		return 1;
 	}
 
-	return 0;
+	struct game *game = calloc(games, sizeof(*game));
+
+	close(pipefd[1]);
+	FILE *f = fdopen(pipefd[0], "r");
+	if (!f) {
+		fprintf(stderr, "error: fdopen cutechess-cli\n");
+		exit(31);
+	}
+
+	char line[BUFSIZ];
+	while (fgets(line, sizeof(line), f)) {
+		printf("%s", line);
+		if (!strstr(line, "Finished game"))
+			continue;
+		parse_finished_game(line, game);
+	}
+
+	int error = 0;
+
+	for (int pair = 0; pair < games / 2; pair++) {
+		int first = 2 * pair;
+		int second = 2 * pair + 1;
+
+		first = game[first].result;
+		second = game[second].result;
+
+		if (first == RESULTNONE || second == RESULTNONE) {
+			error = 1;
+			break;
+		}
+
+		penta[first + second]++;
+		tri[first]++;
+		tri[second]++;
+	}
+
+	fclose(f);
+	free(game);
+
+	return error;
 }
 
-int make(void) {
-	int wstatus;
-	pid_t pid = fork();
-	if (pid == -1)
-		exit(24);
+void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe) {
+	games = (games / 2) * 2;
 
-	if (pid == 0) {
-		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
-		fprintf(stderr, "error: exec make\n");
-		exit(25);
+	double A = log(beta / (1.0 - alpha));
+	double B = log((1.0 - beta) / alpha);
+
+	int32_t tri[3] = { 0 };
+	int32_t penta[5] = { 0 };
+
+	double gametime = maintime + 100 * increment;
+	int batch_size = 2 * max(1, 60.0 * nthreads / gametime);
+
+	char status = TESTINCONCLUSIVE;
+
+	while (games > 0 && status == TESTINCONCLUSIVE) {
+		int batch = min(batch_size, games);
+		if (run_games(batch, nthreads, maintime, increment, tri, penta)) {
+			status = TESTERRRUN;
+			break;
+		}
+
+		double llr;
+		double elo, pm;
+ 		llr = type == TESTTYPESPRT ? loglikelihoodratio(penta, elo0, elo1) : 0.0 / 0.0;
+		elo = elo_calc(penta, &pm);
+
+		if (type == TESTTYPESPRT) {
+			if (llr >= B)
+				status = TESTH1;
+			else if (llr <= A)
+				status = TESTH0;
+		}
+		else if (type == TESTTYPEELO) {
+			if (fabs(pm) <= eloe)
+				status = TESTELO;
+		}
+
+		char cancel;
+		if (sendf(ssl, "cllllllllDDD",
+					REQUESTNODEUPDATE,
+					tri[0], tri[1], tri[2],
+					penta[0], penta[1], penta[2], penta[3], penta[4],
+					llr, elo, pm) ||
+				recvf(ssl, "c", &cancel) || cancel || status != TESTINCONCLUSIVE)
+			break;
+
+		games -= batch;
 	}
-
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(26);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		fprintf(stderr, "error: make\n");
-		return 1;
-	}
-
-	return 0;
-}
-
-void setup_sprt(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
-		double increment, double alpha, double beta, double elo0,
-		double elo1, double eloe, const char *branch, const char *commit) {
-
-	char dtemp[] = "bitbit-testbitn-XXXXXX";
-	int r, fd, error = 0;
-	if ((r = git_clone(dtemp, branch, commit))) {
-		sendf(ssl, "c", r == 1 ? TESTERRBRANCH : TESTERRCOMMIT);
-		error = 1;
-	}
-	/* We are now inside dtemp even if an error occured. */
-	if ((fd = open("patch", O_WRONLY | O_CREAT, 0644)) < 0) {
-		fprintf(stderr, "open patch\n");
-		exit(16);
-	}
-
-	if (recvf(ssl, "f", fd))
-		exit(20);
-
-	if (close(fd)) {
-		fprintf(stderr, "error: close patch\n");
-		exit(17);
-	}
-
-	if (error)
-		goto cleanup;
-
-	if (make()) {
-		/* This should probably never fail. But if a bad commit
-		 * is pushed to the github it can fail.
-		 */
-		sendf(ssl, "c", TESTERRMAKE);
-		goto cleanup;
-	}
-
-	if (rename("bitbit", "bitbitold")) {
-		fprintf(stderr, "error: rename\n");
-		exit(27);
-	}
-
-	if (git_patch()) {
-		sendf(ssl, "c", TESTERRPATCH);
-		goto cleanup;
-	}
-
-	if (make()) {
-		sendf(ssl, "c", TESTERRMAKE);
-		goto cleanup;
-	}
-
-	sprt(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe);
-
-cleanup:
-	if (chdir("/tmp")) {
-		fprintf(stderr, "error: chdir /tmp\n");
-		exit(18);
-	}
-
-	if (rmdir_r(dtemp)) {
-		fprintf(stderr, "error: rmdir %s\n", dtemp);
-		exit(19);
-	}
+	
+	sendf(ssl, "cc", REQUESTNODEDONE, status);
 }

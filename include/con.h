@@ -17,7 +17,6 @@ enum {
 
 struct contest {
 	char status;
-	int64_t id;
 
 	char type;
 
@@ -35,9 +34,10 @@ struct contest {
 
 struct connection {
 	char type;
+	char status;
 	char privileged;
 	
-	struct contest test;
+	int64_t id;
 
 	SSL *ssl;
 };

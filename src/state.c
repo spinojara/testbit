@@ -12,9 +12,13 @@ void init_state(struct state *st, SSL *ssl, int selected) {
 	st->cs.ssl = ssl;
 
 	st->as.type = OLDTESTACTIVE;
+	st->as.single = 0;
 	st->ds.type = OLDTESTDONE;
+	st->ds.single = 0;
 	st->fs.type = OLDTESTFAILED;
+	st->fs.single = 0;
 	st->cs.type = OLDTESTCANCELLED;
+	st->cs.single = 0;
 
 	st->win = newwin(0, 0, 0, 0);
 	keypad(st->win, TRUE);

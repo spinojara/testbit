@@ -5,10 +5,11 @@
 
 #include "con.h"
 #include "req.h"
-#include "sprt.h"
+#include "setup.h"
 
 void nodeloop(SSL *ssl, int nthreads) {
 	char password[128], response = RESPONSEPERMISSIONDENIED;
+	printf("Enter Passphrase: ");
 	if (read_secret(password, sizeof(password)))
 		exit(4);
 
@@ -35,7 +36,7 @@ void nodeloop(SSL *ssl, int nthreads) {
 					&eloe, &games, &branch, &commit))
 			exit(6);
 
-		setup_sprt(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe, branch, commit);
+		setup(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe, branch, commit);
 
 		free(branch);
 		free(commit);
