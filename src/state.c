@@ -2,6 +2,7 @@
 
 #include "newtest.h"
 #include "oldtest.h"
+#include "single.h"
 
 void init_state(struct state *st, SSL *ssl, int selected) {
 	st->selected = selected;
@@ -12,13 +13,13 @@ void init_state(struct state *st, SSL *ssl, int selected) {
 	st->cs.ssl = ssl;
 
 	st->as.type = OLDTESTACTIVE;
-	st->as.single = 0;
+	st->as.fd = -1;
 	st->ds.type = OLDTESTDONE;
-	st->ds.single = 0;
+	st->ds.fd = -1;
 	st->fs.type = OLDTESTFAILED;
-	st->fs.single = 0;
+	st->fs.fd = -1;
 	st->cs.type = OLDTESTCANCELLED;
-	st->cs.single = 0;
+	st->cs.fd = -1;
 
 	st->win = newwin(0, 0, 0, 0);
 	keypad(st->win, TRUE);
@@ -59,4 +60,14 @@ void term_state(struct state *st) {
 	free(st->cs.test);
 
 	term_newtest(&st->ns);
+
+	free_single(&st->as);
+	free_single(&st->ds);
+	free_single(&st->fs);
+	free_single(&st->cs);
+
+	free_oldtest(&st->as);
+	free_oldtest(&st->ds);
+	free_oldtest(&st->fs);
+	free_oldtest(&st->cs);
 }

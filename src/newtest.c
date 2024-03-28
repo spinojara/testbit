@@ -200,6 +200,8 @@ void term_newtest(struct newteststate *ns) {
 	delete_prompt(&ns->prompt[PROMPTELO0]);
 	delete_prompt(&ns->prompt[PROMPTELO1]);
 	delete_prompt(&ns->prompt[PROMPTELOE]);
+	delete_prompt(&ns->prompt[PROMPTBRANCH]);
+	delete_prompt(&ns->prompt[PROMPTCOMMIT]);
 	delete_prompt(&ns->prompt[PROMPTPATH]);
 }
 

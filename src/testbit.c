@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <signal.h>
 
+#include <ncurses.h>
+
 #include "ssl.h"
 #include "con.h"
 #include "tui.h"

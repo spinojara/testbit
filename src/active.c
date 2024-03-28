@@ -124,7 +124,7 @@ void draw_active(struct oldteststate *os) {
 		}
 	}
 	
-	draw_dynamic(os, &attr, select, status, tc, elo, tri, penta, llr, ab, elo0, elo1, eloe, eta, qtime, stime, branch, commit, NULL);
+	draw_dynamic(os, &attr, select, status, tc, elo, tri, penta, llr, ab, elo0, elo1, eloe, eta, stime, qtime, branch, commit, NULL);
 
 	free(select);
 	free(status);

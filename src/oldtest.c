@@ -74,7 +74,7 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 
 	int tests = os->tests + 1;
 
-	int x = 1;
+	int x = 3;
 
 	va_start(ap, attr);
 	for (int j = 0; ; j++) {
@@ -89,45 +89,63 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 				maxlen = len;
 		}
 
-		if (x + maxlen + 3 >= getmaxx(os->win))
+		if (x + maxlen + 4 >= getmaxx(os->win))
 			continue;
 
 		for (int i = 0; i < tests; i++) {
-			int y = 1 + 2 * i;
+			int y = 2 + 2 * i;
 			int align_right = isdigit(strs[i][0]) || strs[i][0] == '.';
-			int selected = i == os->selected + 1 && x == 1;
+			int selected = i == os->selected + 1 && j == 0;
 			int len = strlen(strs[i]);
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);
-			if (x == 1)
-				mvwprintw(os->win, y, 1, " %c ", selected ? '*' : ' ');
+			if (j == 0)
+				mvwprintw(os->win, y, x, " %c ", selected ? '*' : ' ');
 			else {
 				attr(os, i, j);
 				mvwprintw(os->win, y, x + 1 + align_right * (maxlen - len), "%s", strs[i]);
 			}
 			wattrset(os->win, cs.textdim.attr);
-			if (x == 1) {
-				wattrset(os->win, cs.text.attr);
-				mvwaddch(os->win, y + 1, 0, ACS_LTEE);
-				wattrset(os->win, cs.textdim.attr);
+			mvwhline(os->win, y - 1, x, 0, maxlen + 2);
+			mvwhline(os->win, y + 1, x, 0, maxlen + 2);
+			mvwaddch(os->win, y, x - 1, ACS_VLINE);
+			mvwaddch(os->win, y, x + maxlen + 2, ACS_VLINE);
+			if (j == 0) {
+				if (i == 0)
+					mvwaddch(os->win, y - 1, x - 1, ACS_ULCORNER);
+				else
+					mvwaddch(os->win, y - 1, x - 1, ACS_LTEE);
+				if (i == tests - 1)
+					mvwaddch(os->win, y + 1, x - 1, ACS_LLCORNER);
 			}
+			else if (i == 0) {
+				mvwaddch(os->win, y - 1, x - 1, ACS_TTEE);
+				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_URCORNER);
+			}
+			else {
+				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_RTEE);
+				mvwaddch(os->win, y - 1, x - 1, ACS_PLUS);
+			}
+			if (j > 0) {
+				mvwaddch(os->win, y + 1, x - 1, ACS_BTEE);
+			}
+			if (i == tests - 1) {
+				mvwaddch(os->win, y + 1, x + maxlen + 2, ACS_LRCORNER);
+			}
+#if 0
 			else {
 				if (i == tests - 1)
 					mvwaddch(os->win, y + 1, x - 1, ACS_BTEE);
 				if (i == 0) {
-					wattrset(os->win, cs.text.attr);
-					mvwaddch(os->win, 0, x - 1, ACS_TTEE);
-					wattrset(os->win, cs.textdim.attr);
+					mvwaddch(os->win, y - 1, x - 1, ACS_TTEE);
 				}
 				else {
 					mvwaddch(os->win, y - 1, x - 1, ACS_PLUS);
 				}
 			}
-			/* An extra refresh to fix stuttering. */
-			wrefresh(os->win);
+#endif
+#if 0
 			if (i == 0) {
-				wattrset(os->win, cs.text.attr);
-				mvwaddch(os->win, 0, x + maxlen + 2, ACS_TTEE);
-				wattrset(os->win, cs.textdim.attr);
+				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_TTEE);
 			}
 			if (0 < i && i <= tests - 1)
 				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_RTEE);
@@ -135,12 +153,13 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 				mvwaddch(os->win, y + 1, x + maxlen + 2, ACS_LRCORNER);
 			mvwaddch(os->win, y, x + maxlen + 2, ACS_VLINE);
 			mvwhline(os->win, y + 1, x, 0, maxlen + 2);
+#endif
 
-			wrefresh(os->win);
 		}
 
 		x += maxlen + 3;
 	}
+	wrefresh(os->win);
 	va_end(ap);
 }
 
@@ -199,18 +218,13 @@ void draw_oldtest(struct oldteststate *os, int lazy, int load) {
 }
 
 void resize_oldtest(struct oldteststate *os) {
-	if (os->test) {
-		for (int i = 0; i < os->page_size; i++) {
-			free(os->test[i].branch);
-			free(os->test[i].commit);
-		}
-	}
+	free_oldtest(os);
 
 	os->last_loaded = 0;
 	os->page_loaded = 0;
 	os->tests = 0;
 	os->page = 0;
-	os->page_size = (LINES - 12) / 2;
+	os->page_size = (LINES - 13) / 2;
 	os->selected = 0;
 
 	free(os->test);
@@ -242,6 +256,10 @@ int load_oldtest(struct oldteststate *os) {
 
 		struct test *test = &os->test[i];
 
+		free(test->branch);
+		free(test->commit);
+		test->branch = test->commit = NULL;
+
 		if (recvf(os->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
 					&test->id, &test->type, &test->status,
 					&test->maintime, &test->increment, &test->alpha,
@@ -265,4 +283,13 @@ int load_oldtest(struct oldteststate *os) {
 	os->selected_id = os->test[os->selected].id;
 
 	return 0;
+}
+
+void free_oldtest(struct oldteststate *os) {
+	if (os->test) {
+		for (int i = 0; i < os->page_size; i++) {
+			free(os->test[i].branch);
+			free(os->test[i].commit);
+		}
+	}
 }

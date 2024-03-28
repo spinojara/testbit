@@ -254,6 +254,27 @@ int handle_mod_test(struct connection *con, sqlite3 *db) {
 	return 0;
 }
 
+int handle_patch(struct connection *con) {
+	int64_t id;
+	if (recvf(con->ssl, "q", &id))
+		return 1;
+
+	char path[4096];
+	sprintf(path, "/var/lib/bitbit/patch/%ld", id);
+	int fd;
+	if ((fd = open(path, O_RDONLY, 0)) < 0) {
+		sendf(con->ssl, "c", 1);
+		return 0;
+	}
+	int error = 0;
+	if (sendf(con->ssl, "cf", 0, fd))
+		error = 1;
+
+	close(fd);
+
+	return error;
+}
+
 int handle_client_request(struct connection *con, sqlite3 *db, const char password[128]) {
 	char request;
 	if (recvf(con->ssl, "c", &request))
@@ -268,6 +289,8 @@ int handle_client_request(struct connection *con, sqlite3 *db, const char passwo
 		return con->privileged ? handle_mod_test(con, db) : 1;
 	case REQUESTLOGTEST:
 		return handle_log_tests(con, db);
+	case REQUESTPATCH:
+		return handle_patch(con);
 	default:
 		return 1;
 	}

@@ -8,7 +8,6 @@
 
 struct test {
 	int64_t id;
-	int fd;
 
 	char type;
 	char status;
@@ -44,9 +43,13 @@ struct oldteststate {
 	int tests;
 	int selected;
 	int64_t selected_id;
+
+	struct test *test;
+
 	int single;
 	struct test singletest;
-	struct test *test;
+	char path[128];
+	int fd;
 	
 	int page_size;
 	int page;

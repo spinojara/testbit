@@ -24,4 +24,6 @@ int powi(int a, int n);
 
 char *fstr(char *s, double f, int n);
 
+void free_oldtest(struct oldteststate *os);
+
 #endif
