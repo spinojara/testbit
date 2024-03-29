@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 
 	nodeloop(ssl, nthreads);
 
-	ssl_close(ssl);
+	ssl_close(ssl, 0);
 	SSL_CTX_free(ctx);
 
 	return 0;

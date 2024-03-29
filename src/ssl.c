@@ -72,9 +72,10 @@ int get_listener_socket(void) {
 	return listener;
 }
 
-void ssl_close(SSL *ssl) {
+void ssl_close(SSL *ssl, int fast) {
 	SSL_shutdown(ssl);
-	SSL_shutdown(ssl);
+	if (!fast)
+		SSL_shutdown(ssl);
 	SSL_free(ssl);
 }
 

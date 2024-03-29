@@ -16,14 +16,20 @@
 #include "sql.h"
 
 void init_fds(struct fds *fds) {
-	fds->fd_count = 1;
+	fds->fd_count = 2;
 	fds->fd_size = 4;
 	fds->pfds = malloc(fds->fd_size * sizeof(*fds->pfds));
 	fds->cons = malloc(fds->fd_size * sizeof(*fds->cons));
+
 	fds->pfds[0].fd = fds->listener;
 	fds->pfds[0].events = POLLIN;
 	fds->cons[0].type = TYPELISTENER;
 	fds->cons[0].privileged = 1;
+
+	fds->pfds[1].fd = STDIN_FILENO;
+	fds->pfds[1].events = POLLIN;
+	fds->cons[1].type = TYPESTDIN;
+	fds->cons[1].privileged = 1;
 }
 
 void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
@@ -51,7 +57,7 @@ void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
 
 void del_from_fds(struct fds *fds, int i) {
 	printf("closing %d\n", fds->pfds[i].fd);
-	ssl_close(fds->cons[i].ssl);
+	ssl_close(fds->cons[i].ssl, 1);
 	fds->pfds[i] = fds->pfds[fds->fd_count - 1];
 	fds->cons[i] = fds->cons[fds->fd_count - 1];
 	fds->fd_count--;
@@ -87,7 +93,7 @@ void handle_new_connection(SSL_CTX *ctx, struct fds *fds) {
 
 	char type;
 	if (recvexact(ssl, &type, 1)) {
-		ssl_close(ssl);
+		ssl_close(ssl, 1);
 		return;
 	}
 
@@ -97,13 +103,26 @@ void handle_new_connection(SSL_CTX *ctx, struct fds *fds) {
 		add_to_fds(fds, newfd, ssl, type);
 		break;
 	default:
-		ssl_close(ssl);
+		ssl_close(ssl, 1);
 		return;
 	}
 }
 
+void handle_stdin(int *running) {
+	char buf[BUFSIZ];
+	if (!fgets(buf, sizeof(buf), stdin) || !strcmp(buf, "quit\n"))
+		*running = 0;
+}
+
+static void sigint(int signum) {
+	(void)signum;
+	fprintf(stderr, "\n\"quit\\n\" to quit\n");
+	signal(SIGINT, &sigint);
+}
+
 int main(void) {
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, &sigint);
 
 	SSL_CTX *ctx = ssl_ctx_server();
 	if (!ctx)
@@ -125,12 +144,13 @@ int main(void) {
 	if (init_db(&db))
 		return 7;
 
-	while (1) {
+	int running = 1;
+	while (running) {
 		if (start_tests(db, &fds))
 			return 8;
 
 		if (poll(fds.pfds, fds.fd_count, -1) <= 0)
-			return 5;
+			continue;
 
 		for (int i = 0; i < fds.fd_count; i++) {
 			if (!(fds.pfds[i].revents & POLLIN))
@@ -142,6 +162,9 @@ int main(void) {
 			switch (con->type) {
 			case TYPELISTENER:
 				handle_new_connection(ctx, &fds);
+				break;
+			case TYPESTDIN:
+				handle_stdin(&running);
 				break;
 			case TYPECLIENT:
 				r = handle_client_request(con, db, password);
@@ -162,6 +185,26 @@ int main(void) {
 			}
 		}
 	}
+
+	for (int i = 0; i < fds.fd_count; i++) {
+		struct connection *con = &fds.cons[i];
+		struct pollfd *pfds = &fds.pfds[i];
+		switch (con->type) {
+		case TYPELISTENER:
+			close(pfds->fd);
+			break;
+		case TYPESTDIN:
+			break;
+		case TYPENODE:
+		case TYPECLIENT:
+			ssl_close(con->ssl, 1);
+			break;
+		}
+	}
+	free(fds.pfds);
+	free(fds.cons);
+	SSL_CTX_free(ctx);
+	sqlite3_close(db);
 
 	return 0;
 }

@@ -7,7 +7,7 @@ int get_socket(void);
 
 int get_listener_socket(void);
 
-void ssl_close(SSL *ssl);
+void ssl_close(SSL *ssl, int fast);
 
 SSL_CTX *ssl_ctx_server(void);
 
