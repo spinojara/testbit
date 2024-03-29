@@ -16,6 +16,7 @@ int sendu64(SSL *ssl, uint64_t s);
 int sendd32(SSL *ssl, float s);
 int sendd64(SSL *ssl, double s);
 int sendstr(SSL *ssl, const char *s);
+int sendfile(SSL *ssl, int fd);
 
 int recvi8(SSL *ssl, signed char *s);
 int recvu8(SSL *ssl, unsigned char *s);
@@ -27,6 +28,7 @@ int recvi64(SSL *ssl, int64_t *s);
 int recvu64(SSL *ssl, uint64_t *s);
 int recvd32(SSL *ssl, float *s);
 int recvd64(SSL *ssl, double *s);
-int recvstr(SSL *ssl, char **s);
+int recvstr(SSL *ssl, char *s, size_t size);
+int recvfile(SSL *ssl, int fd, ssize_t size);
 
 #endif

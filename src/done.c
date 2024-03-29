@@ -91,11 +91,8 @@ void draw_done(struct oldteststate *os) {
 		double B = log((1.0 - test->beta) / test->alpha);
 
 		sprintf(tc[i], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
-		/* Both branch[i] and commit[i] will be null terminated since
-		 * they were initialized to 0 by calloc.
-		 */
-		snprintf(branch[i], 127, "%s", test->branch);
-		snprintf(commit[i], 127, "%s", test->commit);
+		strcpy(branch[i], test->branch);
+		strcpy(commit[i], test->commit);
 		iso8601local(qtime[i], test->qtime);
 		iso8601local(stime[i], test->stime);
 		iso8601local(dtime[i], test->dtime);
@@ -161,7 +158,7 @@ void draw_done(struct oldteststate *os) {
 		}
 	}
 	
-	draw_dynamic(os, &attr, select, status, tc, elo, tri, penta, llr, ab, elo0, elo1, eloe, dtime, stime, qtime, branch, commit, NULL);
+	draw_dynamic(os, &attr, 1, select, status, tc, elo, tri, penta, llr, ab, elo0, elo1, eloe, dtime, stime, qtime, branch, commit, NULL);
 
 	free(select);
 	free(status);

@@ -152,20 +152,14 @@ error:
 	return r;
 }
 
-/* Each argument of type s should be initialized to NULL.
- * It should _always_ be passed to free().
- *
- * Example:
- * 	char *buf = NULL;
- * 	recvf(ssl, "s", &buf);
- * 	free(buf);
- */
 int recvf(SSL *ssl, const char *fmt, ...) {
 	va_list ap;
 	int r = 0;
 
 	va_start(ap, fmt);
 
+	char *s;
+	int fd;
 	for (; *fmt; fmt++) {
 		switch (*fmt) {
 		case 'c':
@@ -199,10 +193,12 @@ int recvf(SSL *ssl, const char *fmt, ...) {
 			r = recvd64(ssl, va_arg(ap, double *));
 			break;
 		case 's':
-			r = recvstr(ssl, va_arg(ap, char **));
+			s = va_arg(ap, char *);
+			r = recvstr(ssl, s, va_arg(ap, size_t));
 			break;
 		case 'f':
-			r = recvfile(ssl, va_arg(ap, int));
+			fd = va_arg(ap, int);
+			r = recvfile(ssl, fd, va_arg(ap, ssize_t));
 		default:
 			break;
 		}

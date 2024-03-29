@@ -28,8 +28,8 @@ struct test {
 	uint32_t t0, t1, t2;
 	uint32_t p0, p1, p2, p3, p4;
 
-	char *branch;
-	char *commit;
+	char branch[128];
+	char commit[128];
 };
 
 struct oldteststate {

@@ -9,6 +9,7 @@
 #include "con.h"
 #include "util.h"
 #include "sprt.h"
+#include "req.h"
 
 int git_clone(char *dtemp, const char *branch, const char *commit) {
 	int wstatus;
@@ -133,7 +134,7 @@ void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 	char dtemp[] = "testbitn-bitbit-XXXXXX";
 	int r, fd, error = 0;
 	if ((r = git_clone(dtemp, branch, commit))) {
-		sendf(ssl, "c", r == 1 ? TESTERRBRANCH : TESTERRCOMMIT);
+		sendf(ssl, "cc", REQUESTNODEDONE, r == 1 ? TESTERRBRANCH : TESTERRCOMMIT);
 		error = 1;
 	}
 	/* We are now inside dtemp even if an error occured. */
@@ -142,7 +143,7 @@ void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 		exit(16);
 	}
 
-	if (recvf(ssl, "f", fd))
+	if (recvf(ssl, "f", fd, -1))
 		exit(20);
 
 	if (close(fd)) {
@@ -157,7 +158,7 @@ void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 		/* This should probably never fail. But if a bad commit
 		 * is pushed to the github it can fail.
 		 */
-		sendf(ssl, "c", TESTERRMAKE);
+		sendf(ssl, "cc", REQUESTNODEDONE, TESTERRMAKE);
 		goto cleanup;
 	}
 
@@ -167,12 +168,12 @@ void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 	}
 
 	if (git_patch()) {
-		sendf(ssl, "c", TESTERRPATCH);
+		sendf(ssl, "cc", REQUESTNODEDONE, TESTERRPATCH);
 		goto cleanup;
 	}
 
 	if (make()) {
-		sendf(ssl, "c", TESTERRMAKE);
+		sendf(ssl, "cc", REQUESTNODEDONE, TESTERRMAKE);
 		goto cleanup;
 	}
 

@@ -69,14 +69,14 @@ void handle_oldtest(struct oldteststate *os, chtype ch) {
 }
 
 /* NULL terminated list of args. */
-void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststate *os, int i, int j), ...) {
+void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststate *os, int i, int j), int select, ...) {
 	va_list ap;
 
 	int tests = os->tests + 1;
 
 	int x = 3;
 
-	va_start(ap, attr);
+	va_start(ap, select);
 	for (int j = 0; ; j++) {
 		const char (*strs)[128] = va_arg(ap, const char (*)[128]);
 		if (!strs)
@@ -98,7 +98,7 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 			int selected = i == os->selected + 1 && j == 0;
 			int len = strlen(strs[i]);
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);
-			if (j == 0)
+			if (j == 0 && select)
 				mvwprintw(os->win, y, x, " %c ", selected ? '*' : ' ');
 			else {
 				attr(os, i, j);
@@ -131,30 +131,6 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 			if (i == tests - 1) {
 				mvwaddch(os->win, y + 1, x + maxlen + 2, ACS_LRCORNER);
 			}
-#if 0
-			else {
-				if (i == tests - 1)
-					mvwaddch(os->win, y + 1, x - 1, ACS_BTEE);
-				if (i == 0) {
-					mvwaddch(os->win, y - 1, x - 1, ACS_TTEE);
-				}
-				else {
-					mvwaddch(os->win, y - 1, x - 1, ACS_PLUS);
-				}
-			}
-#endif
-#if 0
-			if (i == 0) {
-				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_TTEE);
-			}
-			if (0 < i && i <= tests - 1)
-				mvwaddch(os->win, y - 1, x + maxlen + 2, ACS_RTEE);
-			if (i == tests - 1)
-				mvwaddch(os->win, y + 1, x + maxlen + 2, ACS_LRCORNER);
-			mvwaddch(os->win, y, x + maxlen + 2, ACS_VLINE);
-			mvwhline(os->win, y + 1, x, 0, maxlen + 2);
-#endif
-
 		}
 
 		x += maxlen + 3;
@@ -218,8 +194,6 @@ void draw_oldtest(struct oldteststate *os, int lazy, int load) {
 }
 
 void resize_oldtest(struct oldteststate *os) {
-	free_oldtest(os);
-
 	os->last_loaded = 0;
 	os->page_loaded = 0;
 	os->tests = 0;
@@ -256,16 +230,13 @@ int load_oldtest(struct oldteststate *os) {
 
 		struct test *test = &os->test[i];
 
-		free(test->branch);
-		free(test->commit);
-		test->branch = test->commit = NULL;
-
 		if (recvf(os->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
 					&test->id, &test->type, &test->status,
 					&test->maintime, &test->increment, &test->alpha,
 					&test->beta, &test->llr, &test->elo0,
 					&test->elo1, &test->eloe, &test->elo,
-					&test->pm, &test->branch, &test->commit,
+					&test->pm, test->branch, sizeof(test->branch),
+					test->commit, sizeof(test->commit),
 					&test->qtime, &test->stime, &test->dtime,
 					&test->t0, &test->t1, &test->t2, &test->p0,
 					&test->p1, &test->p2, &test->p3, &test->p4))
@@ -283,13 +254,4 @@ int load_oldtest(struct oldteststate *os) {
 	os->selected_id = os->test[os->selected].id;
 
 	return 0;
-}
-
-void free_oldtest(struct oldteststate *os) {
-	if (os->test) {
-		for (int i = 0; i < os->page_size; i++) {
-			free(os->test[i].branch);
-			free(os->test[i].commit);
-		}
-	}
 }

@@ -245,16 +245,32 @@ int sendstr(SSL *ssl, const char *s) {
 	return sendexact(ssl, s, strlen(s));
 }
 
-int recvstr(SSL *ssl, char **s) {
+int recvstr(SSL *ssl, char *s, size_t size) {
+	if (size == 0)
+		return 1;
 	uint64_t len;
 	/* Limit string size to 16 KiB. */
 	if (recvu64(ssl, &len) || len >= 16384)
 		return 1;
-	*s = malloc(len + 1);
-	if (!*s)
-		return 2;
-	(*s)[len] = '\0';
-	return recvexact(ssl, *s, len);
+	int error = 0;
+	
+	size_t readlen;
+	if (len < size)
+		readlen = len;
+	else
+		readlen = size - 1;
+
+	if (recvexact(ssl, s, readlen))
+		error = 1;
+
+	s[readlen] = '\0';
+
+	char c;
+	for (size_t i = 0; i < len - readlen && !error; i++)
+		if (recvexact(ssl, &c, 1))
+			error = 1;
+	
+	return error;
 }
 
 int sendfile(SSL *ssl, int fd) {
@@ -272,17 +288,27 @@ int sendfile(SSL *ssl, int fd) {
 	return n < 0;
 }
 
-int recvfile(SSL *ssl, int fd) {
+int recvfile(SSL *ssl, int fd, ssize_t size) {
 	uint64_t len;
 	uint64_t rec = 0;
 	/* Limit file size to 16 MiB. */
 	if (recvu64(ssl, &len) || len > 16777216)
 		return 1;
+
+	size_t readlen;
+	if (size < 0)
+		readlen = len;
+	else if (len <= (uint64_t)size)
+		readlen = len;
+	else
+		readlen = size;
+
 	char c;
 	while (rec < len && !recvexact(ssl, &c, 1)) {
 		rec++;
-		if (write(fd, &c, 1) != 1)
-			exit(19);
+		if (rec <= readlen)
+			if (write(fd, &c, 1) != 1)
+				exit(19);
 	}
 	return rec < len;
 }

@@ -18,12 +18,13 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	double maintime, increment;
 	double alpha, beta;
 	double elo0, elo1, eloe;
-	char *branch = NULL, *commit = NULL;
+	char branch[128], commit[128];
 	int r = 0;
 	if ((r = recvf(con->ssl, "cDDDDDDDss",
 					&type, &maintime, &increment, &alpha,
 					&beta, &elo0, &elo1, &eloe,
-					&branch, &commit)))
+					branch, sizeof(branch),
+					commit, sizeof(commit))))
 		goto error;
 
 	double zero = eps;
@@ -66,7 +67,7 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 		fprintf(stderr, "Failed to open file %s\n", path);
 		exit(9);
 	}
-	if ((r = recvf(con->ssl, "f", fd))) {
+	if ((r = recvf(con->ssl, "f", fd, -1))) {
 		/* Delete the file. */
 		sqlite3_prepare_v2(db, "DELETE FROM test WHERE id = ?;", -1, &stmt, NULL);
 		sqlite3_bind_int(stmt, 1, con->id);
@@ -78,8 +79,6 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	}
 	close(fd);
 error:
-	free(branch);
-	free(commit);
 	sendf(con->ssl, "c", r ? RESPONSEFAIL : RESPONSEOK);
 	return r;
 }

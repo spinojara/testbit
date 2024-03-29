@@ -5,4 +5,6 @@
 
 void draw_active(struct oldteststate *os);
 
+char *etastr(char *buf, struct test *test, double A, double B);
+
 #endif

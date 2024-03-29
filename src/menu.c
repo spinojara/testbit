@@ -3,6 +3,7 @@
 #include "draw.h"
 #include "oldtest.h"
 #include "newtest.h"
+#include "single.h"
 
 void handle_menu(struct state *st, chtype ch) {
 	int changed = 0;
@@ -54,16 +55,28 @@ void handle_menu(struct state *st, chtype ch) {
 			draw_newtest(&st->ns);
 			break;
 		case MENUACTIVE:
-			draw_oldtest(&st->as, 0, 1);
+			if (st->as.single)
+				draw_single(&st->as, 0, 1);
+			else
+				draw_oldtest(&st->as, 0, 1);
 			break;
 		case MENUDONE:
-			draw_oldtest(&st->ds, 0, 1);
+			if (st->ds.single)
+				draw_single(&st->ds, 0, 1);
+			else
+				draw_oldtest(&st->ds, 0, 1);
 			break;
 		case MENUCANCELLED:
-			draw_oldtest(&st->cs, 0, 1);
+			if (st->cs.single)
+				draw_single(&st->cs, 0, 1);
+			else
+				draw_oldtest(&st->cs, 0, 1);
 			break;
 		case MENUFAILED:
-			draw_oldtest(&st->fs, 0, 1);
+			if (st->fs.single)
+				draw_single(&st->fs, 0, 1);
+			else
+				draw_oldtest(&st->fs, 0, 1);
 			break;
 		}
 		draw_menu(st);

@@ -46,8 +46,6 @@ int sendexact(SSL *ssl, const char *buf, size_t len);
 int recvexact(SSL *ssl, char *buf, size_t len);
 int sendf(SSL *ssl, const char *fmt, ...);
 int recvf(SSL *ssl, const char *fmt, ...);
-int sendfile(SSL *ssl, int fd);
-int recvfile(SSL *ssl, int fd);
 
 int read_secret(char *secret, int size);
 int create_secret(char *secret, int size);

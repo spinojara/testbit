@@ -27,18 +27,16 @@ void nodeloop(SSL *ssl, int nthreads) {
 		double elo0, elo1;
 		double eloe;
 		uint32_t games;
-		char *branch = NULL;
-		char *commit = NULL;
+		char branch[128];
+		char commit[128];
 
 		if (recvf(ssl, "cDDDDDDDLss",
 					&type, &maintime, &increment,
 					&alpha, &beta, &elo0, &elo1,
-					&eloe, &games, &branch, &commit))
+					&eloe, &games, branch, sizeof(branch),
+					commit, sizeof(commit)))
 			exit(6);
 
 		setup(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe, branch, commit);
-
-		free(branch);
-		free(commit);
 	}
 }

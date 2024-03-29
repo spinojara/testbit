@@ -65,9 +65,4 @@ void term_state(struct state *st) {
 	free_single(&st->ds);
 	free_single(&st->fs);
 	free_single(&st->cs);
-
-	free_oldtest(&st->as);
-	free_oldtest(&st->ds);
-	free_oldtest(&st->fs);
-	free_oldtest(&st->cs);
 }
