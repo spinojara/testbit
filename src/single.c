@@ -318,7 +318,6 @@ void draw_patch(struct oldteststate *os, int lazy, int up) {
 	struct line *cur;
 	int y = min_y;
 	for (cur = os->top; cur && y <= max_y; cur = cur->next, y++) {
-
 		if (lazy) {
 			size_t prev;
 			if (up)
@@ -327,7 +326,8 @@ void draw_patch(struct oldteststate *os, int lazy, int up) {
 				prev = cur->next ? cur->next->len : 0;
 			if ((size_t)size_x > cur->len && prev > cur->len) {
 				size_t len = prev - cur->len;
-				int printlen = len > (size_t)size_x ? size_x : (int)len;
+				int left = size_x - cur->len;
+				int printlen = len > (size_t) left ? left : (int)len;
 				mvwhline(os->win, y, min_x + cur->len, ' ', printlen);
 			}
 		}

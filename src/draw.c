@@ -8,7 +8,7 @@
 
 void mvwaddnstrtab(WINDOW *win, int y, int x, const char *str, int n) {
 	int x_start = x;
-	for (int i = 0; i < n && str[i]; i++) {
+	for (int i = 0; x - x_start < n && str[i]; i++) {
 		if (str[i] == '\t') {
 			int until_tab = TABSIZE - ((x - x_start) % TABSIZE);
 			wmove(win, y, x);
