@@ -249,10 +249,8 @@ int recvstr(SSL *ssl, char *s, size_t size) {
 	if (size == 0)
 		return 1;
 	uint64_t len;
-	/* Limit string size to 16 KiB. */
-	if (recvu64(ssl, &len) || len >= 16384)
+	if (recvu64(ssl, &len))
 		return 1;
-	int error = 0;
 	
 	size_t readlen;
 	if (len < size)
@@ -260,6 +258,7 @@ int recvstr(SSL *ssl, char *s, size_t size) {
 	else
 		readlen = size - 1;
 
+	int error = 0;
 	if (recvexact(ssl, s, readlen))
 		error = 1;
 
@@ -271,6 +270,36 @@ int recvstr(SSL *ssl, char *s, size_t size) {
 			error = 1;
 	
 	return error;
+}
+
+char *recvstrdynamic(SSL *ssl, size_t size) {
+	if (size == 0)
+		return NULL;
+	uint64_t len;
+	if (recvu64(ssl, &len))
+		return NULL;
+
+	size_t readlen;
+	if (len < size)
+		readlen = len;
+	else
+		readlen = size - 1;
+
+	char *s = malloc(readlen + 1);
+	if (!s)
+		return NULL;
+
+	int error = 0;
+	if (recvexact(ssl, s, readlen))
+		error = 1;
+
+	s[readlen] = '\0';
+	char c;
+	for (size_t i = 0; i < len - readlen && !error; i++)
+		if (recvexact(ssl, &c, 1))
+			error = 1;
+
+	return error ? free(s), NULL : s;
 }
 
 int sendfile(SSL *ssl, int fd) {

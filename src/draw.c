@@ -6,6 +6,23 @@
 #include "oldtest.h"
 #include "newtest.h"
 
+void mvwaddnstrtab(WINDOW *win, int y, int x, const char *str, int n) {
+	int x_start = x;
+	for (int i = 0; i < n && str[i]; i++) {
+		if (str[i] == '\t') {
+			int until_tab = TABSIZE - ((x - x_start) % TABSIZE);
+			wmove(win, y, x);
+			for (int j = 0; j < until_tab; j++)
+				waddch(win, ' ');
+			x += until_tab;
+		}
+		else {
+			mvwaddch(win, y, x, str[i]);
+			x++;
+		}
+	}
+}
+
 void draw_fill(WINDOW *win, struct color *bg, int ymin, int xmin, int ysize, int xsize) {
 	wattrset(win, bg->attr);
 	for (int y = ymin; y < ymin + ysize; y++)

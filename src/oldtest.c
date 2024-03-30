@@ -135,7 +135,6 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 
 		x += maxlen + 3;
 	}
-	wrefresh(os->win);
 	va_end(ap);
 }
 
@@ -170,6 +169,11 @@ char *fstr(char *s, double f, int n) {
 }
 
 void draw_oldtest(struct oldteststate *os, int lazy, int load) {
+	if (os->single) {
+		draw_single(os, lazy, load);
+		return;
+	}
+
 	if (load && (time(NULL) - os->last_loaded > refresh_interval || os->page_loaded != os->page)) {
 		load_oldtest(os);
 		lazy = 0;
@@ -200,6 +204,8 @@ void resize_oldtest(struct oldteststate *os) {
 	os->page = 0;
 	os->page_size = (LINES - 13) / 2;
 	os->selected = 0;
+	os->top = os->patch;
+	os->fills = 0;
 
 	free(os->test);
 	/* This initializes all os->test->{branch,commit} to

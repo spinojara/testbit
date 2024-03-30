@@ -22,6 +22,7 @@ void tuiloop(SSL *ssl) {
 
 	initscr();
 	keypad(stdscr, TRUE);
+	set_escdelay(25);
 	curs_set(0);
 	cbreak();
 	noecho();

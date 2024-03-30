@@ -29,6 +29,7 @@ int recvu64(SSL *ssl, uint64_t *s);
 int recvd32(SSL *ssl, float *s);
 int recvd64(SSL *ssl, double *s);
 int recvstr(SSL *ssl, char *s, size_t size);
+char *recvstrdynamic(SSL *ssl, size_t size);
 int recvfile(SSL *ssl, int fd, ssize_t size);
 
 #endif

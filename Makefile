@@ -2,14 +2,15 @@ CC         = cc
 CSTANDARD  = -std=c11
 CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
+CDEBUG     =
 
-CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) -Iinclude
+CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude
 LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm -lssl -lcrypto
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
 	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c \
-	       active.c done.c single.c
+	       active.c done.c single.c line.c
 SRC_TESTBITN = testbitn.c con.c ssl.c binary.c setup.c sprt.c node.c util.c elo.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c
 SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD)

@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 500
 #include "single.h"
 
-#include <unistd.h>
 #include <stdlib.h>
 
 #include "tui.h"
@@ -13,15 +12,20 @@
 #include "sprt.h"
 #include "util.h"
 #include "active.h"
+#include "binary.h"
 
 extern const int refresh_interval;
 
+void draw_table(struct oldteststate *os);
+void draw_patch(struct oldteststate *os, int lazy, int up);
+int load_single(struct oldteststate *os);
+int load_patch(struct oldteststate *os);
+
 void free_single(struct oldteststate *os) {
-	if (os->fd < 0)
-		return;
-	close(os->fd);
-	unlink(os->path);
-	os->fd = -1;
+	if (os->patch)
+		free_file(os->patch);
+
+	os->patch = os->top = NULL;
 }
 
 void handle_single(struct oldteststate *os, chtype ch) {
@@ -36,6 +40,23 @@ void handle_single(struct oldteststate *os, chtype ch) {
 	case 'r':
 		os->last_loaded = 0;
 		update = 1;
+		break;
+	case KEY_UP:
+	case 'k':
+		if (os->top && os->top->prev) {
+			os->top = os->top->prev;
+			draw_patch(os, 1, 0);
+			wrefresh(os->win);
+		}
+		break;
+	case KEY_DOWN:
+	case 'j':
+		if (os->top && os->top->next && os->fills) {
+			os->top = os->top->next;
+			draw_patch(os, 1, 1);
+			wrefresh(os->win);
+		}
+		break;
 	default:
 		break;
 	}
@@ -44,13 +65,8 @@ void handle_single(struct oldteststate *os, chtype ch) {
 		draw_single(os, 1, 1);
 }
 
-void draw_table(struct oldteststate *os);
-void draw_patch(struct oldteststate *os);
-int load_single(struct oldteststate *os);
-int load_patch(struct oldteststate *os);
-
 void draw_single(struct oldteststate *os, int lazy, int load) {
-	if (os->fd < 0)
+	if (!os->patch)
 		load_patch(os);
 
 	if (load && (time(NULL) - os->last_loaded > refresh_interval)) {
@@ -63,7 +79,9 @@ void draw_single(struct oldteststate *os, int lazy, int load) {
 
 	draw_table(os);
 
-	draw_patch(os);
+	draw_patch(os, lazy, 0);
+
+	wrefresh(os->win);
 }
 
 int load_single(struct oldteststate *os) {
@@ -90,15 +108,20 @@ int load_single(struct oldteststate *os) {
 }
 
 int load_patch(struct oldteststate *os) {
-	sprintf(os->path, "/tmp/patch-testbit-XXXXXX");
-	os->fd = mkstemp(os->path);
-
 	sendf(os->ssl, "cq", REQUESTPATCH, os->selected_id);
 	char response;
 	recvf(os->ssl, "c", &response);
 	if (response)
 		return 1;
-	return recvf(os->ssl, "f", os->fd, -1);
+	
+	char *patch = recvstrdynamic(os->ssl, 16 * 1024 * 1024);
+	if (!patch)
+		return 1;
+
+	os->top = os->patch = new_file(patch);
+	free(patch);
+
+	return 0;
 }
 
 static void attr(const struct oldteststate *os, int i, int j) {
@@ -267,24 +290,48 @@ void draw_table(struct oldteststate *os) {
 		draw_dynamic(os, &attr, 0, status, tc, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	}
-#if 0
-	char status[2][128];
-	char tc[2][128];
-	char elo[2][128];
-	char llr[2][128];
-	char ab[2][128];
-	char elo0[2][128];
-	char elo1[2][128];
-	char eloe[2][128];
-	char tri[2][128];
-	char penta[2][128];
-	char qtime[2][128];
-	char stime[2][128];
-	char dtime[2][128];
-	char branch[2][128];
-	char commit[2][128];
-#endif
 }
 
-void draw_patch(struct oldteststate *os) {
+void draw_patch(struct oldteststate *os, int lazy, int up) {
+
+	int min_y = 12;
+	int min_x = 3;
+	int max_y = getmaxy(os->win) - 3;
+	int max_x = getmaxx(os->win) - 4;
+	int size_x = max_x - min_x + 1;
+	int size_y = max_y - min_y + 1;
+
+	if (!lazy) {
+		wattrset(os->win, cs.textdim.attr);
+		mvwhline(os->win, min_y - 1, min_x, 0, size_x);
+		mvwhline(os->win, max_y + 1, min_x, 0, size_x);
+		mvwvline(os->win, min_y, min_x - 1, 0, size_y);
+		mvwvline(os->win, min_y, max_x + 1, 0, size_y);
+		mvwaddch(os->win, min_y - 1, min_x - 1, ACS_ULCORNER);
+		mvwaddch(os->win, max_y + 1, min_x - 1, ACS_LLCORNER);
+		mvwaddch(os->win, min_y - 1, max_x + 1, ACS_URCORNER);
+		mvwaddch(os->win, max_y + 1, max_x + 1, ACS_LRCORNER);
+	}
+
+	wattrset(os->win, cs.text.attr);
+
+	struct line *cur;
+	int y = min_y;
+	for (cur = os->top; cur && y <= max_y; cur = cur->next, y++) {
+
+		if (lazy) {
+			size_t prev;
+			if (up)
+				prev = cur->prev ? cur->prev->len : 0;
+			else
+				prev = cur->next ? cur->next->len : 0;
+			if ((size_t)size_x > cur->len && prev > cur->len) {
+				size_t len = prev - cur->len;
+				int printlen = len > (size_t)size_x ? size_x : (int)len;
+				mvwhline(os->win, y, min_x + cur->len, ' ', printlen);
+			}
+		}
+		mvwaddnstrtab(os->win, y, min_x, cur->data, size_x);
+	}
+	os->fills = cur != NULL;
 }

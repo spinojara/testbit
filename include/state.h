@@ -5,6 +5,7 @@
 #include <openssl/ssl.h>
 
 #include "prompt.h"
+#include "line.h"
 
 struct test {
 	int64_t id;
@@ -48,8 +49,10 @@ struct oldteststate {
 
 	int single;
 	struct test singletest;
-	char path[128];
-	int fd;
+
+	struct line *patch;
+	struct line *top;
+	int fills;
 	
 	int page_size;
 	int page;
