@@ -1,0 +1,5 @@
+TODO
+- Add checks for recvf and sendf in testbit.
+  The program should properly handle a loss of connection.
+- Sort the different logs correctly. I.e. "done" should be
+  sorted by donetime, not queuetime
