@@ -5,6 +5,8 @@
 #include <netdb.h>
 #include <unistd.h>
 
+#include <openssl/err.h>
+
 #define PORT "2718"
 #define HOSTNAME "test.bitbitchess.org"
 
@@ -133,8 +135,10 @@ SSL *ssl_ssl_client(SSL_CTX *ctx, int fd) {
 	if (!SSL_set1_host(ssl, HOSTNAME))
 		return NULL;
 
-	if (SSL_connect(ssl) <= 0)
+	if (SSL_connect(ssl) <= 0) {
+		fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
 		return NULL;
+	}
 
 	return ssl;
 }
