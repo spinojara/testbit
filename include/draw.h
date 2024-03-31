@@ -10,6 +10,8 @@
 #define LINESMIN 42
 #define COLSMIN 75
 
+#define WINDOWS_TERMINAL_BUG
+
 void mvwaddnstrtab(WINDOW *win, int y, int x, const char *str, int n);
 
 void draw_border(WINDOW *win, struct color *bg, struct color *upper, struct color *lower, int fill, int ymin, int xmin, int ysize, int xsize);

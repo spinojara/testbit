@@ -330,8 +330,14 @@ void draw_patch(struct oldteststate *os, int lazy, int up) {
 				int printlen = len > (size_t) left ? left : (int)len;
 				mvwhline(os->win, y, min_x + cur->len, ' ', printlen);
 			}
+#ifdef WINDOWS_TERMINAL_BUG
+			wrefresh(os->win);
+#endif
 		}
 		mvwaddnstrtab(os->win, y, min_x, cur->data, size_x);
+#ifdef WINDOWS_TERMINAL_BUG
+		wrefresh(os->win);
+#endif
 	}
 	os->fills = cur != NULL;
 }

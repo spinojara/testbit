@@ -112,7 +112,9 @@ void draw_prompt_border(WINDOW *win, const char *title, int y, int x, int prompt
 	wattrset(win, cs.bordershadow.attr);
 	mvwprintw(win, y, x + 2, " %s ", title);
 
+#ifdef WINDOWS_TERMINAL_BUG
 	wrefresh(win);
+#endif
 }
 
 void draw_button(WINDOW *win, const char *title, int y, int x, int n, int highlight) {
@@ -131,7 +133,9 @@ void draw_button(WINDOW *win, const char *title, int y, int x, int n, int highli
 	wattrset(win, cs.text.attr);
 	mvwaddstr(win, y + 1, x + 2, title);
 
+#ifdef WINDOWS_TERMINAL_BUG
 	wrefresh(win);
+#endif
 }
 
 void resize_prompts(struct newteststate *ns) {
@@ -165,15 +169,14 @@ void draw_prompts(struct newteststate *ns) {
 
 	for (int i = PROMPTTIME; i <= PROMPTPATH; i++)
 		draw_prompt(&ns->prompt[i]);
+
+	wrefresh(ns->win);
 }
 
 void draw_newtest(struct newteststate *ns) {
 	draw_border(ns->win, NULL, &cs.bordershadow, &cs.border, 1, 0, 0, getmaxy(ns->win), getmaxx(ns->win));
 
 	draw_prompts(ns);
-
-	touchwin(ns->win);
-	wrefresh(ns->win);
 }
 
 void init_newtest(struct newteststate *ns) {
