@@ -154,7 +154,7 @@ char *prompt_str(struct prompt *p) {
 }
 
 int prompt_passphrase(char *passphrase, int size) {
-	WINDOW *win = newwin(6, size + 6, (LINES - 8) / 2, (COLS - (size + 6)) / 2);
+	WINDOW *win = newwin(6, size + 6, (LINES - 6) / 2, (COLS - (size + 6)) / 2);
 	keypad(win, TRUE);
 	draw_border(win, &cs.bordershadow, &cs.border, &cs.bordershadow, 1, 0, 0, getmaxy(win), getmaxx(win));
 	wattrset(win, cs.text.attr);

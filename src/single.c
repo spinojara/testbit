@@ -392,6 +392,8 @@ int handle_button(struct oldteststate *os) {
 	if (prompt_passphrase(passphrase, 48))
 		return 0;
 
+	draw_single(os, 0, 0, 0);
+
 	char response = RESPONSEPERMISSIONDENIED;
 	sendf(os->ssl, "cs", REQUESTPRIVILEGE, passphrase);
 	recvf(os->ssl, "c", &response);
