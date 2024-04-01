@@ -82,7 +82,7 @@ void draw_active(struct oldteststate *os) {
 		strcpy(commit[i], test->commit);
 		iso8601local(qtime[i], test->qtime);
 		if (started) {
-			sprintf(elo[i], "%.2lf+%.2lf", test->elo, test->pm);
+			sprintf(elo[i], "%.2lf+-%.2lf", test->elo, test->pm);
 			iso8601local(stime[i], test->stime);
 		}
 		else {
