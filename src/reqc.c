@@ -247,9 +247,46 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 	return error || sendf(con->ssl, "c", 1);
 }
 
-int handle_mod_test(struct connection *con, sqlite3 *db) {
-	(void)con;
-	(void)db;
+int handle_mod_test(struct connection *con, sqlite3 *db, struct fds *fds) {
+	int64_t id;
+	char status;
+	if (recvf(con->ssl, "qc", &id, &status))
+		return 1;
+
+	printf("Request to change test with id %ld to status %d\n", id, status);
+
+	sqlite3_stmt *stmt;
+	switch (status) {
+	case TESTQUEUE:
+		sqlite3_prepare_v2(db,
+				"UPDATE test SET status = ?, queuetime = unixepoch(), "
+				"starttime = 0 WHERE id = ? AND status != ?;",
+				-1, &stmt, NULL);
+		sqlite3_bind_int(stmt, 1, TESTQUEUE);
+		sqlite3_bind_int64(stmt, 2, id);
+		sqlite3_bind_int(stmt, 3, TESTRUN);
+		break;
+	case TESTCANCEL:
+		sqlite3_prepare_v2(db,
+				"UPDATE test SET status = ?, donetime = unixepoch() "
+				"WHERE id = ? AND (status = ? OR status = ?);",
+				-1, &stmt, NULL);
+		sqlite3_bind_int(stmt, 1, TESTCANCEL);
+		sqlite3_bind_int64(stmt, 2, id);
+		sqlite3_bind_int(stmt, 3, TESTQUEUE);
+		sqlite3_bind_int(stmt, 4, TESTRUN);
+		for (int i = 0; i < fds->fd_count; i++)
+			if (fds->cons[i].type == TYPENODE &&
+					fds->cons[i].status == STATUSRUN &&
+					fds->cons[i].id == id)
+				fds->cons[i].status = STATUSCANCEL;
+		break;
+	default:
+		return 1;
+	}
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
 	return 0;
 }
 
@@ -274,7 +311,7 @@ int handle_patch(struct connection *con) {
 	return error;
 }
 
-int handle_client_request(struct connection *con, sqlite3 *db, const char password[128]) {
+int handle_client_request(struct connection *con, sqlite3 *db, const char password[128], struct fds *fds) {
 	char request;
 	if (recvf(con->ssl, "c", &request))
 		return 1;
@@ -285,7 +322,7 @@ int handle_client_request(struct connection *con, sqlite3 *db, const char passwo
 	case REQUESTNEWTEST:
 		return con->privileged ? handle_new_test(con, db) : 1;
 	case REQUESTMODTEST:
-		return con->privileged ? handle_mod_test(con, db) : 1;
+		return con->privileged ? handle_mod_test(con, db, fds) : 1;
 	case REQUESTLOGTEST:
 		return handle_log_tests(con, db);
 	case REQUESTPATCH:

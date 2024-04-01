@@ -6,20 +6,16 @@
 #include <stdio.h>
 #include <ftw.h>
 
-char *appendstr(char *dest, const char *src) {
-	size_t i, n;
-	for (n = 0; dest[n]; n++);
-	for (i = 0; i <= strlen(src); i++)
-		dest[n + i] = src[i];
-	return dest;
-}
-
 char *iso8601tm(char *str, const struct tm *tm) {
 	strftime(str, 28, "%F %T", tm);
 	return str;
 }
 
 char *iso8601local(char *str, time_t t) {
+	if (t == 0) {
+		sprintf(str, "N/A");
+		return str;
+	}
 	struct tm local;
 	localtime_r(&t, &local);
 

@@ -112,12 +112,12 @@ void draw_prompt_border(WINDOW *win, const char *title, int y, int x, int prompt
 	wattrset(win, cs.bordershadow.attr);
 	mvwprintw(win, y, x + 2, " %s ", title);
 
-#ifdef WINDOWS_TERMINAL_BUG
+#ifdef TERMINAL_FLICKER
 	wrefresh(win);
 #endif
 }
 
-void draw_button(WINDOW *win, const char *title, int y, int x, int n, int highlight) {
+static void draw_button(WINDOW *win, const char *title, int y, int x, int n, int highlight) {
 	struct color *upper, *lower;
 	if (highlight) {
 		upper = &cs.border;
@@ -133,7 +133,7 @@ void draw_button(WINDOW *win, const char *title, int y, int x, int n, int highli
 	wattrset(win, cs.text.attr);
 	mvwaddstr(win, y + 1, x + 2, title);
 
-#ifdef WINDOWS_TERMINAL_BUG
+#ifdef TERMINAL_FLICKER
 	wrefresh(win);
 #endif
 }
@@ -332,7 +332,7 @@ void queue_test(struct newteststate *ns) {
 		if (fd >= 0)
 			close(fd);
 
-		infobox("Permission Denied.");
+		infobox("Permission denied.");
 		return;
 	}
 

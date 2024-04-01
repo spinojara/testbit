@@ -4,7 +4,7 @@ CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
 CDEBUG     =
 
-CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude
+CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude -DTERMINAL_FLICKER
 LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm -lssl -lcrypto
 

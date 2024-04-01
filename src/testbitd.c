@@ -167,7 +167,7 @@ int main(void) {
 				handle_stdin(&running);
 				break;
 			case TYPECLIENT:
-				r = handle_client_request(con, db, password);
+				r = handle_client_request(con, db, password, &fds);
 				break;
 			case TYPENODE:
 				r = handle_node_request(con, db, password);

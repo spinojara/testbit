@@ -13,13 +13,16 @@
 #include "util.h"
 #include "active.h"
 #include "binary.h"
+#include "infobox.h"
 
 extern const int refresh_interval;
 
+static void draw_button(const struct oldteststate *os);
 void draw_table(struct oldteststate *os);
 void draw_patch(struct oldteststate *os, int lazy, int up);
 int load_single(struct oldteststate *os);
 int load_patch(struct oldteststate *os);
+int handle_button(struct oldteststate *os);
 
 void free_single(struct oldteststate *os) {
 	if (os->patch)
@@ -37,10 +40,6 @@ void handle_single(struct oldteststate *os, chtype ch) {
 		free_single(os);
 		draw_oldtest(os, 0, 1);
 		break;
-	case 'r':
-		os->last_loaded = 0;
-		update = 1;
-		break;
 	case KEY_UP:
 	case 'k':
 		if (os->top && os->top->prev) {
@@ -56,6 +55,14 @@ void handle_single(struct oldteststate *os, chtype ch) {
 			draw_patch(os, 1, 1);
 			wrefresh(os->win);
 		}
+		break;
+	case '\n':
+		if (handle_button(os))
+			break;
+		/* fallthrough */
+	case 'r':
+		os->last_loaded = 0;
+		update = 1;
 		break;
 	default:
 		break;
@@ -74,8 +81,10 @@ void draw_single(struct oldteststate *os, int lazy, int load) {
 		lazy = 0;
 	}
 
-	if (!lazy)
+	if (!lazy) {
 		draw_border(os->win, NULL, &cs.bordershadow, &cs.border, 1, 0, 0, getmaxy(os->win), getmaxx(os->win));
+		draw_button(os);
+	}
 
 	draw_table(os);
 
@@ -122,6 +131,27 @@ int load_patch(struct oldteststate *os) {
 	free(patch);
 
 	return 0;
+}
+
+static void draw_button(const struct oldteststate *os) {
+	const struct test *test = &os->singletest;
+	switch (test->status) {
+	case TESTQUEUE:
+	case TESTRUN:
+		wattrset(os->win, cs.text.attr);
+		mvwaddstr(os->win, 8, 4, "Cancel");
+		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 0, 7, 2, 3, 10);
+		break;
+	case TESTH0:
+	case TESTH1:
+	case TESTELO:
+	case TESTINCONCLUSIVE:
+	case TESTCANCEL:
+		wattrset(os->win, cs.text.attr);
+		mvwaddstr(os->win, 8, 4, "Requeue");
+		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 0, 7, 2, 3, 11);
+		break;
+	}
 }
 
 static void attr(const struct oldteststate *os, int i, int j) {
@@ -330,14 +360,53 @@ void draw_patch(struct oldteststate *os, int lazy, int up) {
 				int printlen = len > (size_t) left ? left : (int)len;
 				mvwhline(os->win, y, min_x + cur->len, ' ', printlen);
 			}
-#ifdef WINDOWS_TERMINAL_BUG
+#ifdef TERMINAL_FLICKER
 			wrefresh(os->win);
 #endif
 		}
 		mvwaddnstrtab(os->win, y, min_x, cur->data, size_x);
-#ifdef WINDOWS_TERMINAL_BUG
+#ifdef TERMINAL_FLICKER
 		wrefresh(os->win);
 #endif
 	}
 	os->fills = cur != NULL;
+}
+
+int handle_button(struct oldteststate *os) {
+	const struct test *test = &os->singletest;
+	char status;
+	switch (test->status) {
+	case TESTQUEUE:
+	case TESTRUN:
+		status = TESTCANCEL;
+		break;
+	case TESTH0:
+	case TESTH1:
+	case TESTELO:
+	case TESTINCONCLUSIVE:
+	case TESTCANCEL:
+		status = TESTQUEUE;
+		break;
+	default:
+		return 1;
+	}
+
+	char passphrase[48] = { 0 };
+
+	if (prompt_passphrase(passphrase, 48))
+		return 0;
+
+	char response = RESPONSEPERMISSIONDENIED;
+	sendf(os->ssl, "cs", REQUESTPRIVILEGE, passphrase);
+	recvf(os->ssl, "c", &response);
+	if (response != RESPONSEOK) {
+		infobox("Permission denied.");
+		return 0;
+	}
+
+	sendf(os->ssl, "cqc", REQUESTMODTEST, os->selected_id, status);
+
+	infobox(status == TESTCANCEL ? "The test has been cancelled." : "The test has been put in queue.");
+
+	return 0;
 }
