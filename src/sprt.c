@@ -9,6 +9,7 @@
 #include "util.h"
 #include "req.h"
 #include "elo.h"
+#include "setup.h"
 
 enum {
 	RESULTNONE = -1,
@@ -87,6 +88,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int32_
 				"-engine", "cmd=./bitbit",
 				(char *)NULL);
 		fprintf(stderr, "error: exec cutechess-cli");
+		kill_parent();
 		exit(30);
 	}
 

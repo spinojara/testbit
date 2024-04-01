@@ -11,6 +11,11 @@
 #include "sprt.h"
 #include "req.h"
 
+void kill_parent(void) {
+	pid_t pid = getppid();
+	kill(pid, SIGKILL);
+}
+
 int git_clone(char *dtemp, const char *branch, const char *commit) {
 	int wstatus;
 	pid_t pid;
@@ -36,6 +41,7 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 				"--single-branch",
 				dtemp, (char *)NULL);
 		fprintf(stderr, "error: exec git clone\n");
+		kill_parent();
 		exit(10);
 	}
 
@@ -61,6 +67,7 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 	if (pid == 0) {
 		execlp("git", "git", "reset", "--hard", commit, (char *)NULL);
 		fprintf(stderr, "error: exec git reset\n");
+		kill_parent();
 		exit(14);
 	}
 
@@ -86,6 +93,7 @@ int git_patch(void) {
 	if (pid == 0) {
 		execlp("git", "git", "apply", "patch", (char *)NULL);
 		fprintf(stderr, "error: exec git apply\n");
+		kill_parent();
 		exit(22);
 	}
 
@@ -111,6 +119,7 @@ int make(void) {
 	if (pid == 0) {
 		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
+		kill_parent();
 		exit(25);
 	}
 
