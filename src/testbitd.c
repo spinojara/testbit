@@ -174,6 +174,7 @@ int main(void) {
 				break;
 			case TYPENODE:
 				r = handle_node_request(con, db, password);
+				printf("returned %d\n", r);
 				if (r && con->status == STATUSRUN)
 					requeue_test(db, con->id);
 				break;

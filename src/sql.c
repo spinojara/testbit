@@ -166,16 +166,3 @@ void requeue_test(sqlite3 *db, int64_t id) {
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 }
-
-int start_test(sqlite3 *db, int64_t id) {
-	sqlite3_stmt *stmt;
-	sqlite3_prepare_v2(db,
-			"UPDATE test SET starttime = unixepoch() WHERE id = ?;",
-			-1, &stmt, NULL);
-
-	sqlite3_bind_int64(stmt, 1, id);
-
-	sqlite3_step(stmt);
-	sqlite3_finalize(stmt);
-	return 0;
-}

@@ -146,6 +146,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int32_
 }
 
 void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe) {
+	sendf(ssl, "c", REQUESTNODESTART);
 	games = (games / 2) * 2;
 
 	double A = log(beta / (1.0 - alpha));
@@ -161,10 +162,12 @@ void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double i
 
 	while (games > 0 && status == TESTINCONCLUSIVE) {
 		int batch = min(batch_size, games);
+#if 0
 		if (run_games(batch, nthreads, maintime, increment, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}
+#endif
 
 		double llr;
 		double elo, pm;

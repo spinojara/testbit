@@ -25,6 +25,4 @@ int start_tests(sqlite3 *db, struct fds *fds);
 
 void requeue_test(sqlite3 *db, int64_t id);
 
-int start_test(sqlite3 *db, int64_t id);
-
 #endif

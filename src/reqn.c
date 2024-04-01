@@ -6,10 +6,6 @@
 int handle_update(struct connection *con, sqlite3 *db) {
 	if (sendf(con->ssl, "c", con->status == STATUSCANCEL ? 1 : 0))
 		return 1;
-	if (con->status == STATUSCANCEL)
-		return 0;
-	if (con->status != STATUSRUN)
-		return 1;
 
 	int32_t tri[3];
 	int32_t penta[5];
@@ -21,6 +17,9 @@ int handle_update(struct connection *con, sqlite3 *db) {
 				&penta[0], &penta[1], &penta[2], &penta[3], &penta[4],
 				&llr, &elo, &pm))
 		return 1;
+
+	if (con->status == STATUSCANCEL)
+		return 0;
 
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
@@ -49,26 +48,42 @@ int handle_update(struct connection *con, sqlite3 *db) {
 }
 
 int handle_done(struct connection *con, sqlite3 *db) {
-	printf("test %ld done\n", con->id);
 	char status = con->status;
+	char result;
 	con->status = STATUSWAIT;
+	if (recvf(con->ssl, "c", &result))
+		return 1;
+
 	if (status == STATUSCANCEL)
 		return 0;
-
-	if (recvf(con->ssl, "c", &status))
-		return 1;
 
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
 			"UPDATE test SET status = ?, donetime = unixepoch() WHERE id = ?;",
 			-1, &stmt, NULL);
 
-	sqlite3_bind_int(stmt, 1, status);
+	sqlite3_bind_int(stmt, 1, result);
 	sqlite3_bind_int64(stmt, 2, con->id);
 
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 
+	return 0;
+}
+
+int handle_start(struct connection *con, sqlite3 *db) {
+	if (con->status == STATUSCANCEL)
+		return 0;
+
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,
+			"UPDATE test SET starttime = unixepoch() WHERE id = ?;",
+			-1, &stmt, NULL);
+
+	sqlite3_bind_int64(stmt, 1, con->id);
+
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
 	return 0;
 }
 
@@ -79,6 +94,8 @@ int handle_node_request(struct connection *con, sqlite3 *db, const char password
 	if ((!con->privileged || con->status == STATUSWAIT) && request != REQUESTPRIVILEGE)
 		return 1;
 
+	printf("New node request of type %d\n", request);
+
 	switch (request) {
 	case REQUESTPRIVILEGE:
 		return handle_password(con, password);
@@ -87,7 +104,7 @@ int handle_node_request(struct connection *con, sqlite3 *db, const char password
 	case REQUESTNODEDONE:
 		return handle_done(con, db);
 	case REQUESTNODESTART:
-		return start_test(db, con->id);
+		return handle_start(con, db);
 	default:
 		return 1;
 	}
