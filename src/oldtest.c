@@ -75,6 +75,10 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 
 	int x = 3;
 
+	wattrset(os->win, cs.text.attr);
+	for (int y = 1; y <= 2 * tests + 1; y++)
+		mvwhline(os->win, y, x - 1, ' ', getmaxx(os->win) - 4);
+
 	va_start(ap, select);
 	for (int j = 0; ; j++) {
 		const char (*strs)[128] = va_arg(ap, const char (*)[128]);
@@ -96,9 +100,6 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 			int align_right = isdigit(strs[i][0]) || strs[i][0] == '.';
 			int selected = i == os->selected + 1 && j == 0;
 			int len = strlen(strs[i]);
-			wattrset(os->win, cs.text.attr);
-			for (int k = 0; k < maxlen + 2; k++)
-				mvwaddch(os->win, y, x + k, ' ');
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);
 			if (j == 0 && select)
 				mvwprintw(os->win, y, x, " %c ", selected ? '*' : ' ');
