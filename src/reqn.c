@@ -25,7 +25,8 @@ int handle_update(struct connection *con, sqlite3 *db) {
 	sqlite3_prepare_v2(db,
 			"UPDATE test SET t0 = ?, t1 = ?, t2 = ?, "
 			"p0 = ?, p1 = ?, p2 = ?, p3 = ?, p4 = ?, "
-			"llr = ?, elo = ?, pm = ? WHERE id = ?;",
+			"llr = ?, elo = ?, pm = ?, donetime = unixepoch() "
+			"WHERE id = ?;",
 			-1, &stmt, NULL);
 
 	sqlite3_bind_double(stmt, 1, tri[0]);
