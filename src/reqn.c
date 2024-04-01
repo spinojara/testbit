@@ -4,7 +4,7 @@
 #include "sql.h"
 
 int handle_update(struct connection *con, sqlite3 *db) {
-	if (sendf(con->ssl, "c", con->status))
+	if (sendf(con->ssl, "c", con->status == STATUSCANCEL ? 1 : 0))
 		return 1;
 	if (con->status == STATUSCANCEL)
 		return 0;
