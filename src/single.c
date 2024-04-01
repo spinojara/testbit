@@ -29,7 +29,7 @@ void free_single(struct oldteststate *os) {
 	os->patch = os->top = NULL;
 }
 
-void handle_single(struct oldteststate *os, chtype ch) {
+void handle_single(struct oldteststate *os, chtype ch, int first) {
 	int update = 0;
 	switch (ch) {
 	case KEY_ESC:
@@ -67,10 +67,10 @@ void handle_single(struct oldteststate *os, chtype ch) {
 	}
 
 	if (update)
-		draw_single(os, 1, 1);
+		draw_single(os, 1, 1, ch == 'r' && !first);
 }
 
-void draw_single(struct oldteststate *os, int lazy, int load) {
+void draw_single(struct oldteststate *os, int lazy, int load, int reload) {
 	if (!os->patch)
 		load_patch(os);
 
@@ -79,14 +79,15 @@ void draw_single(struct oldteststate *os, int lazy, int load) {
 		lazy = 0;
 	}
 
-	if (!lazy) {
+	if (!lazy && !reload) {
 		draw_border(os->win, NULL, &cs.bordershadow, &cs.border, 1, 0, 0, getmaxy(os->win), getmaxx(os->win));
 		draw_button(os);
 	}
 
 	draw_table(os);
 
-	draw_patch(os, lazy, 0);
+	if (!reload)
+		draw_patch(os, lazy, 0);
 
 	wrefresh(os->win);
 }
@@ -224,7 +225,7 @@ void draw_table(struct oldteststate *os) {
 	iso8601local(dtime[1], test->dtime);
 	sprintf(tc[1], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
 	if (started) {
-		sprintf(elo[1], "%.2lf+%.2lf", test->elo, test->pm);
+		sprintf(elo[1], "%.2lf+%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		sprintf(llr[1], "%.2lf", test->llr);
 	}
 	else {
@@ -358,9 +359,6 @@ void draw_patch(struct oldteststate *os, int lazy, int up) {
 				int printlen = len > (size_t) left ? left : (int)len;
 				mvwhline(os->win, y, min_x + cur->len, ' ', printlen);
 			}
-#ifdef TERMINAL_FLICKER
-			wrefresh(os->win);
-#endif
 		}
 		mvwaddnstrtab(os->win, y, min_x, cur->data, size_x);
 #ifdef TERMINAL_FLICKER

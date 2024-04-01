@@ -82,18 +82,17 @@ void draw_active(struct oldteststate *os) {
 		strcpy(commit[i], test->commit);
 		iso8601local(qtime[i], test->qtime);
 		if (started) {
-			sprintf(elo[i], "%.2lf+-%.2lf", test->elo, test->pm);
-			iso8601local(stime[i], test->stime);
+			sprintf(elo[i], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		}
 		else {
 			sprintf(elo[i], "N/A");
-			sprintf(stime[i], "N/A");
 		}
 		if (test->status == TESTQUEUE) {
 			sprintf(status[i], "Pending");
 			sprintf(tri[i], "N/A");
 			sprintf(penta[i], "N/A");
 			sprintf(eta[i], "N/A");
+			sprintf(stime[i], "N/A");
 		}
 		else {
 			sprintf(status[i], "Running");
@@ -101,6 +100,7 @@ void draw_active(struct oldteststate *os) {
 			sprintf(penta[i], "%u-%u-%u-%u-%u", test->p0, test->p1, test->p2, test->p3, test->p4);
 			if (!etastr(eta[i], test, A, B))
 				sprintf(eta[i], "N/A");
+			iso8601local(stime[i], test->stime);
 		}
 		if (test->type == TESTTYPESPRT) {
 			sprintf(ab[i], "(%.2lf, %.2lf)", A, B);

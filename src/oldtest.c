@@ -18,7 +18,7 @@ int load_oldtest(struct oldteststate *os);
 
 void handle_oldtest(struct oldteststate *os, chtype ch) {
 	if (os->single) {
-		handle_single(os, ch);
+		handle_single(os, ch, 0);
 		return;
 	}
 
@@ -51,7 +51,7 @@ void handle_oldtest(struct oldteststate *os, chtype ch) {
 	case '\n':
 		if (os->tests > 0) {
 			os->single = 1;
-			handle_single(os, 'r');
+			handle_single(os, 'r', 1);
 			return;
 		}
 		/* fallthrough */
@@ -96,12 +96,15 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 			int align_right = isdigit(strs[i][0]) || strs[i][0] == '.';
 			int selected = i == os->selected + 1 && j == 0;
 			int len = strlen(strs[i]);
+			wattrset(os->win, cs.text.attr);
+			for (int k = 0; k < maxlen + 2; k++)
+				mvwaddch(os->win, y, x + k, ' ');
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);
 			if (j == 0 && select)
 				mvwprintw(os->win, y, x, " %c ", selected ? '*' : ' ');
 			else {
 				attr(os, i, j);
-				mvwprintw(os->win, y, x + 1 + align_right * (maxlen - len), "%s", strs[i]);
+				mvwaddstr(os->win, y, x + 1 + align_right * (maxlen - len), strs[i]);
 			}
 			wattrset(os->win, cs.textdim.attr);
 			mvwhline(os->win, y - 1, x, 0, maxlen + 2);
@@ -169,7 +172,7 @@ char *fstr(char *s, double f, int n) {
 
 void draw_oldtest(struct oldteststate *os, int lazy, int load) {
 	if (os->single) {
-		draw_single(os, lazy, load);
+		draw_single(os, lazy, load, 0);
 		return;
 	}
 

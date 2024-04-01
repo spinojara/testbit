@@ -57,25 +57,25 @@ void handle_menu(struct state *st, chtype ch) {
 			break;
 		case MENUACTIVE:
 			if (st->as.single)
-				draw_single(&st->as, 0, 1);
+				draw_single(&st->as, 0, 1, 0);
 			else
 				draw_oldtest(&st->as, 0, 1);
 			break;
 		case MENUDONE:
 			if (st->ds.single)
-				draw_single(&st->ds, 0, 1);
+				draw_single(&st->ds, 0, 1, 0);
 			else
 				draw_oldtest(&st->ds, 0, 1);
 			break;
 		case MENUCANCELLED:
 			if (st->cs.single)
-				draw_single(&st->cs, 0, 1);
+				draw_single(&st->cs, 0, 1, 0);
 			else
 				draw_oldtest(&st->cs, 0, 1);
 			break;
 		case MENUFAILED:
 			if (st->fs.single)
-				draw_single(&st->fs, 0, 1);
+				draw_single(&st->fs, 0, 1, 0);
 			else
 				draw_oldtest(&st->fs, 0, 1);
 			break;
