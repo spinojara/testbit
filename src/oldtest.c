@@ -12,8 +12,7 @@
 #include "active.h"
 #include "done.h"
 #include "single.h"
-
-const int refresh_interval = 30;
+#include "tui.h"
 
 int load_oldtest(struct oldteststate *os);
 
@@ -64,7 +63,7 @@ void handle_oldtest(struct oldteststate *os, chtype ch) {
 	}
 
 	os->selected_id = os->test[os->selected].id;
-	if (update || time(NULL) - os->last_loaded > refresh_interval)
+	if (update || time(NULL) - os->last_loaded > REFRESH_SECONDS)
 		draw_oldtest(os, 1, 1);
 }
 
@@ -174,7 +173,7 @@ void draw_oldtest(struct oldteststate *os, int lazy, int load) {
 		return;
 	}
 
-	if (load && (time(NULL) - os->last_loaded > refresh_interval || os->page_loaded != os->page)) {
+	if (load && (time(NULL) - os->last_loaded > REFRESH_SECONDS || os->page_loaded != os->page)) {
 		load_oldtest(os);
 		lazy = 0;
 	}

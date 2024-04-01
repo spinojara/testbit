@@ -158,6 +158,9 @@ int main(void) {
 
 			struct connection *con = &fds.cons[i];
 
+			time_t t = time(NULL);
+			printf("Request from %d at %s", fds.pfds[i].fd, ctime(&t));
+
 			int r = 0;
 			switch (con->type) {
 			case TYPELISTENER:

@@ -15,8 +15,6 @@
 #include "binary.h"
 #include "infobox.h"
 
-extern const int refresh_interval;
-
 static void draw_button(const struct oldteststate *os);
 void draw_table(struct oldteststate *os);
 void draw_patch(struct oldteststate *os, int lazy, int up);
@@ -76,7 +74,7 @@ void draw_single(struct oldteststate *os, int lazy, int load) {
 	if (!os->patch)
 		load_patch(os);
 
-	if (load && (time(NULL) - os->last_loaded > refresh_interval)) {
+	if (load && (time(NULL) - os->last_loaded > REFRESH_SECONDS)) {
 		load_single(os);
 		lazy = 0;
 	}

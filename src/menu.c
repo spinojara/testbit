@@ -4,6 +4,7 @@
 #include "oldtest.h"
 #include "newtest.h"
 #include "single.h"
+#include "tui.h"
 
 void handle_menu(struct state *st, chtype ch) {
 	int changed = 0;

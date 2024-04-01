@@ -35,7 +35,11 @@ void tuiloop(SSL *ssl) {
 	draw_resize(&st);
 
 	while (st.selected != MENUQUIT) {
-		ch = wgetch(stdscr);
+		timeout(1000 * REFRESH_SECONDS);
+		ch = getch();
+		if (ch == ERR)
+			ch = 'r';
+		timeout(-1);
 		handle_menu(&st, ch);
 	}
 

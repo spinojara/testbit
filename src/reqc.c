@@ -253,8 +253,6 @@ int handle_mod_test(struct connection *con, sqlite3 *db, struct fds *fds) {
 	if (recvf(con->ssl, "qc", &id, &status))
 		return 1;
 
-	printf("Request to change test with id %ld to status %d\n", id, status);
-
 	sqlite3_stmt *stmt;
 	switch (status) {
 	case TESTQUEUE:
