@@ -17,7 +17,7 @@ char *etastr(char *buf, struct test *test, double A, double B) {
 	if (test->t0 + test->t1 + test->t2 == 0)
 		return NULL;
 
-	time_t duration = time(NULL) - test->stime;
+	time_t duration = test->dtime - test->stime;
 	if (test->type == TESTTYPESPRT) {
 		if (fabs(test->llr) < eps)
 			return NULL;
