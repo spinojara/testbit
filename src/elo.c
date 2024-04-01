@@ -19,7 +19,7 @@ double sigmoidinv(double y) {
 	return -400.0 * log(1.0 / y - 1.0) / log(10.0);
 }
 
-int32_t normalize(const int32_t penta[5], double n[5]) {
+int32_t normalize_clamp(const int32_t penta[5], double n[5]) {
 	int32_t N = 0;
 	for (int j = 0; j < 5; j++)
 		N += penta[j];
@@ -35,6 +35,17 @@ int32_t normalize(const int32_t penta[5], double n[5]) {
 
 	for (int j = 0; j < 5; j++)
 		n[j] /= sum;
+
+	return N;
+}
+
+int32_t normalize(const int32_t penta[5], double n[5]) {
+	int32_t N = 0;
+	for (int j = 0; j < 5; j++)
+		N += penta[j];
+
+	for (int j = 0; j < 5; j++)
+		n[j] = (double)penta[j] / N;
 
 	return N;
 }
@@ -84,7 +95,7 @@ double loglikelihoodratio(const int32_t penta[5], double elo0, double elo1) {
 
 	double mu0, mu1;
 
-	if ((N = normalize(penta, n)) <= 0)
+	if ((N = normalize_clamp(penta, n)) <= 0)
 		return 0.0 / 0.0;
 
 	double score = 0.0;
