@@ -4,7 +4,7 @@ CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
 CDEBUG     =
 
-CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude -DTERMINAL_FLICKER
+CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude
 LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm -lssl -lcrypto
 
@@ -36,6 +36,7 @@ obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
+testbit:  CFLAGS += -DTERMINAL_FLICKER
 testbit:  LDLIBS += -lncurses -ltinfo
 testbitd: LDLIBS += -lsqlite3
 
