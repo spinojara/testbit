@@ -51,7 +51,10 @@ void parse_finished_game(char *line, struct game *game) {
 	game[n].result = error ? RESULTNONE : result;
 }
 
-int run_games(int games, int nthreads, double maintime, double increment, int32_t tri[3], int32_t penta[5]) {
+#define APPENDARG(str) (argv[argc++] = (str))
+int run_games(int games, int nthreads, double maintime, double increment, int adjudicate, int32_t tri[3], int32_t penta[5]) {
+	if (games % 2)
+		exit(39);
 	int wstatus;
 
 	char gamesstr[1024];
@@ -75,18 +78,30 @@ int run_games(int games, int nthreads, double maintime, double increment, int32_
 
 		dup2(pipefd[1], STDOUT_FILENO);
 
-		execlp("cutechess-cli", "cutechess-cli",
-				"-variant", "standard",
-				"-tournament", "gauntlet",
-				"-draw", "movenumber=80", "movecount=8", "score=20",
-				"-concurrency", concurrencystr,
-				"-each", tc, "proto=uci",
-				"-games", gamesstr,
-				"-openings", "format=epd", "file=etc/book/testbit-50cp5d6m100k.epd", "order=random",
-				"-repeat",
-				"-engine", "cmd=./bitbitold", "name=bitbitold",
-				"-engine", "cmd=./bitbit",
-				(char *)NULL);
+		char *argv[32];
+		int argc = 0;
+		APPENDARG("cutechess-cli");
+		APPENDARG("-variant"); APPENDARG("standard");
+		APPENDARG("-tournament"); APPENDARG("gauntlet");
+		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
+		APPENDARG("-each"); APPENDARG(tc); APPENDARG("proto=uci");
+		APPENDARG("-games"); APPENDARG(gamesstr);
+		APPENDARG("-openings"); APPENDARG("format=epd");
+		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
+		APPENDARG("-repeat");
+		APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
+		APPENDARG("-engine"); APPENDARG("cmd=./bitbit");
+		if (adjudicate & ADJUDICATE_DRAW) {
+			APPENDARG("-draw"); APPENDARG("movenumber=60");
+			APPENDARG("movecount=8"); APPENDARG("score=20");
+		}
+		if (adjudicate & ADJUDICATE_RESIGN) {
+			APPENDARG("-resign"); APPENDARG("movecount=3");
+			APPENDARG("score=800"); APPENDARG("twosided=true");
+		}
+		APPENDARG(NULL);
+		execvp("cutechess-cli", argv);
+
 		fprintf(stderr, "error: exec cutechess-cli");
 		kill_parent();
 		exit(30);
@@ -145,9 +160,9 @@ int run_games(int games, int nthreads, double maintime, double increment, int32_
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe) {
+void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
-	games = (games / 2) * 2;
+	games = 2 * (games / 2);
 
 	double A = log(beta / (1.0 - alpha));
 	double B = log((1.0 - beta) / alpha);
@@ -155,14 +170,16 @@ void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double i
 	int32_t tri[3] = { 0 };
 	int32_t penta[5] = { 0 };
 
-	double gametime = maintime + 100 * increment;
-	int batch_size = 2 * max(1, 60.0 * nthreads / gametime);
+	double gametime = 2.0 * (maintime + 75 * increment);
+	double seconds = 180.0;
+	int batch_size = max(2, seconds * nthreads / gametime);
+	batch_size = 2 * (batch_size / 2);
 
 	char status = TESTINCONCLUSIVE;
 
 	while (games > 0 && status == TESTINCONCLUSIVE) {
 		int batch = min(batch_size, games);
-		if (run_games(batch, nthreads, maintime, increment, tri, penta)) {
+		if (run_games(batch, nthreads, maintime, increment, adjudicate, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}

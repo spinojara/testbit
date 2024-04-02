@@ -223,6 +223,7 @@ void queue_test(struct newteststate *ns) {
 	double elo0;
 	double elo1;
 	double eloe;
+	char adjudicate = ADJUDICATE_DRAW | ADJUDICATE_RESIGN;
 	const char *branch, *commit;
 	int fd = -1;
 
@@ -337,9 +338,9 @@ void queue_test(struct newteststate *ns) {
 	}
 
 	sendf(ns->ssl, "c", REQUESTNEWTEST);
-	sendf(ns->ssl, "cDDDDDDDss",
+	sendf(ns->ssl, "cDDDDDDDcss",
 			type, maintime, increment, alpha,
-			beta, elo0, elo1, eloe, branch, commit);
+			beta, elo0, elo1, eloe, adjudicate, branch, commit);
 	sendf(ns->ssl, "f", fd);
 	close(fd);
 

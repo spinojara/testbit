@@ -14,15 +14,15 @@ static inline int inrange(double x, double a, double b) {
 }
 
 int handle_new_test(struct connection *con, sqlite3 *db) {
-	char type;
+	char type, adjudicate;
 	double maintime, increment;
 	double alpha, beta;
 	double elo0, elo1, eloe;
 	char branch[128], commit[128];
 	int r = 0;
-	if ((r = recvf(con->ssl, "cDDDDDDDss",
+	if ((r = recvf(con->ssl, "cDDDDDDDcss",
 					&type, &maintime, &increment, &alpha,
-					&beta, &elo0, &elo1, &eloe,
+					&beta, &elo0, &elo1, &eloe, &adjudicate,
 					branch, sizeof(branch),
 					commit, sizeof(commit))))
 		goto error;
@@ -38,8 +38,8 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
 			"INSERT INTO test (type, status, maintime, increment, alpha, beta, "
-			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash) VALUES "
-			"(?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?) RETURNING id;",
+			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash, adjudicate) VALUES "
+			"(?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?) RETURNING id;",
 			-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);
@@ -55,6 +55,7 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	sqlite3_bind_double(stmt, 11, 0.0 / 0.0);
 	sqlite3_bind_text(stmt, 12, branch, -1, NULL);
 	sqlite3_bind_text(stmt, 13, commit, -1, NULL);
+	sqlite3_bind_int(stmt, 14, adjudicate);
 	sqlite3_step(stmt);
 	con->id = sqlite3_column_int(stmt, 0);
 	sqlite3_step(stmt);
@@ -92,7 +93,7 @@ int handle_log_test(struct connection *con, sqlite3 *db) {
 	sqlite3_prepare_v2(db,
 			"SELECT type, status, maintime, increment, alpha, beta, llr, "
 			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
-			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4 "
+			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
 			"FROM test WHERE id = ?;",
 			-1, &stmt, NULL);
 	sqlite3_bind_int64(stmt, 1, id);
@@ -123,10 +124,11 @@ int handle_log_test(struct connection *con, sqlite3 *db) {
 		uint32_t p2 = sqlite3_column_int(stmt, 22);
 		uint32_t p3 = sqlite3_column_int(stmt, 23);
 		uint32_t p4 = sqlite3_column_int(stmt, 24);
-		sendf(con->ssl, "ccDDDDDDDDDDssqqqLLLLLLLL",
+		char adjudicate = sqlite3_column_int(stmt, 25);
+		sendf(con->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
 				type, status, maintime, increment, alpha, beta, llr,
-				elo0, elo1, eloe, elo, pm, branch, commit, qtime, stime, dtime,
-				t0, t1, t2, p0, p1, p2, p3, p4);
+				elo0, elo1, eloe, elo, pm, adjudicate, branch, commit,
+				qtime, stime, dtime, t0, t1, t2, p0, p1, p2, p3, p4);
 
 	}
 	else {
@@ -180,7 +182,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 	sqlite3_prepare_v2(db,
 			"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
 			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
-			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4 "
+			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
 			"FROM test WHERE status = ? or status = ? "
 			"or status = ? or status = ? or status = ? "
 			"ORDER BY queuetime ASC;",
@@ -226,6 +228,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		uint32_t p2 = sqlite3_column_int(stmt, 23);
 		uint32_t p3 = sqlite3_column_int(stmt, 24);
 		uint32_t p4 = sqlite3_column_int(stmt, 25);
+		char adjudicate = sqlite3_column_int(stmt, 26);
 
 		/* Send information that a row was found. */
 		if (sendf(con->ssl, "c", 0)) {
@@ -233,10 +236,10 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 			break;
 		}
 		/* Send the data. */
-		if (sendf(con->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
+		if (sendf(con->ssl, "qccDDDDDDDDDDcssqqqLLLLLLLL",
 				id, type, status, maintime, increment, alpha, beta, llr,
-				elo0, elo1, eloe, elo, pm, branch, commit, qtime, stime, dtime,
-				t0, t1, t2, p0, p1, p2, p3, p4)) {
+				elo0, elo1, eloe, elo, pm, adjudicate, branch, commit,
+				qtime, stime, dtime, t0, t1, t2, p0, p1, p2, p3, p4)) {
 			error = 1;
 			break;
 		}

@@ -138,7 +138,8 @@ int make(void) {
 
 void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 		double increment, double alpha, double beta, double elo0,
-		double elo1, double eloe, const char *branch, const char *commit) {
+		double elo1, double eloe, int adjudicate,
+		const char *branch, const char *commit) {
 
 	char dtemp[] = "testbitn-bitbit-XXXXXX";
 	int r, fd, error = 0;
@@ -186,7 +187,7 @@ void setup(SSL *ssl, int type, uint32_t games, int nthreads, double maintime,
 		goto cleanup;
 	}
 
-	sprt(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe);
+	sprt(ssl, type, games, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
 
 cleanup:
 	if (chdir("/tmp")) {

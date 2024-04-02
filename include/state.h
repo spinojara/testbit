@@ -21,6 +21,8 @@ struct test {
 	double elo1;
 	double eloe;
 
+	char adjudicate;
+
 	double llr;
 	double elo, pm;
 

@@ -24,6 +24,7 @@ int init_db(sqlite3 **db) {
 			"elo0       REAL, "
 			"elo1       REAL, "
 			"eloe       REAL, "
+			"adjudicate INTEGER, "
 			"queuetime  INTEGER, "
 			"starttime  INTEGER, "
 			"donetime   INTEGER, "
@@ -80,7 +81,7 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 
 		r = sqlite3_prepare_v2(db,
 				"SELECT id, type, maintime, increment, alpha, beta, "
-				"elo0, elo1, eloe, branch, commithash "
+				"elo0, elo1, eloe, branch, commithash, adjudicate "
 				"FROM test WHERE status = ? ORDER BY queuetime ASC LIMIT 1;",
 				-1, &stmt, NULL);
 		if (r != SQLITE_OK) {
@@ -108,6 +109,8 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 		const char *branch = (const char *)sqlite3_column_text(stmt, 9);
 		const char *commit = (const char *)sqlite3_column_text(stmt, 10);
 
+		char adjudicate = sqlite3_column_int(stmt, 11);
+
 		char path[4096];
 		sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
 		int fd;
@@ -117,10 +120,11 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 			exit(10);
 		}
 
-		if (sendf(con->ssl, "cDDDDDDDLssf",
+		if (sendf(con->ssl, "cDDDDDDDLcssf",
 				type, maintime, increment,
 				alpha, beta, elo0, elo1, eloe,
-				games, branch, commit, fd))
+				games, adjudicate, branch,
+				commit, fd))
 			error = 1;
 
 		sqlite3_finalize(stmt);

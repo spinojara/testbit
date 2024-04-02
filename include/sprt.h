@@ -22,10 +22,15 @@ enum {
 };
 
 enum {
+	ADJUDICATE_DRAW = 0x1,
+	ADJUDICATE_RESIGN = 0x2,
+};
+
+enum {
 	TESTTYPESPRT,
 	TESTTYPEELO,
 };
 
-void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe);
+void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate);
 
 #endif

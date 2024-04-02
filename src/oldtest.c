@@ -239,12 +239,13 @@ int load_oldtest(struct oldteststate *os) {
 
 		struct test *test = &os->test[i];
 
-		if (recvf(os->ssl, "qccDDDDDDDDDDssqqqLLLLLLLL",
+		if (recvf(os->ssl, "qccDDDDDDDDDDcssqqqLLLLLLLL",
 					&test->id, &test->type, &test->status,
 					&test->maintime, &test->increment, &test->alpha,
 					&test->beta, &test->llr, &test->elo0,
 					&test->elo1, &test->eloe, &test->elo,
-					&test->pm, test->branch, sizeof(test->branch),
+					&test->pm, &test->adjudicate,
+					test->branch, sizeof(test->branch),
 					test->commit, sizeof(test->commit),
 					&test->qtime, &test->stime, &test->dtime,
 					&test->t0, &test->t1, &test->t2, &test->p0,
