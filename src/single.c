@@ -98,13 +98,14 @@ int load_single(struct oldteststate *os) {
 	recvf(os->ssl, "c", &response);
 	if (response)
 		return 1;
-	return recvf(os->ssl, "ccDDDDDDDDDDssqqqLLLLLLLL",
+	return recvf(os->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
 			&os->singletest.type, &os->singletest.status,
 			&os->singletest.maintime, &os->singletest.increment,
 			&os->singletest.alpha, &os->singletest.beta,
 			&os->singletest.llr, &os->singletest.elo0,
 			&os->singletest.elo1, &os->singletest.eloe,
 			&os->singletest.elo, &os->singletest.pm,
+			&os->singletest.adjudicate,
 			os->singletest.branch, sizeof(os->singletest.branch),
 			os->singletest.commit, sizeof(os->singletest.commit),
 			&os->singletest.qtime, &os->singletest.stime,
@@ -185,6 +186,7 @@ void draw_table(struct oldteststate *os) {
 
 	char status[2][128];
 	char tc[2][128];
+	char adj[2][128];
 	char elo[2][128];
 	char llr[2][128];
 	char ab[2][128];
@@ -204,6 +206,7 @@ void draw_table(struct oldteststate *os) {
 
 	sprintf(status[0], "Status");
 	sprintf(tc[0], "TC");
+	sprintf(adj[0], "Adj");
 	sprintf(elo[0], "Elo");
 	sprintf(llr[0], "LLR");
 	sprintf(ab[0], "(A, B)");
@@ -217,6 +220,21 @@ void draw_table(struct oldteststate *os) {
 	sprintf(dtime[0], "Done Timestamp");
 	sprintf(branch[0], "Branch");
 	sprintf(commit[0], "Commit");
+
+	switch (test->adjudicate) {
+	case 0:
+		sprintf(adj[1], "None");
+		break;
+	case ADJUDICATE_DRAW:
+		sprintf(adj[1], "Draw");
+		break;
+	case ADJUDICATE_RESIGN:
+		sprintf(adj[1], "Resign");
+		break;
+	case ADJUDICATE_DRAW | ADJUDICATE_RESIGN:
+		sprintf(adj[1], "Both");
+		break;
+	}
 
 	int started = test->t0 + test->t1 + test->t2 > 0;
 	char tmp1[128], tmp2[128];
@@ -283,9 +301,9 @@ void draw_table(struct oldteststate *os) {
 	switch (test->status) {
 	case TESTQUEUE:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, ab, elo0, elo1, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, qtime, branch, commit, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, eloe, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, qtime, branch, commit, NULL);
 		break;
 	case TESTRUN:
 		sprintf(dtime[0], "ETA");
@@ -297,26 +315,26 @@ void draw_table(struct oldteststate *os) {
 	case TESTCANCEL:
 	case TESTERRRUN:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	case TESTERRBRANCH:
 	case TESTERRCOMMIT:
 	case TESTERRPATCH:
 	case TESTERRMAKE:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, eloe, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	case TESTINCONCLUSIVE:
 	case TESTH0:
 	case TESTH1:
-		draw_dynamic(os, &attr, 0, status, tc, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	case TESTELO:
-		draw_dynamic(os, &attr, 0, status, tc, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	}
 }

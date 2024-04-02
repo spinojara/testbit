@@ -10,7 +10,7 @@ LDLIBS     = -lm -lssl -lcrypto
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
 	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c \
-	       active.c done.c single.c line.c
+	       active.c done.c single.c line.c toggle.c
 SRC_TESTBITN = testbitn.c con.c ssl.c binary.c setup.c sprt.c node.c util.c elo.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c
 SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD)

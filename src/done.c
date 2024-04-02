@@ -51,6 +51,7 @@ void draw_done(struct oldteststate *os) {
 	char (*select)[128] = calloc(tests, sizeof(*select));
 	char (*status)[128] = calloc(tests, sizeof(*status));
 	char (*tc)[128] = calloc(tests, sizeof(*tc));
+	char (*adj)[128] = calloc(tests, sizeof(*adj));
 	char (*elo)[128] = calloc(tests, sizeof(*elo));
 	char (*llr)[128] = calloc(tests, sizeof(*llr));
 	char (*ab)[128] = calloc(tests, sizeof(*ab));
@@ -68,6 +69,7 @@ void draw_done(struct oldteststate *os) {
 	sprintf(select[0], " ");
 	sprintf(status[0], "Status");
 	sprintf(tc[0], "TC");
+	sprintf(adj[0], "Adj");
 	sprintf(elo[0], "Elo");
 	sprintf(llr[0], "LLR");
 	sprintf(ab[0], "(A, B)");
@@ -90,6 +92,20 @@ void draw_done(struct oldteststate *os) {
 		double A = log(test->beta / (1.0 - test->alpha));
 		double B = log((1.0 - test->beta) / test->alpha);
 
+		switch (test->adjudicate) {
+		case 0:
+			sprintf(adj[i], "None");
+			break;
+		case ADJUDICATE_DRAW:
+			sprintf(adj[i], "Draw");
+			break;
+		case ADJUDICATE_RESIGN:
+			sprintf(adj[i], "Resign");
+			break;
+		case ADJUDICATE_DRAW | ADJUDICATE_RESIGN:
+			sprintf(adj[i], "Both");
+			break;
+		}
 		sprintf(tc[i], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
 		strcpy(branch[i], test->branch);
 		strcpy(commit[i], test->commit);
@@ -158,11 +174,12 @@ void draw_done(struct oldteststate *os) {
 		}
 	}
 	
-	draw_dynamic(os, &attr, 1, select, status, tc, elo, tri, penta, llr, ab, elo0, elo1, eloe, dtime, stime, qtime, branch, commit, NULL);
+	draw_dynamic(os, &attr, 1, select, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, eloe, dtime, stime, qtime, branch, commit, NULL);
 
 	free(select);
 	free(status);
 	free(tc);
+	free(adj);
 	free(elo);
 	free(llr);
 	free(ab);

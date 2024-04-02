@@ -6,6 +6,7 @@
 
 #include "prompt.h"
 #include "line.h"
+#include "toggle.h"
 
 struct test {
 	int64_t id;
@@ -69,6 +70,7 @@ struct newteststate {
 
 	int selected;
 	struct prompt prompt[9];
+	struct toggle toggle[2];
 };
 
 struct state {
