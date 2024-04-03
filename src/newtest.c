@@ -9,6 +9,7 @@
 #include "req.h"
 #include "infobox.h"
 #include "util.h"
+#include "tui.h"
 
 enum {
 	PROMPTTIME,
@@ -368,8 +369,8 @@ void queue_test(struct newteststate *ns) {
 	draw_newtest(ns);
 
 	char response = RESPONSEPERMISSIONDENIED;
-	sendf(ns->ssl, "cs", REQUESTPRIVILEGE, passphrase);
-	recvf(ns->ssl, "c", &response);
+	if (sendf(ns->ssl, "cs", REQUESTPRIVILEGE, passphrase) || recvf(ns->ssl, "c", &response))
+		lostcon();
 
 	if (response != RESPONSEOK) {
 		if (fd >= 0)
@@ -379,14 +380,18 @@ void queue_test(struct newteststate *ns) {
 		return;
 	}
 
-	sendf(ns->ssl, "c", REQUESTNEWTEST);
-	sendf(ns->ssl, "cDDDDDDDcss",
+	if (sendf(ns->ssl, "c", REQUESTNEWTEST) || 
+		sendf(ns->ssl, "cDDDDDDDcss",
 			type, maintime, increment, alpha,
-			beta, elo0, elo1, eloe, adjudicate, branch, commit);
-	sendf(ns->ssl, "f", fd);
+			beta, elo0, elo1, eloe, adjudicate, branch, commit) ||
+		sendf(ns->ssl, "f", fd))
+		lostcon();
 	close(fd);
 
-	if (recvf(ns->ssl, "c", &response) || response != RESPONSEOK) {
+	if (recvf(ns->ssl, "c", &response)) {
+		lostcon();
+	}
+	else if (response != RESPONSEOK) {
 		infobox("An unexpected error occured.");
 	}
 	else {

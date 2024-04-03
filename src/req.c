@@ -5,6 +5,7 @@ int handle_password(struct connection *con, const char password[128]) {
 	if (recvf(con->ssl, "s", buf, sizeof(buf)))
 		return 1;
 	con->privileged = !strcmp(password, buf);
-	sendf(con->ssl, "c", con->privileged ? RESPONSEOK : RESPONSEPERMISSIONDENIED);
+	if (sendf(con->ssl, "c", con->privileged ? RESPONSEOK : RESPONSEPERMISSIONDENIED))
+		return 1;
 	return 0;
 }

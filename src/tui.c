@@ -8,13 +8,28 @@
 #include "draw.h"
 #include "state.h"
 #include "menu.h"
+#include "ssl.h"
 
-static struct state *sigintst;
+static struct state *diestate;
+static SSL *diessl;
 
 void sigint(int num) {
-	term_state(sigintst);
+	die(num, NULL);
+}
+
+void die(int ret, const char *str) {
+	if (diestate)
+		term_state(diestate);
+	if (diessl)
+		ssl_close(diessl, 1);
 	endwin();
-	exit(num);
+	if (str)
+		fprintf(stderr, "%s", str);
+	exit(ret);
+}
+
+void lostcon(void) {
+	die(16, "error: connection lost\n");
 }
 
 void tuiloop(SSL *ssl) {
@@ -30,7 +45,8 @@ void tuiloop(SSL *ssl) {
 
 	struct state st = { 0 };
 	init_state(&st, ssl, MENUNEWTEST);
-	sigintst = &st;
+	diestate = &st;
+	diessl = ssl;
 	signal(SIGINT, &sigint);
 	draw_resize(&st);
 

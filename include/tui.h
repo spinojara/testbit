@@ -10,4 +10,8 @@
 
 void tuiloop(SSL *ssl);
 
+void die(int ret, const char *str);
+
+void lostcon(void);
+
 #endif

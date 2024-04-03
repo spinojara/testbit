@@ -93,12 +93,14 @@ void draw_single(struct oldteststate *os, int lazy, int load, int reload) {
 }
 
 int load_single(struct oldteststate *os) {
-	sendf(os->ssl, "ccq", REQUESTLOGTEST, OLDTESTSINGLE, os->selected_id);
+	if (sendf(os->ssl, "ccq", REQUESTLOGTEST, OLDTESTSINGLE, os->selected_id))
+		lostcon();
 	char response;
-	recvf(os->ssl, "c", &response);
+	if (recvf(os->ssl, "c", &response))
+		lostcon();
 	if (response)
 		return 1;
-	return recvf(os->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
+	if (recvf(os->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
 			&os->singletest.type, &os->singletest.status,
 			&os->singletest.maintime, &os->singletest.increment,
 			&os->singletest.alpha, &os->singletest.beta,
@@ -113,13 +115,17 @@ int load_single(struct oldteststate *os) {
 			&os->singletest.t1, &os->singletest.t2,
 			&os->singletest.p0, &os->singletest.p1,
 			&os->singletest.p2, &os->singletest.p3,
-			&os->singletest.p4);
+			&os->singletest.p4))
+		lostcon();
+	return 0;
 }
 
 int load_patch(struct oldteststate *os) {
-	sendf(os->ssl, "cq", REQUESTPATCH, os->selected_id);
+	if (sendf(os->ssl, "cq", REQUESTPATCH, os->selected_id))
+		lostcon();
 	char response;
-	recvf(os->ssl, "c", &response);
+	if (recvf(os->ssl, "c", &response))
+		lostcon();
 	if (response)
 		return 1;
 	
@@ -413,14 +419,15 @@ int handle_button(struct oldteststate *os) {
 	draw_single(os, 0, 0, 0);
 
 	char response = RESPONSEPERMISSIONDENIED;
-	sendf(os->ssl, "cs", REQUESTPRIVILEGE, passphrase);
-	recvf(os->ssl, "c", &response);
+	if (sendf(os->ssl, "cs", REQUESTPRIVILEGE, passphrase) || recvf(os->ssl, "c", &response))
+		lostcon();
 	if (response != RESPONSEOK) {
 		infobox("Permission denied.");
 		return 0;
 	}
 
-	sendf(os->ssl, "cqc", REQUESTMODTEST, os->selected_id, status);
+	if (sendf(os->ssl, "cqc", REQUESTMODTEST, os->selected_id, status))
+		lostcon();
 
 	infobox(status == TESTCANCEL ? "The test has been cancelled." : "The test has been put in queue.");
 

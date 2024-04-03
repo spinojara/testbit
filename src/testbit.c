@@ -26,7 +26,8 @@ int main(void) {
 	if (!(ssl = ssl_ssl_client(ctx, sockfd)))
 		return 3;
 
-	sendf(ssl, "c", TYPECLIENT);
+	if (sendf(ssl, "c", TYPECLIENT))
+		return 4;
 
 	tuiloop(ssl);
 

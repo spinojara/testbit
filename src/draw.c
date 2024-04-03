@@ -5,6 +5,7 @@
 #include "menu.h"
 #include "oldtest.h"
 #include "newtest.h"
+#include "tui.h"
 
 void mvwaddnstrtab(WINDOW *win, int y, int x, const char *str, int n) {
 	int x_start = x;
@@ -113,12 +114,8 @@ void resize_oldtests(struct state *st) {
 }
 
 void draw_resize(struct state *st) {
-	if (LINES < LINESMIN || COLS < COLSMIN) {
-		endwin();
-		fprintf(stderr, "Terminal needs to be of size at least %dx%d.\n", COLSMIN, LINESMIN);
-		/* Close ssl here. */
-		exit(11);
-	}
+	if (LINES < LINESMIN || COLS < COLSMIN)
+		die(11, "Terminal needs to be of size at least %dx%d.\n");
 
 	wresize(stdscr, LINES, COLS);
 
