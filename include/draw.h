@@ -7,8 +7,9 @@
 #include "color.h"
 #include "state.h"
 
-#define LINESMIN 42
+#define LINESMIN 23
 #define COLSMIN 75
+#define NEWTESTLINESMIN 46
 
 void mvwaddnstrtab(WINDOW *win, int y, int x, const char *str, int n);
 

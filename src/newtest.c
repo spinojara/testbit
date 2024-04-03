@@ -55,6 +55,10 @@ void draw_prompts(struct newteststate *ns);
 void queue_test(struct newteststate *ns);
 
 void handle_newtest(struct newteststate *ns, chtype ch) {
+	if (LINES < NEWTESTLINESMIN) {
+		draw_newtest(ns);
+		return;
+	}
 	int redraw = 0;
 	switch (ch) {
 	case KEY_UP:
@@ -198,6 +202,13 @@ void draw_prompts(struct newteststate *ns) {
 
 void draw_newtest(struct newteststate *ns) {
 	draw_border(ns->win, NULL, &cs.bordershadow, &cs.border, 1, 0, 0, getmaxy(ns->win), getmaxx(ns->win));
+
+	if (LINES < NEWTESTLINESMIN) {
+		wattrset(ns->win, cs.text.attr);
+		mvwaddstr(ns->win, getmaxy(ns->win) / 2, getmaxx(ns->win) / 2 - 21, "Terminal is too small to display this page.");
+		wrefresh(ns->win);
+		return;
+	}
 
 	draw_prompts(ns);
 }
