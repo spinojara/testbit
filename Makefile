@@ -48,12 +48,7 @@ install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
-	cp -f testbit $(DESTDIR)$(BINDIR)/testbit
-	chmod 755 $(DESTDIR)$(BINDIR)/testbit
-	cp -f testbitn $(DESTDIR)$(BINDIR)/testbitn
-	chmod 755 $(DESTDIR)$(BINDIR)/testbitn
-	cp -f testbitd $(DESTDIR)$(BINDIR)/testbitd
-	chmod 755 $(DESTDIR)$(BINDIR)/testbitd
+	install -m 0755 {testbit,testbitn,testbitd} $(DESTDIR)$(BINDIR)
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/{testbit,testbitn,testbitd}
