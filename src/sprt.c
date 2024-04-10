@@ -26,7 +26,13 @@ struct game {
 void parse_finished_game(char *line, struct game *game) {
 	int n = strtol(line + 14, NULL, 10) - 1;
 
-	int white = n % 2;
+	int white;
+	if (strstr(line, "(bitbit vs bitbitold)"))
+		white = 1;
+	else if (strstr(line, "(bitbitold vs bitbit)"))
+		white = 0;
+	else
+		exit(39);
 
 	int result = RESULTNONE;
 
@@ -52,7 +58,7 @@ void parse_finished_game(char *line, struct game *game) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int nthreads, double maintime, double increment, int adjudicate, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int nthreads, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
@@ -89,8 +95,14 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
-		APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
-		APPENDARG("-engine"); APPENDARG("cmd=./bitbit");
+		if (epoch % 2) {
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
+		}
+		else {
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
+		}
 		if (adjudicate & ADJUDICATE_DRAW) {
 			APPENDARG("-draw"); APPENDARG("movenumber=60");
 			APPENDARG("movecount=8"); APPENDARG("score=20");
@@ -173,13 +185,14 @@ void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double i
 	double gametime = 2.0 * (maintime + 75 * increment);
 	double seconds = 180.0;
 	int batch_size = max(2, seconds * nthreads / gametime);
+	int epoch = 0;
 	batch_size = 2 * (batch_size / 2);
 
 	char status = TESTINCONCLUSIVE;
 
 	while (games > 0 && status == TESTINCONCLUSIVE) {
 		int batch = min(batch_size, games);
-		if (run_games(batch, nthreads, maintime, increment, adjudicate, tri, penta)) {
+		if (run_games(batch, nthreads, maintime, increment, adjudicate, epoch++, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}
