@@ -144,19 +144,22 @@ static void draw_button(const struct oldteststate *os) {
 	switch (test->status) {
 	case TESTQUEUE:
 	case TESTRUN:
+		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 1, 7, 2, 3, 10);
 		wattrset(os->win, cs.text.attr);
 		mvwaddstr(os->win, 8, 4, "Cancel");
-		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 0, 7, 2, 3, 10);
 		break;
 	case TESTH0:
 	case TESTH1:
 	case TESTELO:
 	case TESTINCONCLUSIVE:
 	case TESTCANCEL:
+		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 1, 7, 2, 3, 11);
 		wattrset(os->win, cs.text.attr);
 		mvwaddstr(os->win, 8, 4, "Requeue");
-		draw_border(os->win, NULL, &cs.border, &cs.bordershadow, 0, 7, 2, 3, 11);
 		break;
+	default:
+		for (int y = 7; y <= 9; y++)
+			mvwhline(os->win, y, 2, ' ', 11);
 	}
 }
 
@@ -168,6 +171,7 @@ static void attr(const struct oldteststate *os, int i, int j) {
 	case TESTQUEUE:
 	case TESTCANCEL:
 	case TESTINCONCLUSIVE:
+	case TESTELO:
 		wattrset(os->win, cs.yellow.attr);
 		break;
 	case TESTERRBRANCH:
@@ -180,7 +184,6 @@ static void attr(const struct oldteststate *os, int i, int j) {
 		break;
 	case TESTRUN:
 	case TESTH1:
-	case TESTELO:
 		wattrset(os->win, cs.green.attr);
 		break;
 	}
@@ -249,7 +252,7 @@ void draw_table(struct oldteststate *os) {
 	iso8601local(dtime[1], test->dtime);
 	sprintf(tc[1], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
 	if (started) {
-		sprintf(elo[1], "%.2lf+%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
+		sprintf(elo[1], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		sprintf(llr[1], "%.2lf", test->llr);
 	}
 	else {

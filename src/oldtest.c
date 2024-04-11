@@ -161,12 +161,20 @@ char *fstr(char *s, double f, int n) {
 	pos += sprintf(s + pos, "%d", d / m);
 
 	d %= m;
-	for (int i = 1; i < n; i++) {
-		if (!(d % 10))
-			d /= 10;
+	if (d) {
+		s[pos++] = '.';
+
+		for (; powi(10, n - 1) > d; n--)
+			s[pos++] = '0';
+
+		for (int i = 1; i < n; i++)
+			if (!(d % 10))
+				d /= 10;
+
+		pos += snprintf(s + pos, n + 1, "%d", d);
 	}
-	if (d)
-		sprintf(s + pos, ".%d", d);
+
+	s[pos] = '\0';
 
 	return s;
 }
