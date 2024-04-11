@@ -23,8 +23,11 @@ struct game {
 	int result;
 };
 
-void parse_finished_game(char *line, struct game *game) {
-	int n = strtol(line + 14, NULL, 10) - 1;
+void parse_finished_game(char *line, struct game *game, int max) {
+	char *endptr;
+	int n = strtol(line + 14, &endptr, 10) - 1;
+	if (*endptr != ' ' || n < 0 || n >= max)
+		exit(42);
 
 	int white;
 	if (strstr(line, "(bitbit vs bitbitold)"))
@@ -146,7 +149,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 		printf("%s", line);
 		if (!strstr(line, "Finished game"))
 			continue;
-		parse_finished_game(line, game);
+		parse_finished_game(line, game, games);
 	}
 
 	int error = 0;
