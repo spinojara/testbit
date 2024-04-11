@@ -179,14 +179,24 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 	if (recvf(con->ssl, "qq", &min, &max))
 		return 1;
 
-	sqlite3_prepare_v2(db,
-			"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
-			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
-			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
-			"FROM test WHERE status = ? or status = ? "
-			"or status = ? or status = ? or status = ? "
-			"ORDER BY queuetime ASC;",
-			-1, &stmt, NULL);
+	if (request == OLDTESTACTIVE)
+		sqlite3_prepare_v2(db,
+				"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
+				"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
+				"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
+				"FROM test WHERE status = ? or status = ? "
+				"or status = ? or status = ? or status = ? "
+				"ORDER BY queuetime ASC;",
+				-1, &stmt, NULL);
+	else
+		sqlite3_prepare_v2(db,
+				"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
+				"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
+				"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
+				"FROM test WHERE status = ? or status = ? "
+				"or status = ? or status = ? or status = ? "
+				"ORDER BY donetime DESC;",
+				-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, filter[0]);
 	sqlite3_bind_int(stmt, 2, filter[1]);
 	sqlite3_bind_int(stmt, 3, filter[2]);
