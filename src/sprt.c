@@ -53,7 +53,7 @@ void parse_finished_game(char *line, struct game *game) {
 		result = RESULTDRAW;
 	}
 
-	game[n].done = 1;
+	game[n].done = error || result == RESULTNONE ? 0 : 1;
 	game[n].result = error ? RESULTNONE : result;
 }
 
@@ -153,10 +153,11 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 		int first = 2 * pair;
 		int second = 2 * pair + 1;
 
+		int done = game[first].done && game[second].done;
 		first = game[first].result;
 		second = game[second].result;
 
-		if (first == RESULTNONE || second == RESULTNONE) {
+		if (!done || first == RESULTNONE || second == RESULTNONE) {
 			error = 1;
 			break;
 		}
