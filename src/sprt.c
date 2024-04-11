@@ -36,25 +36,27 @@ void parse_finished_game(char *line, struct game *game) {
 
 	int result = RESULTNONE;
 
-	int error = 0;
 	if (strstr(line, "): 1-0")) {
 		if (result != RESULTNONE)
-			error = 1;
+			exit(40);
 		result = white ? RESULTWIN : RESULTLOSS;
 	}
 	if (strstr(line, "): 0-1")) {
 		if (result != RESULTNONE)
-			error = 1;
+			exit(40);
 		result = white ? RESULTLOSS : RESULTWIN;
 	}
 	if (strstr(line, "): 1/2-1/2")) {
 		if (result != RESULTNONE)
-			error = 1;
+			exit(40);
 		result = RESULTDRAW;
 	}
 
-	game[n].done = error || result == RESULTNONE ? 0 : 1;
-	game[n].result = error ? RESULTNONE : result;
+	if (result == RESULTNONE)
+		exit(41);
+
+	game[n].done = 1;
+	game[n].result = result;
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
