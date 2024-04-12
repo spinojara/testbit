@@ -338,6 +338,11 @@ void draw_table(struct oldteststate *os) {
 			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, dtime, stime, qtime, branch, commit, NULL);
 		break;
 	case TESTINCONCLUSIVE:
+		if (test->type == TESTTYPEELO) {
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+			break;
+		}
+		/* fallthrough */
 	case TESTH0:
 	case TESTH1:
 		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
