@@ -8,14 +8,6 @@
 
 #include "con.h"
 
-#if CHAR_BIT != 8
-#error
-#endif
-
-#ifndef __STDC_IEC_559__
-#error
-#endif
-
 int sendi8(SSL *ssl, signed char s) {
 	union {
 		signed char a;
