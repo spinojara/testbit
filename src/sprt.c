@@ -71,7 +71,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 	char gamesstr[1024];
 	char concurrencystr[1024];
 	char tc[1024];
-	sprintf(gamesstr, "%d", games);
+	sprintf(gamesstr, "%d", games / 2);
 	sprintf(concurrencystr, "%d", nthreads);
 	sprintf(tc, "tc=%lg+%lg", maintime, increment);
 
@@ -92,11 +92,11 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 		char *argv[32];
 		int argc = 0;
 		APPENDARG("cutechess-cli");
-		APPENDARG("-variant"); APPENDARG("standard");
-		APPENDARG("-tournament"); APPENDARG("gauntlet");
 		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
-		APPENDARG("-each"); APPENDARG(tc); APPENDARG("proto=uci");
-		APPENDARG("-games"); APPENDARG(gamesstr);
+		APPENDARG("-each"); APPENDARG(tc);
+		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
+		APPENDARG("-rounds"); APPENDARG(gamesstr);
+		APPENDARG("-games"); APPENDARG("2");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
