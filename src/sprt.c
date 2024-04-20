@@ -178,9 +178,8 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
-	games = 2 * (games / 2);
 
 	double A = log(beta / (1.0 - alpha));
 	double B = log((1.0 - beta) / alpha);
@@ -196,9 +195,8 @@ void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double i
 
 	char status = TESTINCONCLUSIVE;
 
-	while (games > 0 && status == TESTINCONCLUSIVE) {
-		int batch = min(batch_size, games);
-		if (run_games(batch, nthreads, maintime, increment, adjudicate, epoch++, tri, penta)) {
+	while (status == TESTINCONCLUSIVE) {
+		if (run_games(batch_size, nthreads, maintime, increment, adjudicate, epoch++, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}
@@ -227,8 +225,6 @@ void sprt(SSL *ssl, int type, int games, int nthreads, double maintime, double i
 					llr, elo, pm) ||
 				recvf(ssl, "c", &cancel) || cancel || status != TESTINCONCLUSIVE)
 			break;
-
-		games -= batch;
 	}
 	
 	sendf(ssl, "cc", REQUESTNODEDONE, status);

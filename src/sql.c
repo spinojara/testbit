@@ -70,7 +70,6 @@ int init_db(sqlite3 **db) {
 }
 
 int start_tests(sqlite3 *db, struct fds *fds) {
-	uint32_t games = 65536;
 	int r;
 	sqlite3_stmt *stmt;
 	for (int i = 0; i < fds->fd_count; i++) {
@@ -120,10 +119,10 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 			exit(10);
 		}
 
-		if (sendf(con->ssl, "cDDDDDDDLcssf",
+		if (sendf(con->ssl, "cDDDDDDDcssf",
 				type, maintime, increment,
 				alpha, beta, elo0, elo1, eloe,
-				games, adjudicate, branch,
+				adjudicate, branch,
 				commit, fd))
 			error = 1;
 
