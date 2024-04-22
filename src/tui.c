@@ -1,6 +1,8 @@
+#define _POSIX_C_SOURCE 1
 #include "tui.h"
 
 #include <signal.h>
+#include <unistd.h>
 
 #include <ncurses.h>
 
@@ -14,7 +16,14 @@ static struct state *diestate;
 static SSL *diessl;
 
 void sigint(int num) {
-	die(num, NULL);
+	(void)num;
+	if (diestate)
+		term_state(diestate);
+	if (diessl)
+		ssl_close(diessl, 1);
+	endwin();
+	signal(SIGINT, SIG_DFL);
+	kill(getpid(), SIGINT);
 }
 
 void die(int ret, const char *str) {

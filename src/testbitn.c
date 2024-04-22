@@ -13,13 +13,13 @@ int main(int argc, char **argv) {
 	signal(SIGPIPE, SIG_IGN);
 
 	char *endptr;
-	int sockfd, nthreads;
+	int sockfd, cpus;
 	SSL *ssl;
 	SSL_CTX *ctx;
 	
 	errno = 0;
-	if (argc != 2 || (nthreads = strtol(argv[1], &endptr, 10)) <= 0 || *endptr != '\0' || errno) {
-		fprintf(stderr, "usage: testbitn nthreads\n");
+	if (argc != 2 || (cpus = strtol(argv[1], &endptr, 10)) <= 0 || *endptr != '\0' || errno) {
+		fprintf(stderr, "usage: testbitn cpus\n");
 		return 5;
 	}
 
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 
 	sendf(ssl, "c", TYPENODE);
 
-	nodeloop(ssl, nthreads);
+	nodeloop(ssl, cpus);
 
 	ssl_close(ssl, 0);
 	SSL_CTX_free(ctx);

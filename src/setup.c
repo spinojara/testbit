@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <signal.h>
 
 #include "con.h"
 #include "util.h"
@@ -137,11 +136,11 @@ int make(void) {
 	return 0;
 }
 
-void setup(SSL *ssl, int type, int nthreads, double maintime,
+void setup(SSL *ssl, int type, int cpus, double maintime,
 		double increment, double alpha, double beta, double elo0,
 		double elo1, double eloe, int adjudicate,
 		const char *branch, const char *commit) {
-
+	
 	char dtemp[] = "testbitn-bitbit-XXXXXX";
 	int r, fd, error = 0;
 	if ((r = git_clone(dtemp, branch, commit))) {
@@ -188,7 +187,7 @@ void setup(SSL *ssl, int type, int nthreads, double maintime,
 		goto cleanup;
 	}
 
-	sprt(ssl, type, nthreads, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
+	sprt(ssl, type, cpus, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
 
 cleanup:
 	if (chdir("/tmp")) {

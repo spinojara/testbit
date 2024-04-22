@@ -3,6 +3,6 @@
 
 #include <openssl/ssl.h>
 
-void nodeloop(SSL *ssl, int nthreads);
+void nodeloop(SSL *ssl, int cpus);
 
 #endif

@@ -63,7 +63,7 @@ void parse_finished_game(char *line, struct game *game, int max) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int nthreads, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int cpus, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
@@ -72,7 +72,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 	char concurrencystr[1024];
 	char tc[1024];
 	sprintf(gamesstr, "%d", games / 2);
-	sprintf(concurrencystr, "%d", nthreads);
+	sprintf(concurrencystr, "%d", cpus);
 	sprintf(tc, "tc=%lg+%lg", maintime, increment);
 
 	int pipefd[2];
@@ -178,7 +178,7 @@ int run_games(int games, int nthreads, double maintime, double increment, int ad
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int nthreads, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int cpus, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
 
 	double A = log(beta / (1.0 - alpha));
@@ -189,14 +189,14 @@ void sprt(SSL *ssl, int type, int nthreads, double maintime, double increment, d
 
 	double gametime = 2.0 * (maintime + 75 * increment);
 	double seconds = 180.0;
-	int batch_size = max(2, seconds * nthreads / gametime);
+	int batch_size = max(2, seconds * cpus / gametime);
 	int epoch = 0;
 	batch_size = 2 * (batch_size / 2);
 
 	char status = TESTINCONCLUSIVE;
 
 	while (status == TESTINCONCLUSIVE) {
-		if (run_games(batch_size, nthreads, maintime, increment, adjudicate, epoch++, tri, penta)) {
+		if (run_games(batch_size, cpus, maintime, increment, adjudicate, epoch++, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}
