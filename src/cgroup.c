@@ -160,7 +160,6 @@ int claim_cpus(int n) {
 	if (cat("/sys/fs/cgroup/testbit/cpuset.cpus.effective", buf, 1024))
 		return 3;
 	parse_cpus(buf, &available, -1);
-	print_cpu(&available);
 
 	for (int i = 0; i < available.count && claimedcpus_count < n; i++) {
 		int cpu = available.cpus[i];
@@ -200,14 +199,6 @@ int claim_cpus(int n) {
 	struct sched_param param = { 99 };
 	if (sched_setscheduler(0, SCHED_FIFO, &param))
 		return 13;
-
-	struct timespec tp = { 0 };
-	sched_rr_get_interval(0, &tp);
-	printf("round robin: %ld %ld\n", tp.tv_sec, tp.tv_nsec);
-
-	printf("claimed %d cpus\n", claimedcpus_count - 1);
-	for (int i = 1; i < claimedcpus_count; i++)
-		print_cpu(&claimedcpus[i]);
 
 	free(available.cpus);
 	return 0;
