@@ -9,7 +9,7 @@
 size_t physlen(const char *s) {
 	size_t len;
 	for (len = 0; *s; s++)
-		len += *s == '\t' ? TABSIZE : 1;
+		len += *s == '\t' ? TABSIZE - (len % TABSIZE) : 1;
 	return len;
 }
 
@@ -17,7 +17,7 @@ struct line *next_line(const char **file, struct line *prev) {
 	char *s;
 	if (!(s = strchr(*file, '\n')))
 		return NULL;
-	
+
 	struct line *line = malloc(sizeof(*line));
 	if (!line)
 		return NULL;
