@@ -17,19 +17,24 @@ SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD)
 
 DEP = $(sort $(patsubst %.c,dep/%.d,$(SRC_ALL)))
 
-OBJ_testbit  = $(patsubst %.c,obj/%.o,$(SRC_TESTBIT))
-OBJ_testbitn = $(patsubst %.c,obj/%.o,$(SRC_TESTBITN))
-OBJ_testbitd = $(patsubst %.c,obj/%.o,$(SRC_TESTBITD))
+OBJ_TESTBIT  = $(patsubst %.c,obj/%.o,$(SRC_TESTBIT))
+OBJ_TESTBITN = $(patsubst %.c,obj/%.o,$(SRC_TESTBITN))
+OBJ_TESTBITD = $(patsubst %.c,obj/%.o,$(SRC_TESTBITD))
 
 BIN          = testbit testbitn testbitd
 
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
-all: $(BIN)
+all: testbit
 
-.SECONDEXPANSION:
-$(BIN): $$(OBJ_$$@)
+everything: $(BIN)
+
+testbit: $(OBJ_TESTBIT)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+testbitd: $(OBJ_TESTBITD)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+testbitn: $(OBJ_TESTBITN)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 obj/%.o: src/%.c dep/%.d
@@ -46,12 +51,15 @@ dep/%.d: src/%.c Makefile
 
 install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
+	install -m 0755 testbit $(DESTDIR)$(BINDIR)
+
+install-everything: install everything
 	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
-	install -m 0755 {testbit,testbitn,testbitd} $(DESTDIR)$(BINDIR)
+	install -m 0755 testbit{n,d} $(DESTDIR)$(BINDIR)
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/{testbit,testbitn,testbitd}
+	rm -f $(DESTDIR)$(BINDIR)/testbit{,n,d}
 	rm -rf $(DESTDIR)/var/lib/bitbit
 
 clean:
@@ -66,4 +74,4 @@ doc/%.pdf: doc/src/%.tex doc/src/%.bib
 -include $(DEP)
 
 .PRECIOUS: dep/%.d
-.PHONY: all clean install uninstall doc
+.PHONY: all clean install install-everything uninstall doc
