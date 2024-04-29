@@ -136,7 +136,7 @@ int make(void) {
 	return 0;
 }
 
-void setup(SSL *ssl, int type, int cpus, double maintime,
+void setup(SSL *ssl, int type, int cpus, char *syzygy, double maintime,
 		double increment, double alpha, double beta, double elo0,
 		double elo1, double eloe, int adjudicate,
 		const char *branch, const char *commit) {
@@ -187,7 +187,7 @@ void setup(SSL *ssl, int type, int cpus, double maintime,
 		goto cleanup;
 	}
 
-	sprt(ssl, type, cpus, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
+	sprt(ssl, type, cpus, syzygy, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
 
 cleanup:
 	if (chdir("/tmp")) {

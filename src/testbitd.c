@@ -116,7 +116,7 @@ void handle_stdin(int *running) {
 
 static void sigint(int signum) {
 	(void)signum;
-	fprintf(stderr, "\n\"quit\\n\" to quit\n");
+	fprintf(stderr, "\n'quit\\n' to quit\n");
 	signal(SIGINT, &sigint);
 }
 

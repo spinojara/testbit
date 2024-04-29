@@ -63,7 +63,7 @@ void parse_finished_game(char *line, struct game *game, int max) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int cpus, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int cpus, char *syzygy, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
@@ -89,7 +89,7 @@ int run_games(int games, int cpus, double maintime, double increment, int adjudi
 
 		dup2(pipefd[1], STDOUT_FILENO);
 
-		char *argv[32];
+		char *argv[64];
 		int argc = 0;
 		APPENDARG("cutechess-cli");
 		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
@@ -115,6 +115,9 @@ int run_games(int games, int cpus, double maintime, double increment, int adjudi
 		if (adjudicate & ADJUDICATE_RESIGN) {
 			APPENDARG("-resign"); APPENDARG("movecount=3");
 			APPENDARG("score=800"); APPENDARG("twosided=true");
+		}
+		if (syzygy) {
+			APPENDARG("-tb"); APPENDARG(syzygy);
 		}
 		APPENDARG(NULL);
 		execvp("cutechess-cli", argv);
@@ -178,7 +181,7 @@ int run_games(int games, int cpus, double maintime, double increment, int adjudi
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int cpus, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int cpus, char *syzygy, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
 
 	double A = log(beta / (1.0 - alpha));
@@ -196,7 +199,7 @@ void sprt(SSL *ssl, int type, int cpus, double maintime, double increment, doubl
 	char status = TESTINCONCLUSIVE;
 
 	while (status == TESTINCONCLUSIVE) {
-		if (run_games(batch_size, cpus, maintime, increment, adjudicate, epoch++, tri, penta)) {
+		if (run_games(batch_size, cpus, syzygy, maintime, increment, adjudicate, epoch++, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}

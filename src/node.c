@@ -8,7 +8,7 @@
 #include "setup.h"
 #include "cgroup.h"
 
-void nodeloop(SSL *ssl, int cpus) {
+void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 	char password[128], response = RESPONSEPERMISSIONDENIED;
 	printf("Enter Passphrase: ");
 	if (read_secret(password, sizeof(password)))
@@ -41,7 +41,7 @@ void nodeloop(SSL *ssl, int cpus) {
 
 		if (claim_cpus(cpus))
 			exit(56);
-		setup(ssl, type, cpus, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit);
+		setup(ssl, type, cpus, syzygy, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit);
 		if (release_cpus())
 			exit(57);
 	}
