@@ -133,6 +133,27 @@ int make(void) {
 		return 1;
 	}
 
+	pid = fork();
+	if (pid == -1)
+		exit(49);
+
+	if (pid == 0) {
+		execlp("make", "make", "clean", (char *)NULL);
+		fprintf(stderr, "error: exec make\n");
+		kill_parent();
+		exit(50);
+	}
+
+	if (waitpid(pid, &wstatus, 0) == -1) {
+		fprintf(stderr, "error: waitpid\n");
+		exit(51);
+	}
+
+	if (WEXITSTATUS(wstatus)) {
+		fprintf(stderr, "error: make clean");
+		return 1;
+	}
+
 	return 0;
 }
 
