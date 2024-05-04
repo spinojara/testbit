@@ -112,26 +112,7 @@ int git_patch(void) {
 
 int make(void) {
 	int wstatus;
-	pid_t pid = fork();
-	if (pid == -1)
-		exit(24);
-
-	if (pid == 0) {
-		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
-		fprintf(stderr, "error: exec make\n");
-		kill_parent();
-		exit(25);
-	}
-
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(26);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		fprintf(stderr, "error: make\n");
-		return 1;
-	}
+	pid_t pid;
 
 	pid = fork();
 	if (pid == -1)
@@ -151,6 +132,27 @@ int make(void) {
 
 	if (WEXITSTATUS(wstatus)) {
 		fprintf(stderr, "error: make clean");
+		return 1;
+	}
+
+	pid = fork();
+	if (pid == -1)
+		exit(24);
+
+	if (pid == 0) {
+		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
+		fprintf(stderr, "error: exec make\n");
+		kill_parent();
+		exit(25);
+	}
+
+	if (waitpid(pid, &wstatus, 0) == -1) {
+		fprintf(stderr, "error: waitpid\n");
+		exit(26);
+	}
+
+	if (WEXITSTATUS(wstatus)) {
+		fprintf(stderr, "error: make\n");
 		return 1;
 	}
 
