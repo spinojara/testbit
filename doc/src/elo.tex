@@ -64,18 +64,18 @@ by $$\Delta E=S^{-1}(s)$$ where $$S(x)=\frac1{1+10^{-x/400}}.$$ The inverse of $
 is given by $$S^{-1}(s)=-\frac{400}{\log10}\log\left(\frac1s-1\right).$$
 
 \section{Estimating Elo}\label{confidence}
-We make the language a little more rigorous. Let $X$ be a random variable taking
-the values $0$, $\frac12$ and $1$ with probabilities $l$, $d$ and $w$. Suppose that
-$x_1,...,x_N$ are independent observations of $X$. The maximum likelihood estimator
-$\hat s$ of $s=E(X)=\frac12d+w$ is given by $$\hat s=\frac1N\sum_{n=1}^Nx_n.$$
-If $\sigma^2$ is the variance of $X$, then the central limit theorem
-\cite{wikipedia_clt} asserts that $$\frac{\hat s-s}{\sigma/\sqrt{N}}$$ will approach
-$N(0,1)$ in distribution.
+We make the language a little more rigorous. Let $X_1,X_2,...$ be independent
+random variables taking the values $0$, $\frac12$ and $1$ with probabilities
+$l$, $d$ and $w$. Let $\hat s$ be the random variable
+given by $$\hat s=\frac1N\sum_{n=1}^NX_n.$$
+The central limit theorem \cite{wikipedia_clt} then asserts that
+$$\frac{\hat s-s}{\sigma/\sqrt{N}}$$ where $\sigma^2$
+is the variance of the variables $X_n$, approaches $N(0,1)$ in distribution.
 
 We want to construct a confidence interval
 for $s$ of confidence grade $1-\alpha$. Let $\lambda_{\alpha/2}$ be the upper $\alpha/2$
 quantile of $N(0,1)$. Then $$P\left(-\lambda_{\alpha/2}<\frac{\hat s-s}{\sigma/\sqrt{N}}<
-\lambda_{\alpha/2}\right)\approx1-\alpha.$$ Equivalently $$P\left(\hat s-
+\lambda_{\alpha/2}\right)\approx1-\alpha$$ or equivalently $$P\left(\hat s-
 \frac{\lambda_{\alpha/2}\sigma}{\sqrt{N}}<s<\hat s+\frac{\lambda_{\alpha/2}\sigma}{\sqrt{N}}
 \right)\approx1-\alpha.$$ Since $S$ is an increasing function we easily derive
 the confidence interval
