@@ -36,7 +36,7 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 
 	if (pid == 0) {
 		execlp("git", "git", "clone",
-				"https://github.com/Spinojara/bitbit.git",
+				"https://github.com/spinojara/bitbit.git",
 				"--branch", branch,
 				"--single-branch",
 				dtemp, (char *)NULL);
