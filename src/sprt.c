@@ -10,6 +10,7 @@
 #include "req.h"
 #include "elo.h"
 #include "setup.h"
+#include "user.h"
 
 enum {
 	RESULTNONE = -1,
@@ -120,6 +121,7 @@ int run_games(int games, int cpus, char *syzygy, double maintime, double increme
 			APPENDARG("-tb"); APPENDARG(syzygy);
 		}
 		APPENDARG(NULL);
+		su("testbit");
 		execvp("cutechess-cli", argv);
 
 		fprintf(stderr, "error: exec cutechess-cli");

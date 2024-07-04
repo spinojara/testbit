@@ -1,3 +1,28 @@
 testbit
 =======
 A test server for bitbit.
+
+Building testbit
+----------------
+Run
+
+	$ make
+
+in the root directory. If the server is desired, it can be compiled by issuing
+
+	$ make everything
+
+instead.
+
+
+Installing testbit
+------------------
+testbitn needs a user called "testbit" to be present. On Linux it is preferably
+created by
+
+	# useradd --system                 \
+                  --no-create-home         \
+		  --comment "testbit user" \
+		  --home-dir /dev/null     \
+		  --shell /sbin/nologin    \
+		  testbit

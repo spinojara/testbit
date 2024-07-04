@@ -5,11 +5,13 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <pwd.h>
 
 #include "con.h"
 #include "util.h"
 #include "sprt.h"
 #include "req.h"
+#include "user.h"
 
 void kill_parent(void) {
 	pid_t pid = getppid();
@@ -25,7 +27,8 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 		exit(7);
 	}
 
-	if (!mkdtemp(dtemp)) {
+	struct passwd *pw = getpwnam("testbit");
+	if (!mkdtemp(dtemp) || !pw || chown(dtemp, pw->pw_uid, pw->pw_gid)) {
 		fprintf(stderr, "error: mkdtemp %s\n", dtemp);
 		exit(8);
 	}
@@ -35,6 +38,7 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 		exit(9);
 
 	if (pid == 0) {
+		su("testbit");
 		execlp("git", "git", "clone",
 				"https://github.com/spinojara/bitbit.git",
 				"--branch", branch,
@@ -65,6 +69,7 @@ int git_clone(char *dtemp, const char *branch, const char *commit) {
 		exit(13);
 
 	if (pid == 0) {
+		su("testbit");
 		execlp("git", "git", "reset", "--hard", commit, (char *)NULL);
 		fprintf(stderr, "error: exec git reset\n");
 		kill_parent();
@@ -91,6 +96,7 @@ int git_patch(void) {
 		exit(21);
 
 	if (pid == 0) {
+		su("testbit");
 		execlp("git", "git", "apply", "patch", (char *)NULL);
 		fprintf(stderr, "error: exec git apply\n");
 		kill_parent();
@@ -119,6 +125,7 @@ int make(void) {
 		exit(49);
 
 	if (pid == 0) {
+		su("testbit");
 		execlp("make", "make", "clean", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
 		kill_parent();
@@ -140,6 +147,7 @@ int make(void) {
 		exit(24);
 
 	if (pid == 0) {
+		su("testbit");
 		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
 		kill_parent();
