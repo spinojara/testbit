@@ -4,9 +4,9 @@ CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
 CDEBUG     =
 
-CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude
-LDFLAGS    = $(CFLAGS)
-LDLIBS     = -lm -lssl -lcrypto
+CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude $(shell pkg-config --cflags openssl)
+LDFLAGS    = $(CFLAGS) $(LDLIBS)
+LDLIBS     = -lm $(shell pkg-config --libs openssl)
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
 	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c \
@@ -41,9 +41,10 @@ obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-testbit:  CFLAGS += -DTERMINAL_FLICKER
-testbit:  LDLIBS += -lncurses -ltinfo
-testbitd: LDLIBS += -lsqlite3
+testbit:  CFLAGS += $(shell pkg-config --cflags ncurses) -DTERMINAL_FLICKER
+testbit:  LDLIBS += $(shell pkg-config --libs ncurses)
+testbitd: CFLAGS += $(shell pkg-config --cflags sqlite3)
+testbitd: LDLIBS += $(shell pkg-config --libs sqlite3)
 
 dep/%.d: src/%.c Makefile
 	@mkdir -p dep
