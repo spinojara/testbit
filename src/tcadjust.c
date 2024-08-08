@@ -100,6 +100,10 @@ int main(void) {
 
 	printf("average: %d ms\n", average);
 
+	double tcfactor = (double)average / 6619 * 2681 / 2054;
+
+	printf("tcfactor: %lf\n", tcfactor);
+	fprintf(f, "%lf\n", tcfactor);
 	fclose(f);
 	if (chdir("/tmp")) {
 		fprintf(stderr, "error: chdir /tmp\n");
