@@ -32,7 +32,7 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 		char branch[128];
 		char commit[128];
 
-		if (recvf(ssl, "cDDDDDDDcss",
+		if (recvf(ssl, "csDDDDDcss",
 					&type, tc, sizeof(tc),
 					&alpha, &beta, &elo0, &elo1,
 					&eloe, &adjudicate,

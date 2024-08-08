@@ -4,19 +4,24 @@
 #include <errno.h>
 #include <string.h>
 
-int tcinfo(char *tc, long *moves, double *maintime, double *increment) {
+int tcinfo(const char *tc, long *moves, double *maintime, double *increment) {
+	char copy[128];
+	snprintf(copy, 128, "%s", tc);
+	copy[127] = '\0';
+	char *tcptr = copy;
+
 	char *ptr, *endptr;
 
 	char *mo = NULL;
 	char *ma = NULL;
 	char *in = NULL;
 
-	if ((ptr = strchr(tc, '/'))) {
-		mo = tc;
-		tc = ptr + 1;
+	if ((ptr = strchr(tcptr, '/'))) {
+		mo = tcptr;
+		tcptr = ptr + 1;
 		ptr[0] = '\0';
 	}
-	ma = tc;
+	ma = tcptr;
 	if ((ptr = strchr(ma, '+'))) {
 		in = ptr + 1;
 		ptr[0] = '\0';
@@ -52,12 +57,9 @@ int tcinfo(char *tc, long *moves, double *maintime, double *increment) {
 }
 
 int tccheck(const char *tc) {
-	char copy[128];
-	snprintf(copy, 128, "%s", tc);
-	copy[127] = '\0';
 	long moves;
 	double maintime, increment;
-	return tcinfo(copy, &moves, &maintime, &increment);
+	return tcinfo(tc, &moves, &maintime, &increment);
 }
 
 int tcadjust(const char *tc, char *adjusted, size_t n) {
@@ -79,13 +81,10 @@ int tcadjust(const char *tc, char *adjusted, size_t n) {
 		return 3;
 	}
 
-	snprintf(adjusted, n, "%s", tc);
-	adjusted[n - 1] = '\0';
-
 	long moves;
 	double maintime;
 	double increment;
-	if (tcinfo(adjusted, &moves, &maintime, &increment))
+	if (tcinfo(tc, &moves, &maintime, &increment))
 		return 1;
 
 	int total = 0;

@@ -13,7 +13,7 @@
 #include "req.h"
 #include "source.h"
 
-void setup(SSL *ssl, int type, int cpus, char *syzygy, char *tc,
+void setup(SSL *ssl, int type, int cpus, char *syzygy, const char *tc,
 		double alpha, double beta, double elo0,
 		double elo1, double eloe, int adjudicate,
 		const char *branch, const char *commit) {

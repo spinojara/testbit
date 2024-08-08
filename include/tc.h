@@ -7,6 +7,6 @@ int tcadjust(const char *tc, char *adjusted, size_t n);
 
 int tccheck(const char *tc);
 
-int tcinfo(char *tc, long *moves, double *maintime, double *increment);
+int tcinfo(const char *tc, long *moves, double *maintime, double *increment);
 
 #endif

@@ -9,6 +9,7 @@
 #include "oldtest.h"
 #include "util.h"
 #include "tc.h"
+#include "sql.h"
 
 static inline int inrange(double x, double a, double b) {
 	return a <= x && x <= b;
@@ -32,7 +33,7 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	double one = 1.0 - eps;
 	if ((r = !inrange(alpha, zero, one) ||
 			!inrange(beta, zero, one) ||
-			tcadjust(tc, NULL, 0) ||
+			tccheck(tc) ||
 			(type == TESTTYPEELO && eloe < zero)))
 		goto error;
 
@@ -40,7 +41,7 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	sqlite3_prepare_v2(db,
 			"INSERT INTO test (type, status, tc, alpha, beta, "
 			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash, adjudicate) VALUES "
-			"(?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?) RETURNING id;",
+			"(?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?) RETURNING id;",
 			-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);

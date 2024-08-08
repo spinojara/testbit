@@ -65,13 +65,18 @@ void parse_finished_game(char *line, struct game *game, int max) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int cpus, char *syzygy, char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
 
 	char gamesstr[1024];
 	char concurrencystr[1024];
+
+	char fulltc[131];
+	snprintf(fulltc, 131, "tc=%s", tc);
+	fulltc[130] = '\0';
+
 	sprintf(gamesstr, "%d", games / 2);
 	sprintf(concurrencystr, "%d", cpus);
 
@@ -93,7 +98,7 @@ int run_games(int games, int cpus, char *syzygy, char *tc, int adjudicate, int e
 		int argc = 0;
 		APPENDARG("cutechess-cli");
 		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
-		APPENDARG("-each"); APPENDARG(tc);
+		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
 		APPENDARG("-rounds"); APPENDARG(gamesstr);
 		APPENDARG("-games"); APPENDARG("2");
@@ -182,7 +187,7 @@ int run_games(int games, int cpus, char *syzygy, char *tc, int adjudicate, int e
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int cpus, char *syzygy, char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int cpus, char *syzygy, const char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
 
 	double A = log(beta / (1.0 - alpha));

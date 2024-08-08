@@ -25,4 +25,6 @@ int start_tests(sqlite3 *db, struct fds *fds);
 
 void requeue_test(sqlite3 *db, int64_t id);
 
+void sqlite3_errout(sqlite3 *db, const char *file, int line);
+
 #endif
