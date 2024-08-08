@@ -42,8 +42,8 @@ int allow_float(chtype ch) {
 	return ('0' <= ch && ch <= '9') || ch == '-' || ch == '.';
 }
 
-int allow_time(chtype ch) {
-	return allow_float(ch) || ch == '+';
+int allow_tc(chtype ch) {
+	return allow_float(ch) || ch == '+' || ch == '/';
 }
 
 int allow_integer(chtype ch) {
@@ -223,7 +223,7 @@ void init_newtest(struct newteststate *ns) {
 	 */
 	int x = getmaxx(ns->win);
 
-	new_prompt(&ns->prompt[PROMPTTIME], ns->win, 2, 4, x - 18, "10+0.1", &allow_time);
+	new_prompt(&ns->prompt[PROMPTTIME], ns->win, 2, 4, x - 18, "40/10+0.1", &allow_tc);
 	new_prompt(&ns->prompt[PROMPTALPHA], ns->win, 5, 4, x - 18, "0.025", &allow_float);
 	new_prompt(&ns->prompt[PROMPTBETA], ns->win, 8, 4, x - 18, "0.025", &allow_float);
 	new_prompt(&ns->prompt[PROMPTELO0], ns->win, 11, 4, x - 18, "0.0", &allow_float);
