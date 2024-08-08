@@ -6,24 +6,26 @@ CDEBUG     =
 
 CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude $(shell pkg-config --cflags openssl)
 LDFLAGS    = $(CFLAGS) $(LDLIBS)
-LDLIBS     = -lm $(shell pkg-config --libs openssl)
+LDLIBS     = -lm
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
 	       state.c menu.c oldtest.c newtest.c prompt.c infobox.c util.c \
 	       active.c done.c single.c line.c toggle.c
 SRC_TESTBITN = testbitn.c con.c ssl.c binary.c setup.c sprt.c node.c util.c elo.c cgroup.c user.c source.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c
-SRC_TCADJUST = tcfactor.c source.c util.c user.c
-SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD) $(SRC_TCADJUST)
+SRC_TCFACTOR = tcfactor.c source.c util.c user.c
+SRC_TCADJUST = tcadjust.c
+SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD) $(SRC_TCFACTOR)
 
 DEP = $(sort $(patsubst %.c,dep/%.d,$(SRC_ALL)))
 
 OBJ_TESTBIT  = $(patsubst %.c,obj/%.o,$(SRC_TESTBIT))
 OBJ_TESTBITN = $(patsubst %.c,obj/%.o,$(SRC_TESTBITN))
 OBJ_TESTBITD = $(patsubst %.c,obj/%.o,$(SRC_TESTBITD))
+OBJ_TCFACTOR = $(patsubst %.c,obj/%.o,$(SRC_TCFACTOR))
 OBJ_TCADJUST = $(patsubst %.c,obj/%.o,$(SRC_TCADJUST))
 
-BIN          = testbit testbitn testbitd tcfactor
+BIN          = testbit testbitn testbitd tcfactor tcadjust
 
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
@@ -38,17 +40,21 @@ testbitd: $(OBJ_TESTBITD)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 testbitn: $(OBJ_TESTBITN)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
-tcfactor: $(OBJ_TCADJUST)
+tcfactor: $(OBJ_TCFACTOR)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+tcadjust: $(OBJ_TCADJUST)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-testbit:  CFLAGS += $(shell pkg-config --cflags ncurses) -DTERMINAL_FLICKER
-testbit:  LDLIBS += $(shell pkg-config --libs ncurses)
-testbitd: CFLAGS += $(shell pkg-config --cflags sqlite3)
-testbitd: LDLIBS += $(shell pkg-config --libs sqlite3)
+testbit:  CFLAGS += $(shell pkg-config --cflags openssl) $(shell pkg-config --cflags ncurses) -DTERMINAL_FLICKER
+testbit:  LDLIBS += $(shell pkg-config --libs openssl) $(shell pkg-config --libs ncurses)
+testbitn: CFLAGS += $(shell pkg-config --cflags openssl)
+testbitn: LDLIBS += $(shell pkg-config --libs openssl)
+testbitd: CFLAGS += $(shell pkg-config --cflags openssl) $(shell pkg-config --cflags sqlite3)
+testbitd: LDLIBS += $(shell pkg-config --libs openssl) $(shell pkg-config --libs sqlite3)
 
 dep/%.d: src/%.c Makefile
 	@mkdir -p dep
@@ -61,10 +67,10 @@ install: all
 install-everything: install everything
 	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
-	install -m 0755 testbit{n,d} $(DESTDIR)$(BINDIR)
+	install -m 0755 testbit{n,d} tcadjust $(DESTDIR)$(BINDIR)
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/testbit{,n,d}
+	rm -f $(DESTDIR)$(BINDIR)/{testbit{,n,d},tcadjust}
 	rm -rf $(DESTDIR)/var/lib/bitbit
 
 clean:
