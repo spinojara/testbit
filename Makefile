@@ -13,7 +13,7 @@ SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
 	       active.c done.c single.c line.c toggle.c
 SRC_TESTBITN = testbitn.c con.c ssl.c binary.c setup.c sprt.c node.c util.c elo.c cgroup.c user.c source.c
 SRC_TESTBITD = testbitd.c con.c ssl.c binary.c req.c reqc.c reqn.c sql.c
-SRC_TCADJUST = tcadjust.c source.c util.c user.c
+SRC_TCADJUST = tcfactor.c source.c util.c user.c
 SRC_ALL      = $(SRC_TESTBIT) $(SRC_TESTBITN) $(SRC_TESTBITD) $(SRC_TCADJUST)
 
 DEP = $(sort $(patsubst %.c,dep/%.d,$(SRC_ALL)))
@@ -23,7 +23,7 @@ OBJ_TESTBITN = $(patsubst %.c,obj/%.o,$(SRC_TESTBITN))
 OBJ_TESTBITD = $(patsubst %.c,obj/%.o,$(SRC_TESTBITD))
 OBJ_TCADJUST = $(patsubst %.c,obj/%.o,$(SRC_TCADJUST))
 
-BIN          = testbit testbitn testbitd tcadjust
+BIN          = testbit testbitn testbitd tcfactor
 
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
@@ -38,7 +38,7 @@ testbitd: $(OBJ_TESTBITD)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 testbitn: $(OBJ_TESTBITN)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
-tcadjust: $(OBJ_TCADJUST)
+tcfactor: $(OBJ_TCADJUST)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 obj/%.o: src/%.c dep/%.d

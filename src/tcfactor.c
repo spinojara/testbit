@@ -74,12 +74,12 @@ int bench(void) {
 
 int main(void) {
 	mkdir("/etc/bitbit", 0777);
-	FILE *f = fopen("/etc/bitbit/tcadjust", "w");
+	FILE *f = fopen("/etc/bitbit/tcfactor", "w");
 	if (!f) {
-		fprintf(stderr, "error: failed to open file /etc/bitbit/tcadjust\n");
+		fprintf(stderr, "error: failed to open file /etc/bitbit/tcfactor\n");
 		return 1;
 	}
-	char dtemp[] = "tcadjust-bitbit-XXXXXX";
+	char dtemp[] = "tcfactor-bitbit-XXXXXX";
 	int r;
 	/* commit: Clear tt before bench */
 	if ((r = git_clone(dtemp, "master", "c7ee42b")))
