@@ -4,8 +4,8 @@ CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
 CDEBUG     =
 
-CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude $(shell pkg-config --cflags openssl)
-LDFLAGS    = $(CFLAGS) $(LDLIBS)
+CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude
+LDFLAGS    = $(CFLAGS)
 LDLIBS     = -lm
 
 SRC_TESTBIT  = testbit.c con.c ssl.c binary.c tui.c color.c draw.c \
