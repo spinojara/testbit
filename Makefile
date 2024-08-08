@@ -2,7 +2,7 @@ CC         = cc
 CSTANDARD  = -std=c11
 CWARNINGS  = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla
 COPTIMIZE  = -O2
-CDEBUG     = -ggdb3 -fsanitize=address,undefined
+CDEBUG     =
 
 CFLAGS     = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) -Iinclude $(shell pkg-config --cflags openssl)
 LDFLAGS    = $(CFLAGS) $(LDLIBS)
