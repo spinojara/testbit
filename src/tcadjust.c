@@ -4,31 +4,39 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-	if (argc != 2) {
-		fprintf(stderr, "usage: %s tc\n", argv[0]);
+	if (argc < 2) {
+		fprintf(stderr, "usage: %s [--check] tc\n", argv[0]);
 		return 1;
 	}
-	
-	FILE *f = fopen("/etc/bitbit/tcfactor", "r");
-	if (!f) {
-		fprintf(stderr, "error: failed to open file /etc/bitbit/tcfactor\n");
-		return 2;
-	}
 
-	char buf[BUFSIZ] = { 0 };
-	fgets(buf, sizeof(buf), f);
-
+	char *tc;
+	double tcfactor = 1.0;
 	char *endptr;
-	errno = 0;
-	double tcfactor = strtod(buf, &endptr);
-	if (errno || *endptr != '\n' || tcfactor < 1e-6) {
-		fprintf(stderr, "error: poorly formatted file /etc/bitbit/tcfactor\n");
-		return 3;
+
+	if (argc >= 3 && !strcmp(argv[1], "--check")) {
+		tc = argv[2];
+	}
+	else {
+		tc = argv[1];
+		FILE *f = fopen("/etc/bitbit/tcfactor", "r");
+		if (!f) {
+			fprintf(stderr, "error: failed to open file /etc/bitbit/tcfactor\n");
+			return 2;
+		}
+
+		char buf[BUFSIZ] = { 0 };
+		fgets(buf, sizeof(buf), f);
+		fclose(f);
+
+		errno = 0;
+		tcfactor = strtod(buf, &endptr);
+		if (errno || *endptr != '\n' || tcfactor < 1e-6) {
+			fprintf(stderr, "error: poorly formatted file /etc/bitbit/tcfactor\n");
+			return 3;
+		}
 	}
 
 	char *ptr;
-
-	char *tc = argv[1];
 
 	char *moves = NULL;
 	char *maintime = NULL;
