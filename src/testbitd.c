@@ -7,6 +7,8 @@
 #include <netdb.h>
 #include <poll.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 #include <openssl/ssl.h>
 
@@ -32,8 +34,14 @@ void init_fds(struct fds *fds) {
 	fds->cons[1].privileged = 1;
 }
 
-void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
-	printf("connecting to %d\n", newfd);
+void *get_in_addr(struct sockaddr *addr) {
+	if (addr->sa_family == AF_INET)
+		return &((struct sockaddr_in *)addr)->sin_addr;
+	return &((struct sockaddr_in6 *)addr)->sin6_addr;
+}
+
+void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type, char name[INET6_ADDRSTRLEN]) {
+	printf("connecting to %s\n", name);
 	if (fds->fd_count == fds->fd_size) {
 		fds->fd_size *= 2;
 		fds->pfds = realloc(fds->pfds, fds->fd_size * sizeof(*fds->pfds));
@@ -51,12 +59,13 @@ void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type) {
 	fds->cons[fds->fd_count].privileged = 0;
 	fds->cons[fds->fd_count].type = type;
 	fds->cons[fds->fd_count].status = STATUSWAIT;
+	memcpy(fds->cons[fds->fd_count].name, name, INET6_ADDRSTRLEN);
 
 	fds->fd_count++;
 }
 
 void del_from_fds(struct fds *fds, int i) {
-	printf("closing %d\n", fds->pfds[i].fd);
+	printf("closing %s\n", fds->cons[i].name);
 	ssl_close(fds->cons[i].ssl, 1);
 	fds->pfds[i] = fds->pfds[fds->fd_count - 1];
 	fds->cons[i] = fds->cons[fds->fd_count - 1];
@@ -69,6 +78,10 @@ void handle_new_connection(SSL_CTX *ctx, struct fds *fds) {
 
 	int newfd = accept(fds->listener, (struct sockaddr *)&remoteaddr, &addrlen);
 	if (newfd == -1)
+		return;
+
+	char name[INET6_ADDRSTRLEN] = { 0 };
+	if (!inet_ntop(remoteaddr.ss_family, get_in_addr((struct sockaddr *)&remoteaddr), name, INET6_ADDRSTRLEN))
 		return;
 
 	struct timeval tv = { .tv_sec = 10 };
@@ -100,7 +113,7 @@ void handle_new_connection(SSL_CTX *ctx, struct fds *fds) {
 	switch (type) {
 	case TYPECLIENT:
 	case TYPENODE:
-		add_to_fds(fds, newfd, ssl, type);
+		add_to_fds(fds, newfd, ssl, type, name);
 		break;
 	default:
 		ssl_close(ssl, 1);

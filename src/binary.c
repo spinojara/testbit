@@ -240,8 +240,6 @@ int sendstr(SSL *ssl, const char *s) {
 }
 
 int recvstr(SSL *ssl, char *s, size_t size) {
-	if (size == 0)
-		return 1;
 	uint64_t len;
 	if (recvu64(ssl, &len))
 		return 1;

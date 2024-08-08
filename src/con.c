@@ -22,6 +22,9 @@
 #include "binary.h"
 
 int sendexact(SSL *ssl, const char *buf, size_t len) {
+	if (len == 0)
+		return 0;
+
 	size_t sent = 0;
 	size_t s = 0;
 
@@ -37,6 +40,9 @@ int sendexact(SSL *ssl, const char *buf, size_t len) {
 }
 
 int recvexact(SSL *ssl, char *buf, size_t len) {
+	if (len == 0)
+		return 0;
+
 	memset(buf, 0, len);
 	size_t rec = 0;
 	size_t s = 0;

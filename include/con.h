@@ -1,6 +1,8 @@
 #ifndef CON_H
 #define CON_H
 
+#include <arpa/inet.h>
+
 #include <openssl/ssl.h>
 
 enum {
@@ -22,6 +24,8 @@ struct connection {
 	char privileged;
 	
 	int64_t id;
+
+	char name[INET6_ADDRSTRLEN];
 
 	SSL *ssl;
 };

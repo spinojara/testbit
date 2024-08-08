@@ -39,7 +39,8 @@ int init_db(sqlite3 **db) {
 			"p3         INTEGER, "
 			"p4         INTEGER, "
 			"branch     TEXT, "
-			"commithash TEXT"
+			"commithash TEXT, "
+			"host       TEXT"
 			");",
 			NULL, NULL, NULL);
 
@@ -133,7 +134,7 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 		sqlite3_prepare_v2(db,
 				"UPDATE test SET starttime = unixepoch(), "
 				"status = ?, t0 = ?, t1 = ?, t2 = ?, "
-				"p0 = ?, p1 = ?, p2 = ?, p3 = ?, p4 = ? "
+				"p0 = ?, p1 = ?, p2 = ?, p3 = ?, p4 = ?, host = ? "
 				"WHERE id = ?;",
 				-1, &stmt, NULL);
 
@@ -146,7 +147,8 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 		sqlite3_bind_int(stmt, 7, 0);
 		sqlite3_bind_int(stmt, 8, 0);
 		sqlite3_bind_int(stmt, 9, 0);
-		sqlite3_bind_int64(stmt, 10, con->id);
+		sqlite3_bind_text(stmt, 10, con->name, -1, NULL);
+		sqlite3_bind_int64(stmt, 11, con->id);
 
 		sqlite3_step(stmt);
 		sqlite3_finalize(stmt);
@@ -158,7 +160,7 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 void requeue_test(sqlite3 *db, int64_t id) {
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
-			"UPDATE test SET status = ? WHERE id = ?;",
+			"UPDATE test SET status = ?, host = '' WHERE id = ?;",
 			-1, &stmt, NULL);
 
 	sqlite3_bind_int(stmt, 1, TESTQUEUE);
