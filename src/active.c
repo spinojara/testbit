@@ -53,6 +53,7 @@ void draw_active(struct oldteststate *os) {
 	char (*stime)[128] = calloc(tests, sizeof(*stime));
 	char (*branch)[128] = calloc(tests, sizeof(*branch));
 	char (*commit)[128] = calloc(tests, sizeof(*commit));
+	char (*host)[128] = calloc(tests, sizeof(*host));
 
 	sprintf(select[0], " ");
 	sprintf(status[0], "Status");
@@ -71,6 +72,7 @@ void draw_active(struct oldteststate *os) {
 	sprintf(stime[0], "Start Timestamp");
 	sprintf(branch[0], "Branch");
 	sprintf(commit[0], "Commit");
+	sprintf(host[0], "Host");
 
 	for (int i = 1; i < tests; i++) {
 		struct test *test = &os->test[i - 1];
@@ -134,9 +136,10 @@ void draw_active(struct oldteststate *os) {
 			sprintf(elo1[i], "N/A");
 			sprintf(eloe[i], "%.1lf", test->eloe);
 		}
+		sprintf(host[i], test->host);
 	}
 	
-	draw_dynamic(os, &attr, 1, select, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, eloe, eta, stime, qtime, branch, commit, NULL);
+	draw_dynamic(os, &attr, 1, select, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, eloe, eta, stime, qtime, branch, commit, host, NULL);
 
 	free(select);
 	free(status);
@@ -155,4 +158,5 @@ void draw_active(struct oldteststate *os) {
 	free(stime);
 	free(branch);
 	free(commit);
+	free(host);
 }

@@ -247,7 +247,7 @@ int load_oldtest(struct oldteststate *os) {
 
 		struct test *test = &os->test[i];
 
-		if (recvf(os->ssl, "qccsDDDDDDDDcssqqqLLLLLLLL",
+		if (recvf(os->ssl, "qccsDDDDDDDDcssqqqLLLLLLLLs",
 					&test->id, &test->type, &test->status,
 					test->tc, sizeof(test->tc), &test->alpha,
 					&test->beta, &test->llr, &test->elo0,
@@ -257,7 +257,8 @@ int load_oldtest(struct oldteststate *os) {
 					test->commit, sizeof(test->commit),
 					&test->qtime, &test->stime, &test->dtime,
 					&test->t0, &test->t1, &test->t2, &test->p0,
-					&test->p1, &test->p2, &test->p3, &test->p4))
+					&test->p1, &test->p2, &test->p3, &test->p4,
+					test->host, sizeof(test->host)))
 			return 1;
 
 		if (os->selected_id == test->id)

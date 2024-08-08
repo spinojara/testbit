@@ -102,7 +102,7 @@ int load_single(struct oldteststate *os) {
 		lostcon();
 	if (response)
 		return 1;
-	if (recvf(os->ssl, "ccsDDDDDDDDcssqqqLLLLLLLL",
+	if (recvf(os->ssl, "ccsDDDDDDDDcssqqqLLLLLLLLs",
 			&os->singletest.type, &os->singletest.status,
 			os->singletest.tc, sizeof(os->singletest.tc),
 			&os->singletest.alpha, &os->singletest.beta,
@@ -117,7 +117,8 @@ int load_single(struct oldteststate *os) {
 			&os->singletest.t1, &os->singletest.t2,
 			&os->singletest.p0, &os->singletest.p1,
 			&os->singletest.p2, &os->singletest.p3,
-			&os->singletest.p4))
+			&os->singletest.p4,
+			os->singletest.host, sizeof(os->singletest.host)))
 		lostcon();
 	return 0;
 }
@@ -211,6 +212,7 @@ void draw_table(struct oldteststate *os) {
 	char dtime[2][128];
 	char branch[2][128];
 	char commit[2][128];
+	char host[2][128];
 
 	double A = log(test->beta / (1.0 - test->alpha));
 	double B = log((1.0 - test->beta) / test->alpha);
@@ -231,6 +233,7 @@ void draw_table(struct oldteststate *os) {
 	sprintf(dtime[0], "Done Timestamp");
 	sprintf(branch[0], "Branch");
 	sprintf(commit[0], "Commit");
+	sprintf(host[0], "Host");
 
 	switch (test->adjudicate) {
 	case 0:
@@ -268,6 +271,7 @@ void draw_table(struct oldteststate *os) {
 	sprintf(eloe[1], "%.1lf", test->eloe);
 	strcpy(branch[1], test->branch);
 	strcpy(commit[1], test->commit);
+	strcpy(host[1], test->host);
 
 	switch (test->status) {
 	case TESTQUEUE:
@@ -311,9 +315,9 @@ void draw_table(struct oldteststate *os) {
 	switch (test->status) {
 	case TESTQUEUE:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, qtime, branch, commit, host, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, qtime, branch, commit, host, NULL);
 		break;
 	case TESTRUN:
 		sprintf(dtime[0], "ETA");
@@ -325,31 +329,31 @@ void draw_table(struct oldteststate *os) {
 	case TESTCANCEL:
 	case TESTERRRUN:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, host, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, host, NULL);
 		break;
 	case TESTERRBRANCH:
 	case TESTERRCOMMIT:
 	case TESTERRPATCH:
 	case TESTERRMAKE:
 		if (test->type == TESTTYPESPRT)
-			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, ab, elo0, elo1, dtime, stime, qtime, branch, commit, host, NULL);
 		else
-			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, eloe, dtime, stime, qtime, branch, commit, host, NULL);
 		break;
 	case TESTINCONCLUSIVE:
 		if (test->type == TESTTYPEELO) {
-			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+			draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, host, NULL);
 			break;
 		}
 		/* fallthrough */
 	case TESTH0:
 	case TESTH1:
-		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, NULL);
+		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, llr, ab, elo0, elo1, dtime, stime, qtime, branch, commit, host, NULL);
 		break;
 	case TESTELO:
-		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, NULL);
+		draw_dynamic(os, &attr, 0, status, tc, adj, elo, tri, penta, eloe, dtime, stime, qtime, branch, commit, host, NULL);
 		break;
 	}
 }

@@ -3,6 +3,7 @@
 
 #include <ncurses.h>
 #include <openssl/ssl.h>
+#include <arpa/inet.h>
 
 #include "prompt.h"
 #include "line.h"
@@ -33,6 +34,8 @@ struct test {
 
 	char branch[128];
 	char commit[128];
+
+	char host[INET6_ADDRSTRLEN];
 };
 
 struct oldteststate {
