@@ -13,8 +13,8 @@
 #include "req.h"
 #include "source.h"
 
-void setup(SSL *ssl, int type, int cpus, char *syzygy, double maintime,
-		double increment, double alpha, double beta, double elo0,
+void setup(SSL *ssl, int type, int cpus, char *syzygy, char *tc,
+		double alpha, double beta, double elo0,
 		double elo1, double eloe, int adjudicate,
 		const char *branch, const char *commit) {
 	
@@ -64,7 +64,7 @@ void setup(SSL *ssl, int type, int cpus, char *syzygy, double maintime,
 		goto cleanup;
 	}
 
-	sprt(ssl, type, cpus, syzygy, maintime, increment, alpha, beta, elo0, elo1, eloe, adjudicate);
+	sprt(ssl, type, cpus, syzygy, tc, alpha, beta, elo0, elo1, eloe, adjudicate);
 
 cleanup:
 	if (chdir("/tmp")) {

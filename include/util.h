@@ -16,4 +16,6 @@ char *iso8601local(char *str, time_t t);
 
 int rmdir_r(const char *path);
 
+void kill_parent(void);
+
 #endif

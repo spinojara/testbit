@@ -11,6 +11,7 @@
 #include "elo.h"
 #include "setup.h"
 #include "user.h"
+#include "tc.h"
 
 enum {
 	RESULTNONE = -1,
@@ -64,17 +65,15 @@ void parse_finished_game(char *line, struct game *game, int max) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int cpus, char *syzygy, double maintime, double increment, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int cpus, char *syzygy, char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
 
 	char gamesstr[1024];
 	char concurrencystr[1024];
-	char tc[1024];
 	sprintf(gamesstr, "%d", games / 2);
 	sprintf(concurrencystr, "%d", cpus);
-	sprintf(tc, "tc=%lg+%lg", maintime, increment);
 
 	int pipefd[2];
 	if (pipe(pipefd))
@@ -183,7 +182,7 @@ int run_games(int games, int cpus, char *syzygy, double maintime, double increme
 	return error;
 }
 
-void sprt(SSL *ssl, int type, int cpus, char *syzygy, double maintime, double increment, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int cpus, char *syzygy, char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
 
 	double A = log(beta / (1.0 - alpha));
@@ -192,7 +191,15 @@ void sprt(SSL *ssl, int type, int cpus, char *syzygy, double maintime, double in
 	int32_t tri[3] = { 0 };
 	int32_t penta[5] = { 0 };
 
-	double gametime = 2.0 * (maintime + 75 * increment);
+	long moves = 0;
+	double maintime = 0;
+	double increment = 0;
+	tcinfo(tc, &moves, &maintime, &increment);
+
+	int expected_moves = 75;
+	double tcs = moves == 0 || moves >= expected_moves ? 1.0 : (double)expected_moves / moves;
+
+	double gametime = 2.0 * tcs * (maintime + (moves == 0 || moves >= expected_moves ? expected_moves : moves) * increment);
 	double seconds = 180.0;
 	int batch_size = max(2, seconds * cpus / gametime);
 	int epoch = 0;
@@ -201,7 +208,7 @@ void sprt(SSL *ssl, int type, int cpus, char *syzygy, double maintime, double in
 	char status = TESTINCONCLUSIVE;
 
 	while (status == TESTINCONCLUSIVE) {
-		if (run_games(batch_size, cpus, syzygy, maintime, increment, adjudicate, epoch++, tri, penta)) {
+		if (run_games(batch_size, cpus, syzygy, tc, adjudicate, epoch++, tri, penta)) {
 			status = TESTERRRUN;
 			break;
 		}

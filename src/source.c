@@ -12,11 +12,6 @@
 #include "user.h"
 #include "util.h"
 
-void kill_parent(void) {
-	pid_t pid = getppid();
-	kill(pid, SIGKILL);
-}
-
 int git_clone(char *dtemp, const char *branch, const char *commit) {
 	int wstatus;
 	pid_t pid;
@@ -165,4 +160,3 @@ int make(void) {
 
 	return 0;
 }
-

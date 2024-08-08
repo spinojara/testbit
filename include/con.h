@@ -16,23 +16,6 @@ enum {
 	STATUSCANCEL,
 };
 
-struct contest {
-	char status;
-
-	char type;
-
-	double maintime;
-	double increment;
-	double alpha;
-	double beta;
-	double elo0;
-	double elo1;
-	double eloe;
-
-	char *branch;
-	char *commit;
-};
-
 struct connection {
 	char type;
 	char status;

@@ -84,7 +84,6 @@ void draw_done(struct oldteststate *os) {
 	sprintf(branch[0], "Branch");
 	sprintf(commit[0], "Commit");
 
-	char tmp1[128], tmp2[128];
 	for (int i = 1; i < tests; i++) {
 		struct test *test = &os->test[i - 1];
 		test->alpha = test->beta = 0.025;
@@ -106,7 +105,7 @@ void draw_done(struct oldteststate *os) {
 			sprintf(adj[i], "Both");
 			break;
 		}
-		sprintf(tc[i], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
+		strcpy(tc[i], test->tc);
 		strcpy(branch[i], test->branch);
 		strcpy(commit[i], test->commit);
 		iso8601local(qtime[i], test->qtime);

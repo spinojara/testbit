@@ -14,8 +14,7 @@ struct test {
 	char type;
 	char status;
 
-	double maintime;
-	double increment;
+	char tc[128];
 	double alpha;
 	double beta;
 	double elo0;

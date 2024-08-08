@@ -102,9 +102,9 @@ int load_single(struct oldteststate *os) {
 		lostcon();
 	if (response)
 		return 1;
-	if (recvf(os->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
+	if (recvf(os->ssl, "ccsDDDDDDDDcssqqqLLLLLLLL",
 			&os->singletest.type, &os->singletest.status,
-			&os->singletest.maintime, &os->singletest.increment,
+			os->singletest.tc, sizeof(os->singletest.tc),
 			&os->singletest.alpha, &os->singletest.beta,
 			&os->singletest.llr, &os->singletest.elo0,
 			&os->singletest.elo1, &os->singletest.eloe,
@@ -248,11 +248,10 @@ void draw_table(struct oldteststate *os) {
 	}
 
 	int started = test->t0 + test->t1 + test->t2 > 0;
-	char tmp1[128], tmp2[128];
 	iso8601local(qtime[1], test->qtime);
 	iso8601local(stime[1], test->stime);
 	iso8601local(dtime[1], test->dtime);
-	sprintf(tc[1], "%s+%s", fstr(tmp1, test->maintime, 2), fstr(tmp2, test->increment, 2));
+	strcpy(tc[1], test->tc);
 	if (started) {
 		sprintf(elo[1], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		sprintf(llr[1], "%.2lf", test->llr);

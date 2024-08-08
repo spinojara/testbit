@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include "draw.h"
 #include "sprt.h"
@@ -10,6 +11,8 @@
 #include "infobox.h"
 #include "util.h"
 #include "tui.h"
+#include "source.h"
+#include "tc.h"
 
 enum {
 	PROMPTTIME,
@@ -248,14 +251,13 @@ void term_newtest(struct newteststate *ns) {
 
 void queue_test(struct newteststate *ns) {
 	struct prompt *p;
-	char *str, *c, *err, *err2 = NULL;
+	char *str, *err;
 
 	const double zero = eps;
 	const double one = 1.0 - zero;
 
 	char type;
-	double maintime;
-	double increment;
+	const char *tc;
 	double alpha;
 	double beta;
 	double elo0;
@@ -268,28 +270,11 @@ void queue_test(struct newteststate *ns) {
 	int error = 0;
 
 	p = &ns->prompt[PROMPTTIME];
-	str = prompt_str(p);
-	c = strchr(str, '+');
-	errno = 0;
-	if (c) {
-		increment = strtod(c + 1, &err2);
-		*c = '\0';
-	}
-	else
-		increment = 0.0;
-
-	int olderrno = errno;
-	errno = 0;
-	maintime = strtod(str, &err);
-	errno = olderrno || errno;
-
-	if (*err != '\0' || (err2 && *err2 != '\0') || maintime <= 0.1 || increment < 0.0 || errno) {
+	tc = prompt_str(p);
+	if (tccheck(tc)) {
 		error = 1;
 		p->error = 1;
 	}
-
-	if (c)
-		*c = '+';
 
 	p = &ns->prompt[PROMPTALPHA];
 	str = prompt_str(p);
@@ -381,8 +366,8 @@ void queue_test(struct newteststate *ns) {
 	}
 
 	if (sendf(ns->ssl, "c", REQUESTNEWTEST) || 
-		sendf(ns->ssl, "cDDDDDDDcss",
-			type, maintime, increment, alpha,
+		sendf(ns->ssl, "csDDDDDcss",
+			type, tc, alpha,
 			beta, elo0, elo1, eloe, adjudicate, branch, commit) ||
 		sendf(ns->ssl, "f", fd))
 		lostcon();

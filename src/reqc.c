@@ -8,6 +8,7 @@
 #include "sprt.h"
 #include "oldtest.h"
 #include "util.h"
+#include "tc.h"
 
 static inline int inrange(double x, double a, double b) {
 	return a <= x && x <= b;
@@ -15,13 +16,13 @@ static inline int inrange(double x, double a, double b) {
 
 int handle_new_test(struct connection *con, sqlite3 *db) {
 	char type, adjudicate;
-	double maintime, increment;
+	char tc[128];
 	double alpha, beta;
 	double elo0, elo1, eloe;
 	char branch[128], commit[128];
 	int r = 0;
-	if ((r = recvf(con->ssl, "cDDDDDDDcss",
-					&type, &maintime, &increment, &alpha,
+	if ((r = recvf(con->ssl, "csDDDDDcss",
+					&type, tc, sizeof(tc), &alpha,
 					&beta, &elo0, &elo1, &eloe, &adjudicate,
 					branch, sizeof(branch),
 					commit, sizeof(commit))))
@@ -31,31 +32,30 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	double one = 1.0 - eps;
 	if ((r = !inrange(alpha, zero, one) ||
 			!inrange(beta, zero, one) ||
-			maintime <= 0.1 || increment < 0.0 ||
+			tcadjust(tc, NULL, 0) ||
 			(type == TESTTYPEELO && eloe < zero)))
 		goto error;
 
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
-			"INSERT INTO test (type, status, maintime, increment, alpha, beta, "
+			"INSERT INTO test (type, status, tc, alpha, beta, "
 			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash, adjudicate) VALUES "
 			"(?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?) RETURNING id;",
 			-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);
-	sqlite3_bind_double(stmt, 3, maintime);
-	sqlite3_bind_double(stmt, 4, increment);
-	sqlite3_bind_double(stmt, 5, alpha);
-	sqlite3_bind_double(stmt, 6, beta);
-	sqlite3_bind_double(stmt, 7, elo0);
-	sqlite3_bind_double(stmt, 8, elo1);
-	sqlite3_bind_double(stmt, 9, eloe);
+	sqlite3_bind_text(stmt, 3, tc, -1, NULL);
+	sqlite3_bind_double(stmt, 4, alpha);
+	sqlite3_bind_double(stmt, 5, beta);
+	sqlite3_bind_double(stmt, 6, elo0);
+	sqlite3_bind_double(stmt, 7, elo1);
+	sqlite3_bind_double(stmt, 8, eloe);
 
+	sqlite3_bind_double(stmt, 9, 0.0 / 0.0);
 	sqlite3_bind_double(stmt, 10, 0.0 / 0.0);
-	sqlite3_bind_double(stmt, 11, 0.0 / 0.0);
-	sqlite3_bind_text(stmt, 12, branch, -1, NULL);
-	sqlite3_bind_text(stmt, 13, commit, -1, NULL);
-	sqlite3_bind_int(stmt, 14, adjudicate);
+	sqlite3_bind_text(stmt, 11, branch, -1, NULL);
+	sqlite3_bind_text(stmt, 12, commit, -1, NULL);
+	sqlite3_bind_int(stmt, 13, adjudicate);
 	sqlite3_step(stmt);
 	con->id = sqlite3_column_int(stmt, 0);
 	sqlite3_step(stmt);
@@ -91,7 +91,7 @@ int handle_log_test(struct connection *con, sqlite3 *db) {
 
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
-			"SELECT type, status, maintime, increment, alpha, beta, llr, "
+			"SELECT type, status, tc, alpha, beta, llr, "
 			"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
 			"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
 			"FROM test WHERE id = ?;",
@@ -101,32 +101,31 @@ int handle_log_test(struct connection *con, sqlite3 *db) {
 		sendf(con->ssl, "c", 0);
 		char type = sqlite3_column_int(stmt, 0);
 		char status = sqlite3_column_int(stmt, 1);
-		double maintime = sqlite3_column_double(stmt, 2);
-		double increment = sqlite3_column_double(stmt, 3);
-		double alpha = sqlite3_column_double(stmt, 4);
-		double beta = sqlite3_column_double(stmt, 5);
-		double llr = sqlite3_column_double(stmt, 6);
-		double elo0 = sqlite3_column_double(stmt, 7);
-		double elo1 = sqlite3_column_double(stmt, 8);
-		double eloe = sqlite3_column_double(stmt, 9);
-		double elo = sqlite3_column_double(stmt, 10);
-		double pm = sqlite3_column_double(stmt, 11);
-		const char *branch = (const char *)sqlite3_column_text(stmt, 12);
-		const char *commit = (const char *)sqlite3_column_text(stmt, 13);
-		int64_t qtime = sqlite3_column_int64(stmt, 14);
-		int64_t stime = sqlite3_column_int64(stmt, 15);
-		int64_t dtime = sqlite3_column_int64(stmt, 16);
-		uint32_t t0 = sqlite3_column_int(stmt, 17);
-		uint32_t t1 = sqlite3_column_int(stmt, 18);
-		uint32_t t2 = sqlite3_column_int(stmt, 19);
-		uint32_t p0 = sqlite3_column_int(stmt, 20);
-		uint32_t p1 = sqlite3_column_int(stmt, 21);
-		uint32_t p2 = sqlite3_column_int(stmt, 22);
-		uint32_t p3 = sqlite3_column_int(stmt, 23);
-		uint32_t p4 = sqlite3_column_int(stmt, 24);
-		char adjudicate = sqlite3_column_int(stmt, 25);
-		sendf(con->ssl, "ccDDDDDDDDDDcssqqqLLLLLLLL",
-				type, status, maintime, increment, alpha, beta, llr,
+		const char *tc = (const char *)sqlite3_column_text(stmt, 2);
+		double alpha = sqlite3_column_double(stmt, 3);
+		double beta = sqlite3_column_double(stmt, 4);
+		double llr = sqlite3_column_double(stmt, 5);
+		double elo0 = sqlite3_column_double(stmt, 6);
+		double elo1 = sqlite3_column_double(stmt, 7);
+		double eloe = sqlite3_column_double(stmt, 8);
+		double elo = sqlite3_column_double(stmt, 9);
+		double pm = sqlite3_column_double(stmt, 10);
+		const char *branch = (const char *)sqlite3_column_text(stmt, 11);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 12);
+		int64_t qtime = sqlite3_column_int64(stmt, 13);
+		int64_t stime = sqlite3_column_int64(stmt, 14);
+		int64_t dtime = sqlite3_column_int64(stmt, 15);
+		uint32_t t0 = sqlite3_column_int(stmt, 16);
+		uint32_t t1 = sqlite3_column_int(stmt, 17);
+		uint32_t t2 = sqlite3_column_int(stmt, 18);
+		uint32_t p0 = sqlite3_column_int(stmt, 19);
+		uint32_t p1 = sqlite3_column_int(stmt, 20);
+		uint32_t p2 = sqlite3_column_int(stmt, 21);
+		uint32_t p3 = sqlite3_column_int(stmt, 22);
+		uint32_t p4 = sqlite3_column_int(stmt, 23);
+		char adjudicate = sqlite3_column_int(stmt, 24);
+		sendf(con->ssl, "ccsDDDDDDDDcssqqqLLLLLLLL",
+				type, status, tc, alpha, beta, llr,
 				elo0, elo1, eloe, elo, pm, adjudicate, branch, commit,
 				qtime, stime, dtime, t0, t1, t2, p0, p1, p2, p3, p4);
 
@@ -181,7 +180,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 
 	if (request == OLDTESTACTIVE)
 		sqlite3_prepare_v2(db,
-				"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
+				"SELECT id, type, status, tc, alpha, beta, llr, "
 				"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
 				"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
 				"FROM test WHERE status = ? or status = ? "
@@ -190,7 +189,7 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 				-1, &stmt, NULL);
 	else
 		sqlite3_prepare_v2(db,
-				"SELECT id, type, status, maintime, increment, alpha, beta, llr, "
+				"SELECT id, type, status, tc, alpha, beta, llr, "
 				"elo0, elo1, eloe, elo, pm, branch, commithash, queuetime, "
 				"starttime, donetime, t0, t1, t2, p0, p1, p2, p3, p4, adjudicate "
 				"FROM test WHERE status = ? or status = ? "
@@ -215,30 +214,29 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		int64_t id = sqlite3_column_int64(stmt, 0);
 		char type = sqlite3_column_int(stmt, 1);
 		char status = sqlite3_column_int(stmt, 2);
-		double maintime = sqlite3_column_double(stmt, 3);
-		double increment = sqlite3_column_double(stmt, 4);
-		double alpha = sqlite3_column_double(stmt, 5);
-		double beta = sqlite3_column_double(stmt, 6);
-		double llr = sqlite3_column_double(stmt, 7);
-		double elo0 = sqlite3_column_double(stmt, 8);
-		double elo1 = sqlite3_column_double(stmt, 9);
-		double eloe = sqlite3_column_double(stmt, 10);
-		double elo = sqlite3_column_double(stmt, 11);
-		double pm = sqlite3_column_double(stmt, 12);
-		const char *branch = (const char *)sqlite3_column_text(stmt, 13);
-		const char *commit = (const char *)sqlite3_column_text(stmt, 14);
-		int64_t qtime = sqlite3_column_int64(stmt, 15);
-		int64_t stime = sqlite3_column_int64(stmt, 16);
-		int64_t dtime = sqlite3_column_int64(stmt, 17);
-		uint32_t t0 = sqlite3_column_int(stmt, 18);
-		uint32_t t1 = sqlite3_column_int(stmt, 19);
-		uint32_t t2 = sqlite3_column_int(stmt, 20);
-		uint32_t p0 = sqlite3_column_int(stmt, 21);
-		uint32_t p1 = sqlite3_column_int(stmt, 22);
-		uint32_t p2 = sqlite3_column_int(stmt, 23);
-		uint32_t p3 = sqlite3_column_int(stmt, 24);
-		uint32_t p4 = sqlite3_column_int(stmt, 25);
-		char adjudicate = sqlite3_column_int(stmt, 26);
+		const char *tc = (const char *)sqlite3_column_text(stmt, 3);
+		double alpha = sqlite3_column_double(stmt, 4);
+		double beta = sqlite3_column_double(stmt, 5);
+		double llr = sqlite3_column_double(stmt, 6);
+		double elo0 = sqlite3_column_double(stmt, 7);
+		double elo1 = sqlite3_column_double(stmt, 8);
+		double eloe = sqlite3_column_double(stmt, 9);
+		double elo = sqlite3_column_double(stmt, 10);
+		double pm = sqlite3_column_double(stmt, 11);
+		const char *branch = (const char *)sqlite3_column_text(stmt, 12);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 13);
+		int64_t qtime = sqlite3_column_int64(stmt, 14);
+		int64_t stime = sqlite3_column_int64(stmt, 15);
+		int64_t dtime = sqlite3_column_int64(stmt, 16);
+		uint32_t t0 = sqlite3_column_int(stmt, 17);
+		uint32_t t1 = sqlite3_column_int(stmt, 18);
+		uint32_t t2 = sqlite3_column_int(stmt, 19);
+		uint32_t p0 = sqlite3_column_int(stmt, 20);
+		uint32_t p1 = sqlite3_column_int(stmt, 21);
+		uint32_t p2 = sqlite3_column_int(stmt, 22);
+		uint32_t p3 = sqlite3_column_int(stmt, 23);
+		uint32_t p4 = sqlite3_column_int(stmt, 24);
+		char adjudicate = sqlite3_column_int(stmt, 25);
 
 		/* Send information that a row was found. */
 		if (sendf(con->ssl, "c", 0)) {
@@ -246,8 +244,8 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 			break;
 		}
 		/* Send the data. */
-		if (sendf(con->ssl, "qccDDDDDDDDDDcssqqqLLLLLLLL",
-				id, type, status, maintime, increment, alpha, beta, llr,
+		if (sendf(con->ssl, "qccsDDDDDDDDcssqqqLLLLLLLL",
+				id, type, status, tc, alpha, beta, llr,
 				elo0, elo1, eloe, elo, pm, adjudicate, branch, commit,
 				qtime, stime, dtime, t0, t1, t2, p0, p1, p2, p3, p4)) {
 			error = 1;

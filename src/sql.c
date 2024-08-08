@@ -17,8 +17,7 @@ int init_db(sqlite3 **db) {
 			"id         INTEGER PRIMARY KEY, "
 			"type       INTEGER, "
 			"status     INTEGER, "
-			"maintime   REAL, "
-			"increment  REAL, "
+			"tc         TEXT, "
 			"alpha      REAL, "
 			"beta       REAL, "
 			"elo0       REAL, "
@@ -79,7 +78,7 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 			continue;
 
 		r = sqlite3_prepare_v2(db,
-				"SELECT id, type, maintime, increment, alpha, beta, "
+				"SELECT id, type, tc, alpha, beta, "
 				"elo0, elo1, eloe, branch, commithash, adjudicate "
 				"FROM test WHERE status = ? ORDER BY queuetime ASC LIMIT 1;",
 				-1, &stmt, NULL);
@@ -97,16 +96,15 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 
 		con->id = sqlite3_column_int64(stmt, 0);
 		char type = sqlite3_column_int(stmt, 1);
-		double maintime = sqlite3_column_double(stmt, 2);
-		double increment = sqlite3_column_double(stmt, 3);
-		double alpha = sqlite3_column_double(stmt, 4);
-		double beta = sqlite3_column_double(stmt, 5);
-		double elo0 = sqlite3_column_double(stmt, 6);
-		double elo1 = sqlite3_column_double(stmt, 7);
-		double eloe = sqlite3_column_double(stmt, 8);
+		const char *tc = (const char *)sqlite3_column_text(stmt, 2);
+		double alpha = sqlite3_column_double(stmt, 3);
+		double beta = sqlite3_column_double(stmt, 4);
+		double elo0 = sqlite3_column_double(stmt, 5);
+		double elo1 = sqlite3_column_double(stmt, 6);
+		double eloe = sqlite3_column_double(stmt, 7);
 
-		const char *branch = (const char *)sqlite3_column_text(stmt, 9);
-		const char *commit = (const char *)sqlite3_column_text(stmt, 10);
+		const char *branch = (const char *)sqlite3_column_text(stmt, 8);
+		const char *commit = (const char *)sqlite3_column_text(stmt, 9);
 
 		char adjudicate = sqlite3_column_int(stmt, 11);
 
@@ -119,8 +117,8 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 			exit(10);
 		}
 
-		if (sendf(con->ssl, "cDDDDDDDcssf",
-				type, maintime, increment,
+		if (sendf(con->ssl, "csDDDDDcssf",
+				type, tc,
 				alpha, beta, elo0, elo1, eloe,
 				adjudicate, branch,
 				commit, fd))

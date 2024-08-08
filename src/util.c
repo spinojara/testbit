@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <ftw.h>
+#include <signal.h>
+#include <unistd.h>
 
 char *iso8601tm(char *str, const struct tm *tm) {
 	strftime(str, 28, "%F %T", tm);
@@ -38,4 +40,9 @@ int rm(const char *path, const struct stat *sb, int typeflag, struct FTW *ftwbuf
 
 int rmdir_r(const char *path) {
 	return nftw(path, rm, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+void kill_parent(void) {
+	pid_t pid = getppid();
+	kill(pid, SIGKILL);
 }
