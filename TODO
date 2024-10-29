@@ -1,5 +1,8 @@
 TODO
-- Add checks for recvf and sendf in testbit.
-  The program should properly handle a loss of connection.
-- Sort the different logs correctly. I.e. "done" should be
-  sorted by donetime, not queuetime
+- Add checks for recvf and sendf in testbit. The program should properly handle
+  a loss of connection.
+- Sort the different logs correctly. I.e. "done" should be sorted by donetime,
+  not queuetime.
+- Disable core boost during testing for more stable results. This can be found
+  in /sys/devices/system/cpu/intel_pstate/no_turbo for intel cpus, and
+  in /sys/devices/system/cpu/cpux/cpufreq/boost for amd cpus.
