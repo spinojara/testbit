@@ -12,6 +12,7 @@ retry="SIGINT/5"
 
 depend() {
 	need net
+	use testbitd
 }
 
 start_pre() {
