@@ -65,8 +65,14 @@ install-everything: install everything
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
 	install -m 0755 testbit{n,d} $(DESTDIR)$(BINDIR)
 
+install-daemon:
+	mkdir -p $(DESTDIR)/etc/init.d
+	install -m 0755 testbitd-openrc.sh $(DESTDIR)/etc/init.d/testbitd
+	install -m 0755 testbitn-openrc.sh $(DESTDIR)/etc/init.d/testbitn
+
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/testbit{,n,d}
+	rm -f $(DESTDIR)/etc/init.d/testbit{d,n}
 	rm -rf $(DESTDIR)/var/lib/bitbit
 
 clean:
@@ -81,4 +87,4 @@ doc/%.pdf: doc/src/%.tex doc/src/%.bib
 -include $(DEP)
 
 .PRECIOUS: dep/%.d
-.PHONY: all clean install install-everything uninstall doc
+.PHONY: all clean install install-everything install-daemon uninstall doc

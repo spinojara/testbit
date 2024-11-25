@@ -9,10 +9,12 @@
 #include "cgroup.h"
 #include "tc.h"
 
+extern int daemon_mode;
+
 void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 	char password[4096], response = RESPONSEPERMISSIONDENIED;
 	printf("Enter Passphrase: ");
-	if (read_secret(password, sizeof(password)))
+	if (read_secret(password, sizeof(password), !daemon_mode))
 		exit(4);
 
 	sendf(ssl, "cs", REQUESTPRIVILEGE, password);

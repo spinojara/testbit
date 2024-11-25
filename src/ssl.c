@@ -8,7 +8,7 @@
 #include <openssl/err.h>
 
 #define PORT "2718"
-#define HOSTNAME "test.bitbitchess.org"
+#define HOSTNAME "bitbit.spinojara.se"
 
 int get_socket(void) {
 	int sockfd;
@@ -89,11 +89,11 @@ SSL_CTX *ssl_ctx_server(void) {
 	if (!SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION))
 		return NULL;
 
-	if (!SSL_CTX_use_certificate_file(ctx, "/var/lib/bitbit/certs/bitbit.crt", SSL_FILETYPE_PEM)) {
+	if (!SSL_CTX_use_certificate_file(ctx, "/var/lib/bitbit/certs/testbit.crt", SSL_FILETYPE_PEM)) {
 		fprintf(stderr, "error: failed to set the certificate\n");
 		return NULL;
 	}
-	if (!SSL_CTX_use_PrivateKey_file(ctx, "/var/lib/bitbit/private/bitbit.key.pem", SSL_FILETYPE_PEM)) {
+	if (!SSL_CTX_use_PrivateKey_file(ctx, "/var/lib/bitbit/private/testbit.key.pem", SSL_FILETYPE_PEM)) {
 		fprintf(stderr, "error: failed to set the private key\n");
 		return NULL;
 	}

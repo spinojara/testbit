@@ -18,23 +18,33 @@
 #include "req.h"
 #include "sql.h"
 
+static int daemon_mode = 0;
+
 static int running = 1;
 
 void init_fds(struct fds *fds) {
-	fds->fd_count = 2;
+	fds->fd_count = 0;
 	fds->fd_size = 4;
 	fds->pfds = malloc(fds->fd_size * sizeof(*fds->pfds));
 	fds->cons = malloc(fds->fd_size * sizeof(*fds->cons));
+	if (!fds->pfds || !fds->cons) {
+		fprintf(stderr, "error: malloc\n");
+		exit(-1);
+	}
 
 	fds->pfds[0].fd = fds->listener;
 	fds->pfds[0].events = POLLIN;
 	fds->cons[0].type = TYPELISTENER;
 	fds->cons[0].privileged = 1;
+	fds->fd_count++;
 
-	fds->pfds[1].fd = STDIN_FILENO;
-	fds->pfds[1].events = POLLIN;
-	fds->cons[1].type = TYPESTDIN;
-	fds->cons[1].privileged = 1;
+	if (!daemon_mode) {
+		fds->pfds[1].fd = STDIN_FILENO;
+		fds->pfds[1].events = POLLIN;
+		fds->cons[1].type = TYPESTDIN;
+		fds->cons[1].privileged = 1;
+		fds->fd_count++;
+	}
 }
 
 void *get_in_addr(struct sockaddr *addr) {
@@ -49,8 +59,10 @@ void add_to_fds(struct fds *fds, int newfd, SSL *ssl, char type, char name[INET6
 		fds->fd_size *= 2;
 		fds->pfds = realloc(fds->pfds, fds->fd_size * sizeof(*fds->pfds));
 		fds->cons = realloc(fds->cons, fds->fd_size * sizeof(*fds->cons));
-		if (!fds->pfds || !fds->cons)
-			exit(8);
+		if (!fds->pfds || !fds->cons) {
+			fprintf(stderr, "error: realloc\n");
+			exit(-2);
+		}
 	}
 	memset(&(fds->pfds)[fds->fd_count], 0, sizeof(*fds->pfds));
 	memset(&(fds->cons)[fds->fd_count], 0, sizeof(*fds->cons));
@@ -135,7 +147,15 @@ static void stop(int signum) {
 	running = 0;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+	if (argc == 2 && !strcmp(argv[1], "--daemon_mode")) {
+		daemon_mode = 1;
+	}
+	else if (argc >= 2) {
+		fprintf(stderr, "error: invalid arguments\n");
+		return -3;
+	}
+
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, &stop);
 	signal(SIGTERM, &stop);

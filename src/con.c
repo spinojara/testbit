@@ -58,19 +58,21 @@ int recvexact(SSL *ssl, char *buf, size_t len) {
 	return s <= 0;
 }
 
-int read_secret(char *secret, int size) {
+int read_secret(char *secret, int size, int hide) {
 	struct termios old, new;
 	tcgetattr(STDIN_FILENO, &old);
 	new = old;
 	new.c_lflag &= ~ECHO;
 	new.c_lflag |= ECHONL;
 
-	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &new))
-		return 1;
+	if (hide)
+		if (tcsetattr(STDIN_FILENO, TCSADRAIN, &new))
+			return 1;
 
 	fgets(secret, size, stdin);
 
-	tcsetattr(STDIN_FILENO, TCSADRAIN, &old);
+	if (hide)
+		tcsetattr(STDIN_FILENO, TCSADRAIN, &old);
 
 	char *p = strchr(secret, '\n');
 	if (p) {
