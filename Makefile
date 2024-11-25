@@ -45,12 +45,12 @@ obj/%.o: src/%.c dep/%.d
 	@mkdir -p obj
 	$(CC) $(CFLAGS) -c $< -o $@
 
-testbit:  CFLAGS += $(shell pkg-config --cflags openssl) $(shell pkg-config --cflags ncurses) -DTERMINAL_FLICKER
-testbit:  LDLIBS += $(shell pkg-config --libs openssl) $(shell pkg-config --libs ncurses)
+testbit:  CFLAGS += $(shell pkg-config --cflags openssl ncurses) -DTERMINAL_FLICKER
+testbit:  LDLIBS += $(shell pkg-config --libs openssl ncurses)
 testbitn: CFLAGS += $(shell pkg-config --cflags openssl)
 testbitn: LDLIBS += $(shell pkg-config --libs openssl)
-testbitd: CFLAGS += $(shell pkg-config --cflags openssl) $(shell pkg-config --cflags sqlite3)
-testbitd: LDLIBS += $(shell pkg-config --libs openssl) $(shell pkg-config --libs sqlite3)
+testbitd: CFLAGS += $(shell pkg-config --cflags openssl sqlite3)
+testbitd: LDLIBS += $(shell pkg-config --libs openssl sqlite3)
 
 dep/%.d: src/%.c Makefile
 	@mkdir -p dep
