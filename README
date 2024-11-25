@@ -32,5 +32,5 @@ authentication. Create it using
 
 	# passwd testbit
 
-If testbitn is run in daemon mode it needs the file /etc/testbit.conf containing
+If testbitn is run as a daemon it needs the file /etc/testbit.conf containing
 a single integer of cpu cores to use.
