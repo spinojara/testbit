@@ -17,6 +17,8 @@
 #include "req.h"
 #include "sql.h"
 
+static int running = 1;
+
 void init_fds(struct fds *fds) {
 	fds->fd_count = 2;
 	fds->fd_size = 4;
@@ -121,21 +123,21 @@ void handle_new_connection(SSL_CTX *ctx, struct fds *fds) {
 	}
 }
 
-void handle_stdin(int *running) {
+void handle_stdin(void) {
 	char buf[BUFSIZ];
 	if (!fgets(buf, sizeof(buf), stdin) || !strcmp(buf, "quit\n"))
-		*running = 0;
+		running = 0;
 }
 
-static void sigint(int signum) {
+static void stop(int signum) {
 	(void)signum;
-	fprintf(stderr, "\n'quit\\n' to quit\n");
-	signal(SIGINT, &sigint);
+	running = 0;
 }
 
 int main(void) {
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGINT, &sigint);
+	signal(SIGINT, &stop);
+	signal(SIGTERM, &stop);
 
 	SSL_CTX *ctx = ssl_ctx_server();
 	if (!ctx)
@@ -157,7 +159,6 @@ int main(void) {
 	if (init_db(&db))
 		return 7;
 
-	int running = 1;
 	while (running) {
 		if (start_tests(db, &fds))
 			return 8;
@@ -180,7 +181,7 @@ int main(void) {
 				handle_new_connection(ctx, &fds);
 				break;
 			case TYPESTDIN:
-				handle_stdin(&running);
+				handle_stdin();
 				break;
 			case TYPECLIENT:
 				r = handle_client_request(con, db, password, &fds);
