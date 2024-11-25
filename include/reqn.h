@@ -5,6 +5,6 @@
 
 #include "con.h"
 
-int handle_node_request(struct connection *con, sqlite3 *db, const char password[128]);
+int handle_node_request(struct connection *con, sqlite3 *db, const char *password);
 
 #endif

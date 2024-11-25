@@ -36,6 +36,5 @@ int sendf(SSL *ssl, const char *fmt, ...);
 int recvf(SSL *ssl, const char *fmt, ...);
 
 int read_secret(char *secret, int size);
-int create_secret(char *secret, int size);
 
 #endif

@@ -22,6 +22,6 @@ enum {
 	RESPONSEPERMISSIONDENIED,
 };
 
-int handle_password(struct connection *con, const char password[128]);
+int handle_password(struct connection *con, const char *password);
 
 #endif

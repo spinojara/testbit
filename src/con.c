@@ -85,27 +85,6 @@ int read_secret(char *secret, int size) {
 	return 0;
 }
 
-int create_secret(char *secret, int size) {
-	int r;
-	char *repeat = malloc(size);
-	if (!repeat)
-		return 1;
-	printf("Choose a passphrase: ");
-	if ((r = read_secret(secret, size)))
-		goto clean;
-	printf("Repeat the passphrase: ");
-	if ((r = read_secret(repeat, size)))
-		goto clean;
-	if ((r = strcmp(secret, repeat))) {
-		fprintf(stderr, "error: passphrases do not match\n");
-		goto clean;
-	}
-
-clean:
-	free(repeat);
-	return r;
-}
-
 int sendf(SSL *ssl, const char *fmt, ...) {
 	va_list ap;
 	int r = 0;

@@ -323,7 +323,7 @@ int handle_patch(struct connection *con) {
 	return error;
 }
 
-int handle_client_request(struct connection *con, sqlite3 *db, const char password[128], struct fds *fds) {
+int handle_client_request(struct connection *con, sqlite3 *db, const char *password, struct fds *fds) {
 	char request;
 	if (recvf(con->ssl, "c", &request))
 		return 1;

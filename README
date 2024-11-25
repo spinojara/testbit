@@ -17,8 +17,8 @@ instead.
 
 Installing testbit
 ------------------
-testbitn needs a user called "testbit" to be present. On Linux it is preferably
-created by
+testbitd and testbitn need a user called "testbit" to be present. On Linux it
+is preferably created by
 
 	# useradd --system                 \
                   --no-create-home         \
@@ -26,3 +26,8 @@ created by
 		  --home-dir /dev/null     \
 		  --shell /sbin/nologin    \
 		  testbit
+
+In addition testbitd needs testbit to have a password as this will be used for
+authentication. Create it using
+
+	# passwd testbit

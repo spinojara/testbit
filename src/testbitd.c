@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <shadow.h>
 
 #include <openssl/ssl.h>
 
@@ -143,9 +144,16 @@ int main(void) {
 	if (!ctx)
 		return 1;
 
-	char password[128];
-	if (create_secret(password, sizeof(password)))
+	struct spwd *spwd = getspnam("testbit");
+	if (!spwd || !spwd->sp_pwdp) {
+		fprintf(stderr, "error: failed to retrieve testbit user\n");
 		return 2;
+	}
+	const char *password = spwd->sp_pwdp;
+	if (!password[0]) {
+		fprintf(stderr, "error: testbit user has empty password\n");
+		return 3;
+	}
 
 	sqlite3 *db;
 	struct fds fds;

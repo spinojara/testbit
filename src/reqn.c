@@ -88,7 +88,7 @@ int handle_start(struct connection *con, sqlite3 *db) {
 	return 0;
 }
 
-int handle_node_request(struct connection *con, sqlite3 *db, const char password[128]) {
+int handle_node_request(struct connection *con, sqlite3 *db, const char *password) {
 	char request;
 	if (recvf(con->ssl, "c", &request))
 		return 1;

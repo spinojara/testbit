@@ -49,8 +49,8 @@ testbit:  CFLAGS += $(shell pkg-config --cflags openssl ncurses) -DTERMINAL_FLIC
 testbit:  LDLIBS += $(shell pkg-config --libs openssl ncurses)
 testbitn: CFLAGS += $(shell pkg-config --cflags openssl)
 testbitn: LDLIBS += $(shell pkg-config --libs openssl)
-testbitd: CFLAGS += $(shell pkg-config --cflags openssl sqlite3)
-testbitd: LDLIBS += $(shell pkg-config --libs openssl sqlite3)
+testbitd: CFLAGS += $(shell pkg-config --cflags openssl sqlite3 libcrypt)
+testbitd: LDLIBS += $(shell pkg-config --libs openssl sqlite3 libcrypt)
 
 dep/%.d: src/%.c Makefile
 	@mkdir -p dep
