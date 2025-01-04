@@ -40,6 +40,7 @@ int init_db(sqlite3 **db) {
 			"p4         INTEGER, "
 			"branch     TEXT, "
 			"commithash TEXT, "
+			"simd       TEXT, "
 			"host       TEXT"
 			");",
 			NULL, NULL, NULL);
@@ -80,7 +81,7 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 
 		r = sqlite3_prepare_v2(db,
 				"SELECT id, type, tc, alpha, beta, "
-				"elo0, elo1, eloe, branch, commithash, adjudicate "
+				"elo0, elo1, eloe, branch, commithash, simd, adjudicate "
 				"FROM test WHERE status = ? ORDER BY queuetime ASC LIMIT 1;",
 				-1, &stmt, NULL);
 		if (r != SQLITE_OK) {
@@ -106,23 +107,30 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 
 		const char *branch = (const char *)sqlite3_column_text(stmt, 8);
 		const char *commit = (const char *)sqlite3_column_text(stmt, 9);
+		const char *simd = (const char *)sqlite3_column_text(stmt, 10);
 
 		char adjudicate = sqlite3_column_int(stmt, 11);
 
 		char path[4096];
-		sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
-		int fd;
+		int fd, nnuefd;
 
+		sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
 		if ((fd = open(path, O_RDONLY, 0)) < 0) {
 			fprintf(stderr, "Failed to open %s\n", path);
 			exit(10);
 		}
 
-		if (sendf(con->ssl, "csDDDDDcssf",
+		sprintf(path, "/var/lib/bitbit/nnue/%ld.nnue", con->id);
+		if ((nnuefd = open(path, O_RDONLY, 0)) < 0) {
+			fprintf(stderr, "Failed to open %s\n", path);
+			exit(10);
+		}
+
+		if (sendf(con->ssl, "csDDDDDcsssff",
 				type, tc,
 				alpha, beta, elo0, elo1, eloe,
 				adjudicate, branch,
-				commit, fd))
+				commit, simd, fd, nnuefd))
 			error = 1;
 
 		sqlite3_finalize(stmt);

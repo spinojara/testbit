@@ -17,6 +17,7 @@ int sendd32(SSL *ssl, float s);
 int sendd64(SSL *ssl, double s);
 int sendstr(SSL *ssl, const char *s);
 int sendfile(SSL *ssl, int fd);
+int sendnullfile(SSL *ssl);
 
 int recvi8(SSL *ssl, signed char *s);
 int recvu8(SSL *ssl, unsigned char *s);

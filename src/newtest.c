@@ -25,6 +25,9 @@ enum {
 	PROMPTCOMMIT,
 	PROMPTPATH,
 
+	PROMPTNNUE,
+	PROMPTSIMD,
+
 	PROMPTDRAW,
 	PROMPTRESIGN,
 
@@ -88,7 +91,7 @@ void handle_newtest(struct newteststate *ns, chtype ch) {
 		}
 		/* fallthrough */
 	case 'i':
-		if (ns->selected <= PROMPTPATH) {
+		if (ns->selected <= PROMPTSIMD) {
 			redraw = 1;
 			handle_prompt(&ns->prompt[ns->selected]);
 		}
@@ -175,6 +178,8 @@ void resize_prompts(struct newteststate *ns) {
 	resize_prompt(&ns->prompt[PROMPTBRANCH], x - 8);
 	resize_prompt(&ns->prompt[PROMPTCOMMIT], x - 8);
 	resize_prompt(&ns->prompt[PROMPTPATH], x - 8);
+	resize_prompt(&ns->prompt[PROMPTNNUE], x - 8);
+	resize_prompt(&ns->prompt[PROMPTSIMD], x - 8);
 }
 
 void draw_prompts(struct newteststate *ns) {
@@ -188,14 +193,16 @@ void draw_prompts(struct newteststate *ns) {
 	draw_prompt_border(ns->win, "Elo Error", 16, 2, x - 4, ns->selected == PROMPTELOE, ns->prompt[PROMPTELOE].error);
 	draw_prompt_border(ns->win, "Branch", 19, 2, x - 4, ns->selected == PROMPTBRANCH, ns->prompt[PROMPTBRANCH].error);
 	draw_prompt_border(ns->win, "Commit", 22, 2, x - 4, ns->selected == PROMPTCOMMIT, ns->prompt[PROMPTCOMMIT].error);
-	draw_prompt_border(ns->win, "Path", 25, 2, x - 4, ns->selected == PROMPTPATH, ns->prompt[PROMPTPATH].error);
+	draw_prompt_border(ns->win, "Patch Path", 25, 2, x - 4, ns->selected == PROMPTPATH, ns->prompt[PROMPTPATH].error);
+	draw_prompt_border(ns->win, "NNUE Path", 28, 2, x - 4, ns->selected == PROMPTNNUE, ns->prompt[PROMPTNNUE].error);
+	draw_prompt_border(ns->win, "SIMD", 31, 2, x - 4, ns->selected == PROMPTSIMD, ns->prompt[PROMPTSIMD].error);
 
-	draw_prompt_border(ns->win, "Adj Draw", 28, 2, 16, ns->selected == PROMPTDRAW, 0);
-	draw_prompt_border(ns->win, "Adj Resign", 31, 2, 16, ns->selected == PROMPTRESIGN, 0);
+	draw_prompt_border(ns->win, "Adj Draw", 34, 2, 16, ns->selected == PROMPTDRAW, 0);
+	draw_prompt_border(ns->win, "Adj Resign", 37, 2, 16, ns->selected == PROMPTRESIGN, 0);
 
-	draw_button(ns->win, "Submit Test", 34, 2, 15, ns->selected == PROMPTQUEUE);
+	draw_button(ns->win, "Submit Test", 40, 2, 15, ns->selected == PROMPTQUEUE);
 
-	for (int i = PROMPTTIME; i <= PROMPTPATH; i++)
+	for (int i = PROMPTTIME; i <= PROMPTSIMD; i++)
 		draw_prompt(&ns->prompt[i]);
 
 	for (int i = TOGGLEDRAW; i <= TOGGLERESIGN; i++)
@@ -232,9 +239,11 @@ void init_newtest(struct newteststate *ns) {
 	new_prompt(&ns->prompt[PROMPTBRANCH], ns->win, 20, 4, x - 18, "master", &allow_text);
 	new_prompt(&ns->prompt[PROMPTCOMMIT], ns->win, 23, 4, x - 18, "HEAD", &allow_text);
 	new_prompt(&ns->prompt[PROMPTPATH], ns->win, 26, 4, x - 18, "", &allow_text);
+	new_prompt(&ns->prompt[PROMPTNNUE], ns->win, 29, 4, x - 18, "", &allow_text);
+	new_prompt(&ns->prompt[PROMPTSIMD], ns->win, 32, 4, x - 18, "avx2", &allow_text);
 
-	new_toggle(&ns->toggle[TOGGLEDRAW], ns->win, 29, 4, 12, 1);
-	new_toggle(&ns->toggle[TOGGLERESIGN], ns->win, 32, 4, 12, 1);
+	new_toggle(&ns->toggle[TOGGLEDRAW], ns->win, 35, 4, 12, 1);
+	new_toggle(&ns->toggle[TOGGLERESIGN], ns->win, 38, 4, 12, 1);
 }
 
 void term_newtest(struct newteststate *ns) {
@@ -247,6 +256,8 @@ void term_newtest(struct newteststate *ns) {
 	delete_prompt(&ns->prompt[PROMPTBRANCH]);
 	delete_prompt(&ns->prompt[PROMPTCOMMIT]);
 	delete_prompt(&ns->prompt[PROMPTPATH]);
+	delete_prompt(&ns->prompt[PROMPTNNUE]);
+	delete_prompt(&ns->prompt[PROMPTSIMD]);
 }
 
 void queue_test(struct newteststate *ns) {
@@ -264,8 +275,8 @@ void queue_test(struct newteststate *ns) {
 	double elo1;
 	double eloe;
 	char adjudicate = 0;
-	const char *branch, *commit;
-	int fd = -1;
+	const char *branch, *commit, *simd;
+	int fd = -1, nnuefd = -1;
 
 	int error = 0;
 
@@ -337,6 +348,19 @@ void queue_test(struct newteststate *ns) {
 		p->error = 1;
 	}
 
+	p = &ns->prompt[PROMPTNNUE];
+	str = prompt_str(p);
+	if (strlen(str)) {
+		nnuefd = open(str, O_RDONLY, 0);
+		if (nnuefd < 0) {
+			error = 1;
+			p->error = 1;
+		}
+	}
+
+	p = &ns->prompt[PROMPTSIMD];
+	simd = prompt_str(p);
+
 	if (ns->toggle[TOGGLEDRAW].state)
 		adjudicate |= ADJUDICATE_DRAW;
 	if (ns->toggle[TOGGLERESIGN].state)
@@ -347,6 +371,8 @@ void queue_test(struct newteststate *ns) {
 	if (error || prompt_passphrase(passphrase, 48)) {
 		if (fd >= 0)
 			close(fd);
+		if (nnuefd >= 0)
+			close(nnuefd);
 		draw_prompts(ns);
 		return;
 	}
@@ -360,18 +386,22 @@ void queue_test(struct newteststate *ns) {
 	if (response != RESPONSEOK) {
 		if (fd >= 0)
 			close(fd);
+		if (nnuefd >= 0)
+			close(nnuefd);
 
 		infobox("Permission denied.");
 		return;
 	}
 
 	if (sendf(ns->ssl, "c", REQUESTNEWTEST) || 
-		sendf(ns->ssl, "csDDDDDcss",
+		sendf(ns->ssl, "csDDDDDcsss",
 			type, tc, alpha,
-			beta, elo0, elo1, eloe, adjudicate, branch, commit) ||
-		sendf(ns->ssl, "f", fd))
+			beta, elo0, elo1, eloe, adjudicate, branch, commit, simd) ||
+		sendf(ns->ssl, "ff", fd, nnuefd))
 		lostcon();
 	close(fd);
+	if (nnuefd >= 0)
+		close(nnuefd);
 
 	if (recvf(ns->ssl, "c", &response)) {
 		lostcon();
@@ -381,9 +411,9 @@ void queue_test(struct newteststate *ns) {
 	}
 	else {
 		infobox("The test has been put in queue.");
-		for (int i = 0; i < 9; i++)
+		for (int i = PROMPTTIME; i <= PROMPTSIMD; i++)
 			reset_prompt(&ns->prompt[i]);
-		for (int i = 0; i < 2; i++)
+		for (int i = TOGGLEDRAW; i <= TOGGLERESIGN; i++)
 			reset_toggle(&ns->toggle[i]);
 		ns->selected = 0;
 	}

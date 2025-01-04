@@ -61,7 +61,7 @@ install: all
 	install -m 0755 testbit $(DESTDIR)$(BINDIR)
 
 install-everything: install everything
-	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch}
+	mkdir -p $(DESTDIR)/var/lib/bitbit/{certs,private,patch,nnue}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
 	install -m 0755 testbit{n,d} $(DESTDIR)$(BINDIR)
 

@@ -33,20 +33,22 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 		double eloe;
 		char branch[128];
 		char commit[128];
+		char simd[128];
 
-		if (recvf(ssl, "csDDDDDcss",
+		if (recvf(ssl, "csDDDDDcsss",
 					&type, tc, sizeof(tc),
 					&alpha, &beta, &elo0, &elo1,
 					&eloe, &adjudicate,
 					branch, sizeof(branch),
-					commit, sizeof(commit)))
+					commit, sizeof(commit),
+					simd, sizeof(simd)))
 			exit(6);
 
 		tcadjust(tc, adjusted, 128);
 
 		if (claim_cpus(cpus))
 			exit(56);
-		setup(ssl, type, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit);
+		setup(ssl, type, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
 		if (release_cpus())
 			exit(57);
 	}

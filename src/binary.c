@@ -309,11 +309,15 @@ int sendfile(SSL *ssl, int fd) {
 	return n < 0;
 }
 
+int sendnullfile(SSL *ssl) {
+	return sendu64(ssl, 0);
+}
+
 int recvfile(SSL *ssl, int fd, ssize_t size) {
 	uint64_t len;
 	uint64_t rec = 0;
-	/* Limit file size to 16 MiB. */
-	if (recvu64(ssl, &len) || len > 16777216)
+	/* Limit file size to 128 MiB. */
+	if (recvu64(ssl, &len) || len > 134217728)
 		return 1;
 
 	size_t readlen;

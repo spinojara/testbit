@@ -85,7 +85,7 @@ int main(void) {
 	if ((r = git_clone(dtemp, "master", "c7ee42b")))
 		return r;
 
-	if ((r = make()))
+	if ((r = make("avx2", "etc/current.nnue")))
 		return r;
 
 	int average = 0;

@@ -7,6 +7,6 @@ int git_clone(char *dtemp, const char *branch, const char *commit);
 
 int git_patch(void);
 
-int make(void);
+int make(const char *simd, const char *nnue);
 
 #endif

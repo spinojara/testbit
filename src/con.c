@@ -90,6 +90,7 @@ int read_secret(char *secret, int size, int hide) {
 int sendf(SSL *ssl, const char *fmt, ...) {
 	va_list ap;
 	int r = 0;
+	int fd = 0;
 
 	va_start(ap, fmt);
 
@@ -129,7 +130,11 @@ int sendf(SSL *ssl, const char *fmt, ...) {
 			r = sendstr(ssl, va_arg(ap, const char *));
 			break;
 		case 'f':
-			r = sendfile(ssl, va_arg(ap, int));
+			fd = va_arg(ap, int);
+			if (fd >= 0)
+				r = sendfile(ssl, fd);
+			else
+				r = sendnullfile(ssl);
 			break;
 		default:
 			break;

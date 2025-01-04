@@ -71,7 +71,7 @@ struct newteststate {
 	SSL *ssl;
 
 	int selected;
-	struct prompt prompt[9];
+	struct prompt prompt[11];
 	struct toggle toggle[2];
 };
 

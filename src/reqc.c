@@ -20,13 +20,14 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	char tc[128];
 	double alpha, beta;
 	double elo0, elo1, eloe;
-	char branch[128], commit[128];
+	char branch[128], commit[128], simd[128];
 	int r = 0;
-	if ((r = recvf(con->ssl, "csDDDDDcss",
+	if ((r = recvf(con->ssl, "csDDDDDcsss",
 					&type, tc, sizeof(tc), &alpha,
 					&beta, &elo0, &elo1, &eloe, &adjudicate,
 					branch, sizeof(branch),
-					commit, sizeof(commit))))
+					commit, sizeof(commit),
+					simd, sizeof(simd))))
 		goto error;
 
 	double zero = eps;
@@ -40,8 +41,8 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	sqlite3_stmt *stmt;
 	sqlite3_prepare_v2(db,
 			"INSERT INTO test (type, status, tc, alpha, beta, "
-			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash, adjudicate, host) VALUES "
-			"(?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?, '') RETURNING id;",
+			"elo0, elo1, eloe, queuetime, elo, pm, branch, commithash, adjudicate, host, simd) VALUES "
+			"(?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), ?, ?, ?, ?, ?, '', ?) RETURNING id;",
 			-1, &stmt, NULL);
 	sqlite3_bind_int(stmt, 1, type);
 	sqlite3_bind_int(stmt, 2, TESTQUEUE);
@@ -57,29 +58,38 @@ int handle_new_test(struct connection *con, sqlite3 *db) {
 	sqlite3_bind_text(stmt, 11, branch, -1, NULL);
 	sqlite3_bind_text(stmt, 12, commit, -1, NULL);
 	sqlite3_bind_int(stmt, 13, adjudicate);
+	sqlite3_bind_text(stmt, 14, simd, -1, NULL);
 	sqlite3_step(stmt);
 	con->id = sqlite3_column_int(stmt, 0);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 
-	char path[4096];
+	char path[4096], nnuepath[4096];
 	sprintf(path, "/var/lib/bitbit/patch/%ld", con->id);
-	int fd;
+	int fd, nnuefd;
 	if ((fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0444)) < 0) {
 		fprintf(stderr, "Failed to open file %s\n", path);
 		exit(9);
 	}
-	if ((r = recvf(con->ssl, "f", fd, -1))) {
+	sprintf(nnuepath, "/var/lib/bitbit/nnue/%ld.nnue", con->id);
+	if ((nnuefd = open(nnuepath, O_WRONLY | O_CREAT | O_TRUNC, 0444)) < 0) {
+		fprintf(stderr, "Failed to open file %s\n", nnuepath);
+		exit(9);
+	}
+	if ((r = recvf(con->ssl, "ff", fd, -1, nnuefd, -1))) {
 		/* Delete the file. */
 		sqlite3_prepare_v2(db, "DELETE FROM test WHERE id = ?;", -1, &stmt, NULL);
 		sqlite3_bind_int(stmt, 1, con->id);
 		sqlite3_step(stmt);
 		sqlite3_finalize(stmt);
 		close(fd);
+		close(nnuefd);
 		unlink(path);
+		unlink(nnuepath);
 		goto error;
 	}
 	close(fd);
+	close(nnuefd);
 error:
 	sendf(con->ssl, "c", r ? RESPONSEFAIL : RESPONSEOK);
 	return r;

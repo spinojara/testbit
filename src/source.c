@@ -110,7 +110,7 @@ int git_patch(void) {
 	return 0;
 }
 
-int make(void) {
+int make(const char *simd, const char *nnue) {
 	int wstatus;
 	pid_t pid;
 
@@ -140,9 +140,13 @@ int make(void) {
 	if (pid == -1)
 		exit(24);
 
+	char simdstr[4096], nnuestr[4096];
+	snprintf(simdstr, sizeof(simdstr), "SIMD=%s", simd);
+	snprintf(nnuestr, sizeof(nnuestr), "NNUE=%s", nnue);
+
 	if (pid == 0) {
 		su("testbit");
-		execlp("make", "make", "SIMD=avx2", "bitbit", (char *)NULL);
+		execlp("make", "make", simdstr, nnuestr, "bitbit", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
 		kill_parent();
 		exit(25);
