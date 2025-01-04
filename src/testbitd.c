@@ -148,7 +148,7 @@ static void stop(int signum) {
 }
 
 int main(int argc, char **argv) {
-	if (argc == 2 && !strcmp(argv[1], "--daemon_mode")) {
+	if (argc == 2 && !strcmp(argv[1], "--daemon")) {
 		daemon_mode = 1;
 	}
 	else if (argc >= 2) {
