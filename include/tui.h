@@ -6,7 +6,7 @@
 
 #define KEY_ESC 27
 
-#define REFRESH_SECONDS 60
+#define REFRESH_SECONDS 5
 
 void tuiloop(SSL *ssl);
 
