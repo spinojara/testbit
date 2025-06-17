@@ -95,6 +95,28 @@ int cpu_is_online(int cpu) {
 	return *c == '1';
 }
 
+int cpu_is_performance(int cpu) {
+	struct stat sb;
+	if (stat("/sys/devices/cpu_core", &sb) || !S_ISDIR(sb.st_mode))
+		return 1;
+
+	char buf[1024];
+	if (cat("/sys/devices/cpu_core/cpus", buf, 1024))
+		return 0;
+
+	struct cpu cpus = { 0 };
+	parse_cpus(buf, &cpus, -1);
+
+	int ret = 0;
+	for (int i = 0; i < cpus.count; i++)
+		if (cpus.cpus[i] == cpu)
+			ret = 1;
+
+	free(cpus.cpus);
+
+	return ret;
+}
+
 int already_claimed(int cpu) {
 	for (int i = 0; i < claimedcpus_count; i++) {
 		struct cpu *cpus = &claimedcpus[i];
@@ -163,7 +185,7 @@ int claim_cpus(int n) {
 
 	for (int i = 0; i < available.count && claimedcpus_count < n; i++) {
 		int cpu = available.cpus[i];
-		if (cpu_is_online(cpu) && !already_claimed(cpu))
+		if (cpu_is_online(cpu) && !already_claimed(cpu) && cpu_is_performance(cpu))
 			if (claim_cpu(cpu))
 				return 4;
 	}
@@ -179,7 +201,7 @@ int claim_cpus(int n) {
 	/* Start from 1 to skip cpu0. */
 	for (int i = 1; i < claimedcpus_count; i++) {
 		struct cpu *cpus = &claimedcpus[i];
-		if (i)
+		if (i > 1)
 			fprintf(f, ",");
 		fprintf(f, "%d", cpus->cpu);
 		CPU_SET(cpus->cpu, &mask);
@@ -216,6 +238,7 @@ int release_cpus() {
 				error = 1;
 			}
 		}
+		free(cpus->cpus);
 	}
 	claimedcpus_count = 0;
 
