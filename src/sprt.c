@@ -96,7 +96,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 
 		char *argv[64];
 		int argc = 0;
-		APPENDARG("cutechess-cli");
+		APPENDARG("fastchess");
 		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
 		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
@@ -105,6 +105,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
+		APPENDARG("-use-affinity"); APPENDARG("4");
 		if (epoch % 2) {
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
@@ -126,9 +127,9 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 		}
 		APPENDARG(NULL);
 		su("testbit");
-		execvp("cutechess-cli", argv);
+		execvp("fastchess", argv);
 
-		fprintf(stderr, "error: exec cutechess-cli");
+		fprintf(stderr, "error: exec fastchess");
 		kill_parent();
 		exit(30);
 	}
@@ -149,7 +150,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 	close(pipefd[1]);
 	FILE *f = fdopen(pipefd[0], "r");
 	if (!f) {
-		fprintf(stderr, "error: fdopen cutechess-cli\n");
+		fprintf(stderr, "error: fdopen fastchess\n");
 		exit(31);
 	}
 
