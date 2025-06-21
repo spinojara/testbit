@@ -65,7 +65,7 @@ void parse_finished_game(char *line, struct game *game, int max) {
 }
 
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
+int run_games(int games, int concurrency, char *syzygy, const char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
 	if (games % 2)
 		exit(39);
 	int wstatus;
@@ -78,7 +78,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 	fulltc[130] = '\0';
 
 	sprintf(gamesstr, "%d", games / 2);
-	sprintf(concurrencystr, "%d", cpus);
+	sprintf(concurrencystr, "%d", concurrency);
 
 	int pipefd[2];
 	if (pipe(pipefd))
@@ -94,6 +94,13 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 
 		dup2(pipefd[1], STDOUT_FILENO);
 
+		char cpus[BUFSIZ] = { 0 };
+		FILE *f = fopen("/sys/fs/cgroup/testbit/cpuset.cpus", "r");
+		if (!f || !fgets(cpus, sizeof(cpus), f))
+			exit(29);
+		fclose(f);
+		cpus[strcspn(cpus, "\n")] = '\0';
+
 		char *argv[64];
 		int argc = 0;
 		APPENDARG("fastchess");
@@ -105,7 +112,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
-		APPENDARG("-use-affinity"); APPENDARG("4");
+		APPENDARG("-use-affinity"); APPENDARG(cpus);
 		if (epoch % 2) {
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
@@ -142,7 +149,7 @@ int run_games(int games, int cpus, char *syzygy, const char *tc, int adjudicate,
 	if (WEXITSTATUS(wstatus)) {
 		close(pipefd[0]);
 		close(pipefd[1]);
-		return 1;
+		exit(59);
 	}
 
 	struct game *game = calloc(games, sizeof(*game));
