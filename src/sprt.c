@@ -123,8 +123,8 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
 		}
 		if (adjudicate & ADJUDICATE_DRAW) {
-			APPENDARG("-draw"); APPENDARG("movenumber=60");
-			APPENDARG("movecount=8"); APPENDARG("score=20");
+			APPENDARG("-draw"); APPENDARG("movenumber=40");
+			APPENDARG("movecount=8"); APPENDARG("score=10");
 		}
 		if (adjudicate & ADJUDICATE_RESIGN) {
 			APPENDARG("-resign"); APPENDARG("movecount=3");
