@@ -104,6 +104,7 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 		char *argv[64];
 		int argc = 0;
 		APPENDARG("fastchess");
+		APPENDARG("-testEnv");
 		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
 		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
@@ -141,17 +142,6 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 		exit(30);
 	}
 
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(31);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		close(pipefd[0]);
-		close(pipefd[1]);
-		exit(59);
-	}
-
 	struct game *game = calloc(games, sizeof(*game));
 
 	close(pipefd[1]);
@@ -161,12 +151,23 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 		exit(31);
 	}
 
-	char line[BUFSIZ];
+	char line[16384];
 	while (fgets(line, sizeof(line), f)) {
-		printf("%s", line);
+		fprintf(stderr, "fastchess: %s", line);
 		if (!strstr(line, "Finished game"))
 			continue;
 		parse_finished_game(line, game, games);
+	}
+
+	if (waitpid(pid, &wstatus, 0) == -1) {
+		fprintf(stderr, "error: waitpid\n");
+		exit(31);
+	}
+
+	if (WEXITSTATUS(wstatus)) {
+		close(pipefd[0]);
+		close(pipefd[1]);
+		exit(59);
 	}
 
 	int error = 0;
