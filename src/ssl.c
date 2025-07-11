@@ -89,10 +89,11 @@ SSL_CTX *ssl_ctx_server(void) {
 	if (!SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION))
 		return NULL;
 
-	if (!SSL_CTX_use_certificate_file(ctx, "/etc/letsencrypt/live/jalagaoi.se/fullchain.pem", SSL_FILETYPE_PEM)) {
-		fprintf(stderr, "error: failed to set the certificate\n");
+	if (!SSL_CTX_use_certificate_chain_file(ctx, "/etc/letsencrypt/live/jalagaoi.se/fullchain.pem")) {
+		fprintf(stderr, "error: failed to set the certificate chain\n");
 		return NULL;
 	}
+
 	if (!SSL_CTX_use_PrivateKey_file(ctx, "/etc/letsencrypt/live/jalagaoi.se/privkey.pem", SSL_FILETYPE_PEM)) {
 		fprintf(stderr, "error: failed to set the private key\n");
 		return NULL;
