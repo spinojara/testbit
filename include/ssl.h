@@ -9,6 +9,8 @@ int get_listener_socket(void);
 
 void ssl_close(SSL *ssl, int fast);
 
+int certificate_expired(SSL_CTX *ctx);
+
 SSL_CTX *ssl_ctx_server(void);
 
 SSL_CTX *ssl_ctx_client(void);

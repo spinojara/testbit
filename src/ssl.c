@@ -81,6 +81,14 @@ void ssl_close(SSL *ssl, int fast) {
 	SSL_free(ssl);
 }
 
+int certificate_expired(SSL_CTX *ctx) {
+	X509 *x509 = SSL_CTX_get0_certificate(ctx);
+	const ASN1_TIME* not_after = X509_getm_notAfter(x509);
+	int pday, psec;
+	ASN1_TIME_diff(&pday, &psec, NULL, not_after);
+	return pday == 0 && psec <= 10;
+}
+
 SSL_CTX *ssl_ctx_server(void) {
 	SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
 	if (!ctx)

@@ -160,9 +160,7 @@ int main(int argc, char **argv) {
 	signal(SIGINT, &stop);
 	signal(SIGTERM, &stop);
 
-	SSL_CTX *ctx = ssl_ctx_server();
-	if (!ctx)
-		return 1;
+	SSL_CTX *ctx = NULL;
 
 	struct spwd *spwd = getspnam("testbit");
 	if (!spwd || !spwd->sp_pwdp) {
@@ -182,7 +180,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "error: failed to get listener socket\n");
 		return 4;
 	}
-	
+
 	init_fds(&fds);
 	if (init_db(&db))
 		return 7;
@@ -206,6 +204,13 @@ int main(int argc, char **argv) {
 			int r = 0;
 			switch (con->type) {
 			case TYPELISTENER:
+				if (!ctx || certificate_expired(ctx)) {
+					SSL_CTX_free(ctx);
+					ctx = ssl_ctx_server();
+					if (!ctx) {
+						return 1;
+					}
+				}
 				handle_new_connection(ctx, &fds);
 				break;
 			case TYPESTDIN:
