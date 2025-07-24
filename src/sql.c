@@ -73,12 +73,16 @@ int init_db(sqlite3 **db) {
 int start_tests(sqlite3 *db, struct fds *fds) {
 	int r;
 	sqlite3_stmt *stmt;
+	fprintf(stderr, "starting tests...\n");
 	for (int i = 0; i < fds->fd_count; i++) {
 		int error = 0;
 		struct connection *con = &fds->cons[i];
+		fprintf(stderr, "%d, %d, %d\n", con->type == TYPENODE, con->status == STATUSWAIT, con->privileged);
 		if (con->type != TYPENODE || con->status != STATUSWAIT || !con->privileged)
 			continue;
+		fprintf(stderr, "found node!\n");
 
+		fprintf(stderr, "fetching tests\n");
 		r = sqlite3_prepare_v2(db,
 				"SELECT id, type, tc, alpha, beta, "
 				"elo0, elo1, eloe, branch, commithash, simd, adjudicate "
@@ -91,8 +95,11 @@ int start_tests(sqlite3 *db, struct fds *fds) {
 		sqlite3_bind_int(stmt, 1, TESTQUEUE);
 
 		r = sqlite3_step(stmt);
-		if (r == SQLITE_DONE)
+		if (r == SQLITE_DONE) {
+			fprintf(stderr, "no tests!\n");
 			break;
+		}
+		fprintf(stderr, "got test!\n");
 
 		con->status = STATUSRUN;
 

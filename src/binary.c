@@ -332,7 +332,7 @@ int recvfile(SSL *ssl, int fd, ssize_t size) {
 	while (rec < len && !recvexact(ssl, &c, 1)) {
 		rec++;
 		if (rec <= readlen)
-			if (write(fd, &c, 1) != 1)
+			if (fd >= 0 && write(fd, &c, 1) != 1)
 				exit(19);
 	}
 	return rec < len;

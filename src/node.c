@@ -35,6 +35,7 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 		char commit[128];
 		char simd[128];
 
+		fprintf(stderr, "waiting...\n");
 		if (recvf(ssl, "csDDDDDcsss",
 					&type, tc, sizeof(tc),
 					&alpha, &beta, &elo0, &elo1,
@@ -43,6 +44,7 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 					commit, sizeof(commit),
 					simd, sizeof(simd)))
 			exit(6);
+		fprintf(stderr, "got test!\n");
 
 		tcadjust(tc, adjusted, 128);
 
@@ -51,5 +53,7 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 		setup(ssl, type, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
 		if (release_cpus())
 			exit(57);
+
+		fprintf(stderr, "finished test!\n");
 	}
 }

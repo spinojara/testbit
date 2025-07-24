@@ -205,6 +205,7 @@ int main(int argc, char **argv) {
 			switch (con->type) {
 			case TYPELISTENER:
 				if (!ctx || certificate_expired(ctx)) {
+					printf("Setting certificate\n");
 					SSL_CTX_free(ctx);
 					ctx = ssl_ctx_server();
 					if (!ctx) {
