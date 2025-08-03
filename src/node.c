@@ -11,7 +11,7 @@
 
 extern int daemon_mode;
 
-void nodeloop(SSL *ssl, int cpus, char *syzygy) {
+void nodeloop(SSL *ssl, int ncpus, char *syzygy) {
 	char password[4096], response = RESPONSEPERMISSIONDENIED;
 	printf("Enter Passphrase: ");
 	if (read_secret(password, sizeof(password), !daemon_mode))
@@ -48,9 +48,11 @@ void nodeloop(SSL *ssl, int cpus, char *syzygy) {
 
 		tcadjust(tc, adjusted, 128);
 
-		if (claim_cpus(cpus))
+		int *cpus = malloc(ncpus * sizeof(*cpus));
+
+		if (claim_cpus(ncpus, cpus))
 			exit(56);
-		setup(ssl, type, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
+		setup(ssl, type, ncpus, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
 		if (release_cpus())
 			exit(57);
 

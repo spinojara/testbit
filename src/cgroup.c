@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <sched.h>
+#include <errno.h>
 
 struct cpu {
 	int cpu;
@@ -149,7 +150,7 @@ void sig_release_cpus(int n) {
 	kill(getpid(), SIGINT);
 }
 
-int claim_cpus(int n) {
+int claim_cpus(int n, int *ret) {
 	static int already_registered = 0;
 	if (n <= 0)
 		return 10;
@@ -164,11 +165,6 @@ int claim_cpus(int n) {
 		atexit(&exit_release_cpus);
 		signal(SIGINT, &sig_release_cpus);
 	}
-
-	char pid[1024];
-	sprintf(pid, "%d\n", getpid());
-	if (echo("/sys/fs/cgroup/testbit/cgroup.procs", pid))
-		return 11;
 
 	if (echo("/sys/fs/cgroup/testbit/cgroup.subtree_control", "+cpuset"))
 		return 10;
@@ -196,15 +192,13 @@ int claim_cpus(int n) {
 	FILE *f = fopen("/sys/fs/cgroup/testbit/cpuset.cpus", "w");
 	if (!f)
 		return 6;
-	cpu_set_t mask;
-	CPU_ZERO(&mask);
 	/* Start from 1 to skip cpu0. */
 	for (int i = 1; i < claimedcpus_count; i++) {
 		struct cpu *cpus = &claimedcpus[i];
 		if (i > 1)
 			fprintf(f, ",");
 		fprintf(f, "%d", cpus->cpu);
-		CPU_SET(cpus->cpu, &mask);
+		ret[i - 1] = cpus->cpu;
 		for (int j = 0; j < cpus->count; j++) {
 			sprintf(path, "/sys/devices/system/cpu/cpu%d/online", cpus->cpus[j]);
 			if (echo(path, "0"))
@@ -218,15 +212,13 @@ int claim_cpus(int n) {
 	if (echo("/sys/fs/cgroup/testbit/cpuset.cpus.partition", "isolated"))
 		return 9;
 
-	struct sched_param param = { 99 };
-	if (sched_setscheduler(0, SCHED_FIFO, &param))
-		return 13;
-
 	free(available.cpus);
 	return 0;
 }
 
 int release_cpus() {
+	if (!claimedcpus)
+		return 0;
 	int error = 0;
 	char path[1024];
 	for (int i = 1; i < claimedcpus_count; i++) {
@@ -241,19 +233,24 @@ int release_cpus() {
 		free(cpus->cpus);
 	}
 	claimedcpus_count = 0;
+	free(claimedcpus);
+	claimedcpus = NULL;
 
 	char pid[1024];
 	sprintf(pid, "%d\n", getpid());
-	if (echo("/sys/fs/cgroup/cgroup.procs", pid))
+	if (echo("/sys/fs/cgroup/cgroup.procs", pid)) {
 		return 2;
+	}
 
-	if (echo("/sys/fs/cgroup/testbit/cgroup.kill", "1"))
+	if (echo("/sys/fs/cgroup/testbit/cgroup.kill", "1")) {
 		return 3;
+	}
 
-	if (rmdir("/sys/fs/cgroup/testbit"))
+	usleep(100000);
+
+	if (rmdir("/sys/fs/cgroup/testbit")) {
 		return 4;
+	}
 
-	free(claimedcpus);
-	claimedcpus = NULL;
 	return error;
 }

@@ -31,6 +31,6 @@ enum {
 	TESTTYPEELO,
 };
 
-void sprt(SSL *ssl, int type, int cpus, char *syzygy, const char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate);
+void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate);
 
 #endif

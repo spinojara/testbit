@@ -1,10 +1,13 @@
 #define _POSIX_C_SOURCE 1
+#define _GNU_SOURCE
 #include "sprt.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
+#include <sched.h>
 
 #include "util.h"
 #include "req.h"
@@ -23,6 +26,12 @@ enum {
 struct game {
 	int done;
 	int result;
+};
+
+struct process {
+	int running;
+	pid_t pid;
+	FILE *r;
 };
 
 void parse_finished_game(char *line, struct game *game, int max) {
@@ -64,21 +73,36 @@ void parse_finished_game(char *line, struct game *game, int max) {
 	game[n].result = result;
 }
 
+int parse_fastchess(FILE *r, int32_t tri[3], int32_t penta[5]) {
+	char line[16384];
+	struct game game[2] = { 0 };
+	while (fgets(line, sizeof(line), r)) {
+		fprintf(stderr, "fastchess: %s", line);
+		if (strncmp(line, "Finished game", 13))
+			continue;
+		parse_finished_game(line, game, 2);
+	}
+
+	int done = game[0].done && game[1].done;
+
+	int first = game[0].result;
+	int second = game[1].result;
+
+	if (!done || first == RESULTNONE || second == RESULTNONE)
+		return 1;
+
+	penta[first + second]++;
+	tri[first]++;
+	tri[second]++;
+
+	return 0;
+}
+
 #define APPENDARG(str) (argv[argc++] = (str))
-int run_games(int games, int concurrency, char *syzygy, const char *tc, int adjudicate, int epoch, int32_t tri[3], int32_t penta[5]) {
-	if (games % 2)
-		exit(39);
-	int wstatus;
-
-	char gamesstr[1024];
-	char concurrencystr[1024];
-
+int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int adjudicate, int epoch) {
 	char fulltc[131];
 	snprintf(fulltc, 131, "tc=%s", tc);
 	fulltc[130] = '\0';
-
-	sprintf(gamesstr, "%d", games / 2);
-	sprintf(concurrencystr, "%d", concurrency);
 
 	int pipefd[2];
 	if (pipe(pipefd))
@@ -94,26 +118,34 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 
 		dup2(pipefd[1], STDOUT_FILENO);
 
-		char cpus[BUFSIZ] = { 0 };
-		FILE *f = fopen("/sys/fs/cgroup/testbit/cpuset.cpus", "r");
-		if (!f || !fgets(cpus, sizeof(cpus), f))
-			exit(29);
-		fclose(f);
-		cpus[strcspn(cpus, "\n")] = '\0';
+		FILE *f = fopen("/sys/fs/cgroup/testbit/cgroup.procs", "w");
+		if (!f)
+			exit(102);
+		fprintf(f, "%d\n", getpid());
+		if (fclose(f))
+			exit(103);
+
+		struct sched_param param = { 99 };
+		sched_setscheduler(0, SCHED_FIFO, &param);
+
+		cpu_set_t mask;
+		CPU_ZERO(&mask);
+		CPU_SET(cpu, &mask);
+
+		sched_setaffinity(0, sizeof(cpu_set_t), &mask);
 
 		char *argv[64];
 		int argc = 0;
 		APPENDARG("fastchess");
 		APPENDARG("-testEnv");
-		APPENDARG("-concurrency"); APPENDARG(concurrencystr);
+		APPENDARG("-concurrency"); APPENDARG("1");
 		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
-		APPENDARG("-rounds"); APPENDARG(gamesstr);
+		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
-		APPENDARG("-use-affinity"); APPENDARG(cpus);
 		if (epoch % 2) {
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
 			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
@@ -142,61 +174,20 @@ int run_games(int games, int concurrency, char *syzygy, const char *tc, int adju
 		exit(30);
 	}
 
-	struct game *game = calloc(games, sizeof(*game));
-
 	close(pipefd[1]);
-	FILE *f = fdopen(pipefd[0], "r");
-	if (!f) {
+	proc->r = fdopen(pipefd[0], "r");
+	if (!proc->r) {
 		fprintf(stderr, "error: fdopen fastchess\n");
 		exit(31);
 	}
 
-	char line[16384];
-	while (fgets(line, sizeof(line), f)) {
-		fprintf(stderr, "fastchess: %s", line);
-		if (!strstr(line, "Finished game"))
-			continue;
-		parse_finished_game(line, game, games);
-	}
+	proc->pid = pid;
+	proc->running = 1;
 
-	if (waitpid(pid, &wstatus, 0) == -1) {
-		fprintf(stderr, "error: waitpid\n");
-		exit(31);
-	}
-
-	if (WEXITSTATUS(wstatus)) {
-		close(pipefd[0]);
-		close(pipefd[1]);
-		exit(59);
-	}
-
-	int error = 0;
-
-	for (int pair = 0; pair < games / 2; pair++) {
-		int first = 2 * pair;
-		int second = 2 * pair + 1;
-
-		int done = game[first].done && game[second].done;
-		first = game[first].result;
-		second = game[second].result;
-
-		if (!done || first == RESULTNONE || second == RESULTNONE) {
-			error = 1;
-			break;
-		}
-
-		penta[first + second]++;
-		tri[first]++;
-		tri[second]++;
-	}
-
-	fclose(f);
-	free(game);
-
-	return error;
+	return 0;
 }
 
-void sprt(SSL *ssl, int type, int cpus, char *syzygy, const char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
+void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc, double alpha, double beta, double elo0, double elo1, double eloe, int adjudicate) {
 	sendf(ssl, "c", REQUESTNODESTART);
 
 	double A = log(beta / (1.0 - alpha));
@@ -210,48 +201,89 @@ void sprt(SSL *ssl, int type, int cpus, char *syzygy, const char *tc, double alp
 	double increment = 0;
 	tcinfo(tc, &moves, &maintime, &increment);
 
-	int expected_moves = 75;
-	double tcs = moves == 0 || moves >= expected_moves ? 1.0 : (double)expected_moves / moves;
-
-	double gametime = 2.0 * tcs * (maintime + (moves == 0 || moves >= expected_moves ? expected_moves : moves) * increment);
-	double seconds = 180.0;
-	int batch_size = max(2, seconds * cpus / gametime);
 	int epoch = 0;
-	batch_size = 2 * (batch_size / 2);
 
 	char status = TESTINCONCLUSIVE;
 
-	while (status == TESTINCONCLUSIVE) {
-		if (run_games(batch_size, cpus, syzygy, tc, adjudicate, epoch++, tri, penta)) {
-			status = TESTERRRUN;
-			break;
+	struct process *procs = calloc(ncpus, sizeof(*procs));
+
+	char cancel = 0;
+	while (status == TESTINCONCLUSIVE && !cancel) {
+		/* Start games. */
+		for (int i = 0; i < ncpus; i++) {
+			if (procs[i].running)
+				continue;
+
+			run_games(cpus[i], &procs[i], syzygy, tc, adjudicate, epoch++);
 		}
 
-		double llr;
-		double elo, pm;
- 		llr = type == TESTTYPESPRT ? loglikelihoodratio(penta, elo0, elo1) : 0.0 / 0.0;
-		elo = elo_calc(penta, &pm);
+		int any_done = 0;
+		/* Done games. */
+		for (int i = 0; i < ncpus; i++) {
+			int wstatus;
+			switch (waitpid(procs[i].pid, &wstatus, WNOHANG)) {
+			case -1:
+				exit(31);
+			case 0:
+				continue;
+			default:
+				break;
+			}
 
-		if (type == TESTTYPESPRT) {
-			if (llr >= B)
-				status = TESTH1;
-			else if (llr <= A)
-				status = TESTH0;
-		}
-		else if (type == TESTTYPEELO) {
-			if (fabs(pm) <= eloe)
-				status = TESTELO;
+			any_done = 1;
+
+			procs[i].running = 0;
+
+			if (WEXITSTATUS(wstatus) || parse_fastchess(procs[i].r, tri, penta)) {
+				status = TESTERRRUN;
+				fclose(procs[i].r);
+				break;
+			}
+
+			fclose(procs[i].r);
+
+			double llr;
+			double elo, pm;
+ 			llr = type == TESTTYPESPRT ? loglikelihoodratio(penta, elo0, elo1) : 0.0 / 0.0;
+			elo = elo_calc(penta, &pm);
+
+			if (type == TESTTYPESPRT) {
+				if (llr >= B)
+					status = TESTH1;
+				else if (llr <= A)
+					status = TESTH0;
+			}
+			else if (type == TESTTYPEELO) {
+				if (fabs(pm) <= eloe)
+					status = TESTELO;
+			}
+
+			if (sendf(ssl, "cllllllllDDD",
+						REQUESTNODEUPDATE,
+						tri[0], tri[1], tri[2],
+						penta[0], penta[1], penta[2], penta[3], penta[4],
+						llr, elo, pm) ||
+					recvf(ssl, "c", &cancel))
+				exit(100);
+			if (cancel || status != TESTINCONCLUSIVE)
+				break;
 		}
 
-		char cancel;
-		if (sendf(ssl, "cllllllllDDD",
-					REQUESTNODEUPDATE,
-					tri[0], tri[1], tri[2],
-					penta[0], penta[1], penta[2], penta[3], penta[4],
-					llr, elo, pm) ||
-				recvf(ssl, "c", &cancel) || cancel || status != TESTINCONCLUSIVE)
-			break;
+		/* Sleep for 100 ms. */
+		if (!any_done) {
+			usleep(100000);
+		}
 	}
-	
+
+	for (int i = 0; i < ncpus; i++) {
+		if (!procs[i].running)
+			continue;
+		fclose(procs[i].r);
+		if (kill(procs[i].pid, SIGKILL))
+			exit(101);
+	}
+
 	sendf(ssl, "cc", REQUESTNODEDONE, status);
+
+	free(procs);
 }
