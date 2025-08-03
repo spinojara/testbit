@@ -84,7 +84,18 @@ int main(int argc, char **argv) {
 			return -3;
 		}
 
+		if (fgets(buf, sizeof(buf), f)) {
+			buf[strcspn(buf, "\n")] = '\0';
+			/* We don't free this, but that's ok. */
+			hostname = strdup(buf);
+		}
+
 		printf("cpus: %d\n", cpus);
+
+		if (hostname)
+			printf("hostname: %s\n", hostname);
+
+		fclose(f);
 	}
 	else {
 		if (optind >= argc) {
