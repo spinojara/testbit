@@ -227,12 +227,12 @@ int handle_log_tests(struct connection *con, sqlite3 *db) {
 		char type = sqlite3_column_int(stmt, 1);
 		char status = sqlite3_column_int(stmt, 2);
 		const char *tc = (const char *)sqlite3_column_text(stmt, 3);
-		double alpha = sqlite3_column_double(stmt, 4);
-		double beta = sqlite3_column_double(stmt, 5);
-		double llr = sqlite3_column_double(stmt, 6);
-		double elo0 = sqlite3_column_double(stmt, 7);
-		double elo1 = sqlite3_column_double(stmt, 8);
-		double eloe = sqlite3_column_double(stmt, 9);
+		double alpha = type == TESTTYPESPRT ? sqlite3_column_double(stmt, 4) : 0.0 / 0.0;
+		double beta = type == TESTTYPESPRT ? sqlite3_column_double(stmt, 5) : 0.0 / 0.0;
+		double llr = type == TESTTYPESPRT ? sqlite3_column_double(stmt, 6) : 0.0 / 0.0;
+		double elo0 = type == TESTTYPESPRT ? sqlite3_column_double(stmt, 7) : 0.0 / 0.0;
+		double elo1 = type == TESTTYPESPRT ? sqlite3_column_double(stmt, 8) : 0.0 / 0.0;
+		double eloe = type == TESTTYPEELO ? sqlite3_column_double(stmt, 9) : 0.0 / 0.0;
 		double elo = sqlite3_column_double(stmt, 10);
 		double pm = sqlite3_column_double(stmt, 11);
 		const char *branch = (const char *)sqlite3_column_text(stmt, 12);
