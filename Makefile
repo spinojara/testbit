@@ -61,7 +61,7 @@ install: all
 	install -m 0755 testbit $(DESTDIR)$(BINDIR)
 
 install-everything: install everything
-	mkdir -p $(DESTDIR)/var/lib/bitbit/{private,patch,nnue}
+	mkdir -p $(DESTDIR)/var/lib/bitbit/{private,patch,nnue,pgn}
 	chmod 700 $(DESTDIR)/var/lib/bitbit/private
 	install -m 0755 testbit{n,d} $(DESTDIR)$(BINDIR)
 
@@ -73,7 +73,6 @@ install-daemon:
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/testbit{,n,d}
 	rm -f $(DESTDIR)/etc/init.d/testbit{d,n}
-	rm -rf $(DESTDIR)/var/lib/bitbit
 
 clean:
 	rm -rf obj dep
