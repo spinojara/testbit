@@ -18,22 +18,24 @@ int daemon_mode = 0;
 
 int main(int argc, char **argv) {
 	char *syzygy = NULL;
+	char *hostname = NULL;
 	int sockfd, cpus = 0;
 	SSL *ssl;
 	SSL_CTX *ctx;
-	
+
 	static struct option opts[] = {
-		{ "syzygy", required_argument, NULL, 'z' },
-		{ "daemon", no_argument,       NULL, 'd' },
-		{ "stdin",  required_argument, NULL, 's' },
-		{ 0,        0,                 0,    0,  },
+		{ "syzygy",   required_argument, NULL, 'z' },
+		{ "daemon",   no_argument,       NULL, 'd' },
+		{ "stdin",    required_argument, NULL, 's' },
+		{ "hostname", required_argument, NULL, 'h' },
+		{ 0,          0,                 0,    0,  },
 	};
 
 	char *endptr;
 	int c, option_index = 0;
 	int error = 0;
 
-	while ((c = getopt_long(argc, argv, "z:ds:", opts, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "z:ds:h:", opts, &option_index)) != -1) {
 		switch (c) {
 		case 'z':
 			syzygy = optarg;
@@ -56,6 +58,9 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "error: dup2\n");
 				error = 1;
 			}
+			break;
+		case 'h':
+			hostname = optarg;
 			break;
 		default:
 			error = 1;
@@ -96,7 +101,7 @@ int main(int argc, char **argv) {
 	if (!(ctx = ssl_ctx_client()))
 		return 1;
 
-	if ((sockfd = get_socket()) < 0) {
+	if ((sockfd = get_socket(hostname)) < 0) {
 		printf("error: failed to connect\n");
 		return 2;
 	}

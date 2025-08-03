@@ -18,7 +18,7 @@ int main(void) {
 	if (!(ctx = ssl_ctx_client()))
 		return 1;
 
-	if ((sockfd = get_socket()) < 0) {
+	if ((sockfd = get_socket(NULL)) < 0) {
 		printf("error: failed to connect\n");
 		return 2;
 	}

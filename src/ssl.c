@@ -10,14 +10,14 @@
 #define PORT "2718"
 #define HOSTNAME "jalagaoi.se"
 
-int get_socket(void) {
+int get_socket(const char *hostname) {
 	int sockfd;
 	struct addrinfo hints = { 0 }, *ai, *p;
 
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if (getaddrinfo(HOSTNAME, PORT, &hints, &ai))
+	if (getaddrinfo(hostname ? hostname : HOSTNAME, PORT, &hints, &ai))
 		return -1;
 
 	for (p = ai; p; p = p->ai_next) {

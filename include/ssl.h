@@ -3,7 +3,7 @@
 
 #include <openssl/ssl.h>
 
-int get_socket(void);
+int get_socket(const char *hostname);
 
 int get_listener_socket(void);
 
