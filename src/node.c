@@ -48,13 +48,7 @@ void nodeloop(SSL *ssl, int ncpus, char *syzygy) {
 
 		tcadjust(tc, adjusted, 128);
 
-		int *cpus = malloc(ncpus * sizeof(*cpus));
-
-		if (claim_cpus(ncpus, cpus))
-			exit(56);
-		setup(ssl, type, ncpus, cpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
-		if (release_cpus())
-			exit(57);
+		setup(ssl, type, ncpus, syzygy, adjusted, alpha, beta, elo0, elo1, eloe, adjudicate, branch, commit, simd);
 
 		fprintf(stderr, "finished test!\n");
 	}

@@ -120,7 +120,7 @@ int make(const char *simd, const char *nnue) {
 
 	if (pid == 0) {
 		su("testbit");
-		execlp("make", "make", "clean", (char *)NULL);
+		execlp("make", "make", "clean", "-j", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
 		kill_parent();
 		exit(50);
@@ -146,7 +146,7 @@ int make(const char *simd, const char *nnue) {
 
 	if (pid == 0) {
 		su("testbit");
-		execlp("make", "make", simdstr, nnuestr, "bitbit-pgo", (char *)NULL);
+		execlp("make", "make", simdstr, nnuestr, "bitbit-pgo", "-j", (char *)NULL);
 		fprintf(stderr, "error: exec make\n");
 		kill_parent();
 		exit(25);

@@ -177,12 +177,12 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
 		if (epoch % 2) {
-			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
-			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit-new");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbit-old");
 		}
 		else {
-			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbitold");
-			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbitold"); APPENDARG("name=bitbit-old");
+			APPENDARG("-engine"); APPENDARG("cmd=./bitbit"); APPENDARG("name=bitbit-new");
 		}
 		if (adjudicate & ADJUDICATE_DRAW) {
 			APPENDARG("-draw"); APPENDARG("movenumber=40");

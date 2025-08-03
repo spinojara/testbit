@@ -12,8 +12,9 @@
 #include "sprt.h"
 #include "req.h"
 #include "source.h"
+#include "cgroup.h"
 
-void setup(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc,
+void setup(SSL *ssl, int type, int ncpus, char *syzygy, const char *tc,
 		double alpha, double beta, double elo0,
 		double elo1, double eloe, int adjudicate,
 		const char *branch, const char *commit, const char *simd) {
@@ -56,7 +57,7 @@ void setup(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *t
 
 	if (make(simd, "etc/current.nnue")) {
 		/* This should probably never fail. But if a bad commit
-		 * is pushed to the github it can fail.
+		 * is pushed to github it can fail.
 		 */
 		sendf(ssl, "cc", REQUESTNODEDONE, TESTERRMAKE);
 		goto cleanup;
@@ -77,8 +78,13 @@ void setup(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *t
 		goto cleanup;
 	}
 
-	sprt(ssl, type, ncpus, cpus, syzygy, tc, alpha, beta, elo0, elo1, eloe, adjudicate);
+	int *cpus = malloc(ncpus * sizeof(*cpus));
 
+	if (claim_cpus(ncpus, cpus))
+		exit(56);
+	sprt(ssl, type, ncpus, cpus, syzygy, tc, alpha, beta, elo0, elo1, eloe, adjudicate);
+	if (release_cpus())
+		exit(57);
 cleanup:
 	if (chdir("/tmp")) {
 		fprintf(stderr, "error: chdir /tmp\n");
