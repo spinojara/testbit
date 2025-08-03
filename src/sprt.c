@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <sched.h>
+#include <fcntl.h>
 
 #include "util.h"
 #include "req.h"
@@ -33,6 +34,28 @@ struct process {
 	pid_t pid;
 	FILE *r;
 };
+
+void write_pgn(int ncpu, int *cpus) {
+	FILE *g = fopen("full.pgn", "w");
+	if (!g)
+		exit(104);
+
+	for (int i = 0; i < ncpu; i++) {
+		int cpu = cpus[i];
+		char buf[BUFSIZ];
+		sprintf(buf, "%d.pgn", cpu);
+		FILE *f = fopen(buf, "r");
+		if (!f)
+			continue;
+
+		while (fgets(buf, sizeof(buf), f))
+			fputs(buf, g);
+
+		fclose(f);
+	}
+
+	fclose(g);
+}
 
 void parse_finished_game(char *line, struct game *game, int max) {
 	char *endptr;
@@ -104,6 +127,9 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 	snprintf(fulltc, 131, "tc=%s", tc);
 	fulltc[130] = '\0';
 
+	char pgnfile[128];
+	sprintf(pgnfile, "file=%d.pgn", cpu);
+
 	int pipefd[2];
 	if (pipe(pipefd))
 		exit(28);
@@ -143,6 +169,10 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
 		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
+		APPENDARG("-pgnout"); APPENDARG(pgnfile);
+		APPENDARG("nodes=true"); APPENDARG("seldepth=true");
+		APPENDARG("nps=true"); APPENDARG("hashfull=true");
+		APPENDARG("tbhits=true"); APPENDARG("timeleft=true");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
@@ -270,9 +300,8 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 		}
 
 		/* Sleep for 100 ms. */
-		if (!any_done) {
+		if (!any_done)
 			usleep(100000);
-		}
 	}
 
 	for (int i = 0; i < ncpus; i++) {
@@ -283,7 +312,13 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 			exit(101);
 	}
 
-	sendf(ssl, "cc", REQUESTNODEDONE, status);
+	write_pgn(ncpus, cpus);
+
+	int fd = open("full.pgn", O_RDONLY, 0);
+	if (fd < 0)
+		exit(105);
+
+	sendf(ssl, "ccf", REQUESTNODEDONE, status, fd);
 
 	free(procs);
 }

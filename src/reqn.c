@@ -1,5 +1,8 @@
 #include "reqn.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "req.h"
 #include "sql.h"
 
@@ -52,8 +55,18 @@ int handle_done(struct connection *con, sqlite3 *db) {
 	char status = con->status;
 	char result;
 	con->status = STATUSWAIT;
-	if (recvf(con->ssl, "c", &result))
+	char path[BUFSIZ];
+	sprintf(path, "/var/lib/bitbit/pgn/%ld", con->id);
+	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open file %s\n", path);
+		exit(23);
+	}
+	if (recvf(con->ssl, "cf", &result, fd, -1)) {
+		close(fd);
 		return 1;
+	}
+	close(fd);
 
 	if (status == STATUSCANCEL)
 		return 0;
