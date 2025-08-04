@@ -169,10 +169,7 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
 		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
-		APPENDARG("-pgnout"); APPENDARG(pgnfile);
-		APPENDARG("nodes=true"); APPENDARG("seldepth=true");
-		APPENDARG("nps=true"); APPENDARG("hashfull=true");
-		APPENDARG("tbhits=true"); APPENDARG("timeleft=true");
+		APPENDARG("-pgnout"); APPENDARG(pgnfile); APPENDARG("nodes=true");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
