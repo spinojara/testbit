@@ -64,9 +64,9 @@ void parse_finished_game(char *line, struct game *game, int max) {
 		exit(42);
 
 	int white;
-	if (strstr(line, "(bitbit vs bitbitold)"))
+	if (strstr(line, "(bitbit-new vs bitbit-old)"))
 		white = 1;
-	else if (strstr(line, "(bitbitold vs bitbit)"))
+	else if (strstr(line, "(bitbit-old vs bitbit-new)"))
 		white = 0;
 	else
 		exit(39);
