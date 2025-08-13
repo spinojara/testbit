@@ -307,6 +307,8 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 		fclose(procs[i].r);
 		if (kill(procs[i].pid, SIGKILL))
 			exit(101);
+		if (waitpid(procs[i].pid, NULL, 0) == -1)
+			exit(106);
 	}
 
 	write_pgn(ncpus, cpus);
