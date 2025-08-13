@@ -54,7 +54,6 @@ int handle_update(struct connection *con, sqlite3 *db) {
 int handle_done(struct connection *con, sqlite3 *db) {
 	char status = con->status;
 	char result;
-	con->status = STATUSWAIT;
 	char path[BUFSIZ];
 	sprintf(path, "/var/lib/bitbit/pgn/%ld", con->id);
 	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0444);
@@ -62,12 +61,19 @@ int handle_done(struct connection *con, sqlite3 *db) {
 		fprintf(stderr, "Failed to open file %s\n", path);
 		exit(23);
 	}
-	if (recvf(con->ssl, "cf", &result, fd, -1)) {
+	if (recvf(con->ssl, "c", &result) || result < TESTERRBRANCH || result > TESTELO) {
 		close(fd);
 		return 1;
 	}
+	if (TESTINCONCLUSIVE <= result && result <= TESTELO) {
+		if (recvf(con->ssl, "f", fd, -1)) {
+			close(fd);
+			return 1;
+		}
+	}
 	close(fd);
 
+	con->status = STATUSWAIT;
 	if (status == STATUSCANCEL)
 		return 0;
 
