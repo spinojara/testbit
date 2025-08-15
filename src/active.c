@@ -99,7 +99,10 @@ void draw_active(struct oldteststate *os) {
 		strcpy(commit[i], test->commit);
 		iso8601local(qtime[i], test->qtime);
 		if (started) {
-			sprintf(elo[i], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
+			if (isnan(test->pm))
+				sprintf(elo[i], "%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo);
+			else
+				sprintf(elo[i], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		}
 		else {
 			sprintf(elo[i], "N/A");

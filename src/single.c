@@ -256,7 +256,10 @@ void draw_table(struct oldteststate *os) {
 	iso8601local(dtime[1], test->dtime);
 	strcpy(tc[1], test->tc);
 	if (started) {
-		sprintf(elo[1], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
+		if (isnan(test->pm))
+			sprintf(elo[1], "%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo);
+		else
+			sprintf(elo[1], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 		sprintf(llr[1], "%.2lf", test->llr);
 	}
 	else {

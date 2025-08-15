@@ -97,7 +97,7 @@ void draw_dynamic(struct oldteststate *os, void (*attr)(const struct oldteststat
 
 		for (int i = 0; i < tests; i++) {
 			int y = 2 + 2 * i;
-			int align_right = isdigit(strs[i][0]) || strs[i][0] == '.';
+			int align_right = isdigit(strs[i][0]) || strs[i][0] == '.' || strs[i][0] == '-';
 			int selected = i == os->selected + 1 && j == 0;
 			int len = strlen(strs[i]);
 			wattrset(os->win, selected ? cs.texthl.attr : cs.text.attr);

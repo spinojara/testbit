@@ -114,7 +114,10 @@ void draw_done(struct oldteststate *os) {
 		iso8601local(stime[i], test->stime);
 		iso8601local(dtime[i], test->dtime);
 		if (games) {
-			sprintf(elo[i], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
+			if (isnan(test->pm))
+				sprintf(elo[i], "%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo);
+			else
+				sprintf(elo[i], "%.2lf+-%.2lf", fabs(test->elo) <= 0.005 ? 0.0 : test->elo, test->pm);
 			sprintf(tri[i], "%u-%u-%u", test->t0, test->t1, test->t2);
 			sprintf(penta[i], "%u-%u-%u-%u-%u", test->p0, test->p1, test->p2, test->p3, test->p4);
 		}
