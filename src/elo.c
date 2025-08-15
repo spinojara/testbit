@@ -131,23 +131,32 @@ double elo_calc(const int32_t penta[5], double *pm) {
 		return 0.0 / 0.0;
 
 	double score = 0.0;
-	for (int j = 0; j < 5; j++)
+	int zeros = 0;
+	for (int j = 0; j < 5; j++) {
+		if (penta[j] == 0)
+			zeros++;
 		score += ALPHA(j) * n[j];
+	}
 
 	score = fclamp(score, eps, 1.0 - eps);
 	double elo = sigmoidinv(score);
 
 	if (pm) {
-		double sigma = -score * score;
-		for (int j = 0; j < 5; j++)
-			sigma += ALPHA(j) * ALPHA(j) * n[j];
-		sigma = sqrt(sigma);
+		if (zeros >= 4) {
+			*pm = 0.0 / 0.0;
+		}
+		else {
+			double sigma = -score * score;
+			for (int j = 0; j < 5; j++)
+				sigma += ALPHA(j) * ALPHA(j) * n[j];
+			sigma = sqrt(sigma);
 
-		double lambda = 1.96;
+			double lambda = 1.96;
 
-		double dSdx = dsigmoiddx(elo);
+			double dSdx = dsigmoiddx(elo);
 
-		*pm = lambda * sigma / (sqrt(N) * dSdx);
+			*pm = lambda * sigma / (sqrt(N) * dSdx);
+		}
 	}
 
 	return elo;
