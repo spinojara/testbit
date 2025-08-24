@@ -234,7 +234,7 @@ void init_newtest(struct newteststate *ns) {
 	new_prompt(&ns->prompt[PROMPTALPHA], ns->win, 5, 4, x - 18, "0.025", &allow_float);
 	new_prompt(&ns->prompt[PROMPTBETA], ns->win, 8, 4, x - 18, "0.025", &allow_float);
 	new_prompt(&ns->prompt[PROMPTELO0], ns->win, 11, 4, x - 18, "0.0", &allow_float);
-	new_prompt(&ns->prompt[PROMPTELO1], ns->win, 14, 4, x - 18, "4.0", &allow_float);
+	new_prompt(&ns->prompt[PROMPTELO1], ns->win, 14, 4, x - 18, "2.0", &allow_float);
 	new_prompt(&ns->prompt[PROMPTELOE], ns->win, 17, 4, x - 18, "0.0", &allow_float);
 	new_prompt(&ns->prompt[PROMPTBRANCH], ns->win, 20, 4, x - 18, "master", &allow_text);
 	new_prompt(&ns->prompt[PROMPTCOMMIT], ns->win, 23, 4, x - 18, "HEAD", &allow_text);
