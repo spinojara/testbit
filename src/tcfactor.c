@@ -29,7 +29,7 @@ int bench(void) {
 		close(STDOUT_FILENO);
 
 		dup2(pipefd[1], STDOUT_FILENO);
-		
+
 		execlp("./bitbit", "./bitbit", "bench,", "quit", (char *)NULL);
 
 		fprintf(stderr, "error: exec bitbit");
@@ -39,6 +39,8 @@ int bench(void) {
 
 	close(pipefd[1]);
 	FILE *f = fdopen(pipefd[0], "r");
+	if (!f)
+		exit(1);
 
 	char line[BUFSIZ];
 	int total_time = -1;
@@ -82,11 +84,15 @@ int main(void) {
 	char dtemp[] = "tcfactor-bitbit-XXXXXX";
 	int r;
 	/* commit: Clear tt before bench */
-	if ((r = git_clone(dtemp, "master", "c7ee42b")))
+	if ((r = git_clone(dtemp, "master", "c7ee42b"))) {
+		fclose(f);
 		return r;
+	}
 
-	if ((r = make("avx2", "etc/current.nnue")))
+	if ((r = make("avx2", "etc/current.nnue"))) {
+		fclose(f);
 		return r;
+	}
 
 	int average = 0;
 	int N = 10;

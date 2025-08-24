@@ -27,8 +27,10 @@ int echo(const char *path, const char *buf) {
 	if (!f)
 		return 1;
 	int len = strlen(buf);
-	if (fprintf(f, "%s\n", buf) != len + 1)
+	if (fprintf(f, "%s\n", buf) != len + 1) {
+		fclose(f);
 		return 2;
+	}
 	if (fclose(f))
 		return 3;
 
@@ -37,8 +39,13 @@ int echo(const char *path, const char *buf) {
 
 int cat(const char *path, char *buf, int n) {
 	FILE *f = fopen(path, "r");
-	if (!f || !fgets(buf, n, f) || fclose(f))
+	if (!f)
 		return 1;
+	if (!fgets(buf, n, f)) {
+		fclose(f);
+		return 1;
+	}
+	fclose(f);
 	return 0;
 }
 
@@ -186,6 +193,7 @@ int claim_cpus(int n, int *ret) {
 				return 4;
 	}
 
+	free(available.cpus);
 	if (claimedcpus_count != n)
 		return 5;
 
@@ -201,8 +209,10 @@ int claim_cpus(int n, int *ret) {
 		ret[i - 1] = cpus->cpu;
 		for (int j = 0; j < cpus->count; j++) {
 			sprintf(path, "/sys/devices/system/cpu/cpu%d/online", cpus->cpus[j]);
-			if (echo(path, "0"))
+			if (echo(path, "0")) {
+				fclose(f);
 				return 7;
+			}
 		}
 	}
 	fprintf(f, "\n");
@@ -212,7 +222,6 @@ int claim_cpus(int n, int *ret) {
 	if (echo("/sys/fs/cgroup/testbit/cpuset.cpus.partition", "isolated"))
 		return 9;
 
-	free(available.cpus);
 	return 0;
 }
 

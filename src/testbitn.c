@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "error: failed to open file '%s'\n", optarg);
 				error = 1;
 			}
-			if (dup2(fd, STDIN_FILENO) == -1) {
+			else if (dup2(fd, STDIN_FILENO) == -1) {
 				fprintf(stderr, "error: dup2\n");
 				error = 1;
 			}
@@ -74,12 +74,15 @@ int main(int argc, char **argv) {
 		FILE *f = fopen("/etc/testbit.conf", "r");
 		char buf[4096];
 		if (!f || !fgets(buf, sizeof(buf), f)) {
+			if (f)
+				fclose(f);
 			fprintf(stderr, "error: failed to open file '/etc/testbit.conf'\n");
 			return -4;
 		}
 
 		errno = 0;
 		if ((cpus = strtol(buf, &endptr, 10)) <= 0 || (*endptr != '\0' && *endptr != '\n') || errno) {
+			fclose(f);
 			fprintf(stderr, "error: cpus: %s\n", argv[optind]);
 			return -3;
 		}
