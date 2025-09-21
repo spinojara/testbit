@@ -130,6 +130,12 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 	char pgnfile[128];
 	sprintf(pgnfile, "file=%d.pgn", cpu);
 
+	char logfile[128];
+	sprintf(logfile, "file=%d.log", cpu);
+
+	char processname[128];
+	sprintf(processname, "fastchess-%d", cpu);
+
 	int pipefd[2];
 	if (pipe(pipefd))
 		exit(28);
@@ -162,7 +168,7 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 
 		char *argv[64];
 		int argc = 0;
-		APPENDARG("fastchess");
+		APPENDARG(processname);
 		APPENDARG("-testEnv");
 		APPENDARG("-concurrency"); APPENDARG("1");
 		APPENDARG("-each"); APPENDARG(fulltc);
@@ -170,6 +176,8 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
 		APPENDARG("-pgnout"); APPENDARG(pgnfile); APPENDARG("nodes=true");
+		APPENDARG("-log"); APPENDARG(logfile); APPENDARG("level=trace");
+		APPENDARG("realtime=true"); APPENDARG("engine=true");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
 		APPENDARG("-repeat");
