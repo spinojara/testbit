@@ -101,6 +101,11 @@ int parse_fastchess(FILE *r, int32_t tri[3], int32_t penta[5]) {
 	struct game game[2] = { 0 };
 	while (fgets(line, sizeof(line), r)) {
 		fprintf(stderr, "fastchess: %s", line);
+		if (strstr(line, "makes an illegal move") ||
+				strstr(line, "disconnects") ||
+				strstr(line, "connection stalls") ||
+				strstr(line, "Game interrupted"))
+			return 1;
 		if (strncmp(line, "Finished game", 13))
 			continue;
 		parse_finished_game(line, game, 2);
