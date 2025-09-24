@@ -139,19 +139,6 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 	char processname[128];
 	sprintf(processname, "fastchess-%d", cpu);
 
-	char ttfile[128];
-	sprintf(ttfile, "%d.tt", cpu);
-
-	char debughash[256];
-	sprintf(debughash, "option.DebugHash=%s", ttfile);
-
-	/* Make sure log and tt files exist and are empty. */
-	int fd;
-	fd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	close(fd);
-	fd = open(ttfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	close(fd);
-
 	int pipefd[2];
 	if (pipe(pipefd))
 		exit(28);
@@ -189,7 +176,7 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("-concurrency"); APPENDARG("1");
 		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
-		APPENDARG(debughash);
+		APPENDARG("option.Debug=true");
 		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
 		APPENDARG("-pgnout"); APPENDARG(pgnfile); APPENDARG("nodes=true");
@@ -218,7 +205,17 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 			APPENDARG("-tb"); APPENDARG(syzygy);
 		}
 		APPENDARG(NULL);
+
 		su("testbit");
+		/* Make sure log file exists and is empty. */
+		int fd;
+		fd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fd < 0) {
+			fprintf(stderr, "error: open %s\n", logfile);
+			exit(796);
+		}
+		close(fd);
+
 		execvp("fastchess", argv);
 
 		fprintf(stderr, "error: exec fastchess");
@@ -352,18 +349,14 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 	if (status == TESTERRRUN) {
 		char logfile[128];
 		sprintf(logfile, "%d.log", cpuerr);
-		char ttfile[128];
-		sprintf(ttfile, "%d.tt", cpuerr);
 		int logfd = open(logfile, O_RDONLY, 0);
-		int ttfd = open(ttfile, O_RDONLY, 0);
 
-		if (logfd < 0 || ttfd < 0)
+		if (logfd < 0)
 			exit(1234);
 
-		sendf(ssl, "ff", logfd, ttfd);
+		sendf(ssl, "f", logfd);
 
 		close(logfd);
-		close(ttfd);
 	}
 
 	free(procs);
