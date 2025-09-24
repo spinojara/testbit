@@ -158,7 +158,7 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 			exit(103);
 
 		struct sched_param param = { 99 };
-		sched_setscheduler(0, SCHED_FIFO, &param);
+		sched_setscheduler(0, SCHED_RR, &param);
 
 		cpu_set_t mask;
 		CPU_ZERO(&mask);
