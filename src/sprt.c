@@ -131,10 +131,26 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 	sprintf(pgnfile, "file=%d.pgn", cpu);
 
 	char logfile[128];
-	sprintf(logfile, "file=%d.log", cpu);
+	sprintf(logfile, "%d.log", cpu);
+
+	char filelogfile[256];
+	sprintf(filelogfile, "file=%s", logfile);
 
 	char processname[128];
 	sprintf(processname, "fastchess-%d", cpu);
+
+	char ttfile[128];
+	sprintf(ttfile, "%d.tt", cpu);
+
+	char debughash[256];
+	sprintf(debughash, "option.DebugHash=%s", ttfile);
+
+	/* Make sure log and tt files exist and are empty. */
+	int fd;
+	fd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	close(fd);
+	fd = open(ttfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	close(fd);
 
 	int pipefd[2];
 	if (pipe(pipefd))
@@ -173,10 +189,11 @@ int run_games(int cpu, struct process *proc, char *syzygy, const char *tc, int a
 		APPENDARG("-concurrency"); APPENDARG("1");
 		APPENDARG("-each"); APPENDARG(fulltc);
 		APPENDARG("proto=uci"); APPENDARG("timemargin=10000");
+		APPENDARG(debughash);
 		APPENDARG("-rounds"); APPENDARG("1");
 		APPENDARG("-games"); APPENDARG("2");
 		APPENDARG("-pgnout"); APPENDARG(pgnfile); APPENDARG("nodes=true");
-		APPENDARG("-log"); APPENDARG(logfile); APPENDARG("level=trace");
+		APPENDARG("-log"); APPENDARG(filelogfile); APPENDARG("level=trace");
 		APPENDARG("realtime=true"); APPENDARG("engine=true");
 		APPENDARG("-openings"); APPENDARG("format=epd");
 		APPENDARG("file=etc/book/testbit-50cp5d6m100k.epd"); APPENDARG("order=random");
@@ -242,6 +259,8 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 
 	struct process *procs = calloc(ncpus, sizeof(*procs));
 
+	int cpuerr = -1;
+
 	char cancel = 0;
 	while (status == TESTINCONCLUSIVE && !cancel) {
 		/* Start games. */
@@ -271,6 +290,7 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 
 			if (WEXITSTATUS(wstatus) || parse_fastchess(procs[i].r, tri, penta)) {
 				status = TESTERRRUN;
+				cpuerr = cpus[i];
 				fclose(procs[i].r);
 				break;
 			}
@@ -326,6 +346,25 @@ void sprt(SSL *ssl, int type, int ncpus, int *cpus, char *syzygy, const char *tc
 		exit(105);
 
 	sendf(ssl, "ccf", REQUESTNODEDONE, status, fd);
+
+	close(fd);
+
+	if (status == TESTERRRUN) {
+		char logfile[128];
+		sprintf(logfile, "%d.log", cpuerr);
+		char ttfile[128];
+		sprintf(ttfile, "%d.tt", cpuerr);
+		int logfd = open(logfile, O_RDONLY, 0);
+		int ttfd = open(ttfile, O_RDONLY, 0);
+
+		if (logfd < 0 || ttfd < 0)
+			exit(1234);
+
+		sendf(ssl, "ff", logfd, ttfd);
+
+		close(logfd);
+		close(ttfd);
+	}
 
 	free(procs);
 }

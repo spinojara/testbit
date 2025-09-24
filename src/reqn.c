@@ -65,10 +65,33 @@ int handle_done(struct connection *con, sqlite3 *db) {
 		close(fd);
 		return 1;
 	}
-	if (TESTINCONCLUSIVE <= result && result <= TESTELO) {
+	if (TESTERRRUN <= result && result <= TESTELO) {
 		if (recvf(con->ssl, "f", fd, -1)) {
 			close(fd);
 			return 1;
+		}
+		/* In the case of a runtime error, get the log file and current tt. */
+		if (result == TESTERRRUN) {
+			char logfile[BUFSIZ], ttfile[BUFSIZ];
+			sprintf(logfile, "/var/lib/bitbit/log/%ld", con->id);
+			sprintf(ttfile, "/var/lib/bitbit/tt/%ld", con->id);
+			int logfd = open(logfile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+			if (logfd < 0) {
+				fprintf(stderr, "Failed to open file %s\n", logfile);
+				exit(24);
+			}
+			int ttfd = open(ttfile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+			if (ttfd < 0) {
+				fprintf(stderr, "Failed to open file %s\n", ttfile);
+				exit(25);
+			}
+			if (recvf(con->ssl, "ff", logfd, -1, ttfd, -1)) {
+				close(logfd);
+				close(ttfd);
+				return 1;
+			}
+			close(logfd);
+			close(ttfd);
 		}
 	}
 	close(fd);
