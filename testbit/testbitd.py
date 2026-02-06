@@ -202,7 +202,7 @@ async def test_new(request):
     if type not in ["elo", "sprt"]:
         return web.json_response({"message": "bad type"}, status=400)
     tc = data.get("tc")
-    if not isinstance(tc, str) or not tc.validatetc(tc):
+    if not isinstance(tc, str) or not validatetc(tc):
         return web.json_response({"message": "bad tc"}, status=400)
 
     alpha = data.get("alpha")
