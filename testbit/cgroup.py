@@ -33,7 +33,7 @@ class CPU:
             f.write("isolated")
 
         for cpu in self.thread_siblings:
-            with open("/sys/devices/system/cpu/cpu%d/online" % self.cpu, "w") as f:
+            with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
                 f.write("0")
 
     def release(self: Self):
@@ -41,7 +41,7 @@ class CPU:
             return
         Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
         for cpu in self.thread_siblings:
-            with open("/sys/devices/system/cpu/cpu%d/online" % self.cpu, "w") as f:
+            with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
                 f.write("1")
         self.claimed = False
 
@@ -70,7 +70,7 @@ def cpuset_cpus_effective() -> Set[CPU]:
     return cpus
 
 def list_cpus(cpus: str) -> List[str]:
-    l = []
+    l: List[str] = []
     current_int = ""
     for c in cpus:
         if c == "\n":
@@ -108,7 +108,7 @@ def parse_cpus(cpus: str | List[str]) -> Set[int]:
 
 
 
-def make_cpu_claiming_strategy(cpus: Set[CPU], n: int) -> Set[CPU]:
+def make_cpu_claiming_strategy(cpus: Set[CPU], n: int) -> Set[CPU] | None:
     claimed: Set[CPU] = set()
     for cpu in cpus:
         if (

@@ -5,7 +5,6 @@ import threading, sqlite3, json
 from typing import Dict
 from pathlib import Path
 import tempfile
-import time
 import docker
 import sys
 from docker.errors import BuildError
@@ -34,16 +33,17 @@ RUN curl -L -o fastchess.tar.gz https://github.com/Disservin/fastchess/archive/r
     rm -rf fastchess fastchess.tar.gz
 
 ARG COMMIT
+ARG SIMD
 
 COPY patch patch
 
 RUN git clone https://github.com/spinojara/bitbit.git && \
     git -C bitbit checkout $COMMIT && \
-    make -C bitbit clean && make -C bitbit SIMD=avx2 bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit SIMD=$SIMD bitbit-pgo && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     mv bitbit/bitbit bitbit-old && \
     git -C bitbit apply ../patch && \
-    make -C bitbit clean && make -C bitbit SIMD=avx2 bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
     rm -rf bitbit patch nnue
 """
@@ -83,10 +83,10 @@ def build_docker_images():
         try:
             client = docker.from_env()
             print("building docker image")
-            image, build_logs = client.images.build(
+            client.images.build(
                 path=str(tempdir),
                 dockerfile=str(dockerfile),
-                buildargs={"COMMIT": commit},
+                buildargs={"COMMIT": commit, "SIMD": simd},
                 tag="testbit:%d" % id,
             )
         except BuildError as e:
@@ -198,34 +198,45 @@ async def test_new(request):
     if not patch_contents:
         return web.json_response({"message": "no patch"}, status=400)
 
-    if data.get("type") not in ["elo", "sprt"]:
+    type = data.get("type")
+    if type not in ["elo", "sprt"]:
         return web.json_response({"message": "bad type"}, status=400)
-    if not isinstance(data.get("tc"), str) or not tc.validatetc(data.get("tc")):
+    tc = data.get("tc")
+    if not isinstance(tc, str) or not tc.validatetc(tc):
         return web.json_response({"message": "bad tc"}, status=400)
-    if data.get("type") == "sprt":
-        print(type(data.get("alpha")))
-        if not isinstance(data.get("alpha"), float) or data.get("alpha") <= 0.0:
+
+    alpha = data.get("alpha")
+    beta = data.get("beta")
+    elo0 = data.get("elo0")
+    elo1 = data.get("elo1")
+    eloe = data.get("eloe")
+    commit = data.get("commit")
+    adjudicate = data.get("adjudicate")
+    simd = data.get("simd")
+
+    if type == "sprt":
+        if not isinstance(alpha, float) or alpha <= 0.0:
             return web.json_response({"message": "bad alpha"}, status=400)
-        if not isinstance(data.get("beta"), float) or data.get("beta") <= 0.0:
+        if not isinstance(beta, float) or beta <= 0.0:
             return web.json_response({"message": "bad beta"}, status=400)
-        if not isinstance(data.get("elo0"), float):
+        if not isinstance(elo0, float):
             return web.json_response({"message": "bad elo0"}, status=400)
-        if not isinstance(data.get("elo1"), float):
+        if not isinstance(elo1, float):
             return web.json_response({"message": "bad elo1"}, status=400)
-        if data.get("elo0") >= data.get("elo1"):
+        if elo0 >= elo1:
             return web.json_response({"message": "need elo0 < elo1"}, status=400)
-        if data.get("alpha") + data.get("beta") >= 0.5:
+        if alpha + beta >= 0.5:
             return web.json_response({"message": "need alpha + beta < 0.5"}, status=400)
-    elif data.get("type") == "elo":
-        if not isinstance(data.get("eloe"), float) or data.get("eloe") <= 0.0:
+    elif type == "elo":
+        if not isinstance(eloe, float) or eloe <= 0.0:
             return web.json_response({"message": "bad eloe"}, status=400)
 
-    if not data.get("commit"):
+    if not commit:
         return web.json_response({"message": "no commit"}, status=400)
-    if data.get("adjudicate") not in ["none", "draw", "resign", "both"]:
+    if adjudicate not in ["none", "draw", "resign", "both"]:
         return web.json_response({"message": "bad adjudicate"}, status=400)
 
-    if data.get("simd") not in ["none", "avx2"]:
+    if simd not in ["none", "avx2"]:
         return web.json_response({"message": "bad simd"}, status=400)
 
     with dbcond:
@@ -260,16 +271,16 @@ async def test_new(request):
                 ?
             );
         """, (
-                data.get("type"),
-                data.get("tc"),
-                data.get("alpha"),
-                data.get("beta"),
-                data.get("elo0"),
-                data.get("elo1"),
-                data.get("eloe"),
-                data.get("adjudicate"),
-                data.get("commit"),
-                data.get("simd"),
+                type,
+                tc,
+                alpha,
+                beta,
+                elo0,
+                elo1,
+                eloe,
+                adjudicate,
+                commit,
+                simd,
                 patch_contents
              ))
         con.commit()
@@ -289,18 +300,21 @@ async def test_data(request):
     except Exception:
         return web.json_response({"message": "no json"}, status=400)
 
-    if not isinstance(data.get("wins"), int) or data.get("wins") < 0:
+    wins = data.get("wins")
+    draws = data.get("draws")
+    losses = data.get("losses")
+    if not isinstance(wins, int) or wins < 0:
         return web.json_response({"message": "bad wins"}, status=400)
-    if not isinstance(data.get("losses"), int) or data.get("losses") < 0:
+    if not isinstance(losses, int) or losses < 0:
         return web.json_response({"message": "bad losses"}, status=400)
-    if not isinstance(data.get("draws"), int) or data.get("draws") < 0:
+    if not isinstance(draws, int) or draws < 0:
         return web.json_response({"message": "bad draws"}, status=400)
-    if data.get("wins") + data.get("draws") + data.get("losses") != 2:
+    if wins + draws + losses != 2:
         return web.json_response({"message": "need losses + draws + wins = 2"}, status=400)
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
-            SELECT type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4
+            SELECT type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1
             FROM tests
             WHERE id = ? AND (
                 status = "running"
@@ -313,16 +327,16 @@ async def test_data(request):
             # It could be that this id was already set to done.
             return web.json_response({"message": "ok"}, status=400)
 
-        type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4 = row
+        type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1 = row
         p = [p0, p1, p2, p3, p4]
-        t0 += data.get("losses")
-        t1 += data.get("draws")
-        t2 += data.get("wins")
-        p[data.get("draws") + 2 * data.get("wins")] += 1
+        t0 += losses
+        t1 += draws
+        t2 += wins
+        p[draws + 2 * wins] += 1
 
         elo, pm = elo.calculate_elo(p)
         if type == "sprt":
-            llr = elo.calculate_llr(p)
+            llr = elo.loglikelihoodratio(p, elo0, elo1)
             A = math.log(beta / (1.0 - alpha))
             B = math.log((1.0 - beta) / alpha)
             if llr < A:
@@ -501,7 +515,7 @@ async def authenticate(request, handler):
         if not status:
             return web.json_response({"message": message}, status=401)
 
-    except Exception as e:
+    except Exception:
         return web.json_response({"message": "an error occured"}, status=401)
 
     return await handler(request)
@@ -526,7 +540,7 @@ def main() -> int:
     parser.add_argument("--cert-chain", type=str, help="SSL certificate chain", default="")
     parser.add_argument("--cert-key", type=str, help="SSL certificate key", default="")
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     """
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)

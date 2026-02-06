@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 
 import math
+from typing import List
 
 eps = 1e-6
 
-def sigmoid(x):
+def alpha(i: float) -> float:
+    return i / 4
+
+def sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x * math.log(10.0) / 400.0))
 
-def dsigmoiddx(x):
-    e = math.exp(-x * log(10.0) / 400.0)
+def dsigmoiddx(x: float) -> float:
+    e = math.exp(-x * math.log(10.0) / 400.0)
     return math.log(10.0) / 400.0 * e / ((1.0 + e) ** 2)
 
-def sigmoidinv(y):
-    return -400.0 * math.log(1.0 / y - 1.0) / log(10.0)
+def sigmoidinv(y: float) -> float:
+    return -400.0 * math.log(1.0 / y - 1.0) / math.log(10.0)
 
-def f_calc(mu, C, n):
+def f_calc(mu: float, C: float, n: List[float]) -> float:
     s = 0.0
 
     for i in range(5):
@@ -22,31 +26,31 @@ def f_calc(mu, C, n):
 
     return s
 
-def mu_bisect(C, n):
+def mu_bisect(C: float, n: List[float]) -> float:
     a = -1.0 / (1.0 - C)
     b = 1.0 / C
 
     while True:
         c = (a + b) / 2
         f = f_calc(c, C, n)
-        if math.abs(f) < eps:
+        if abs(f) < eps:
             return c
         if f > 0.0:
             a = c
         else:
             b = c
 
-def loglikelihood(mu, C, n):
+def loglikelihood(mu: float, C: float, n: List[float]) -> float:
     s = 0.0
     for i in range(5):
         p = n[i] / (1.0 + (alpha(i) - C) * mu)
         if n[i] > 0.0:
-            s += n[j] * math.log(p)
+            s += n[i] * math.log(p)
 
     return s
 
 
-def loglikelihoodratio(p, elo0, elo1):
+def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
     N = sum(p)
 
     n = [px / N for px in p]
@@ -71,7 +75,7 @@ def loglikelihoodratio(p, elo0, elo1):
 
     return N * (loglikelihood(mu1, C1, n) - loglikelihood(mu0, C0, n))
 
-def calculate_elo(p):
+def calculate_elo(p: List[int]) -> tuple[float, float | None]:
     N = sum(p)
 
     n = [px / N for px in p]
@@ -81,7 +85,7 @@ def calculate_elo(p):
     score = 0.25 * n[1] + 0.5 * n[2] + 0.75 * n[3] + n[4]
     elo = sigmoidinv(min(max(score, eps), 1.0 - eps))
 
-    if zeros >= 4;
+    if zeros >= 4:
         return elo, None
 
     sigma = 0.25 * 0.25 * n[1] + 0.5 * 0.5 * n[2] + 0.75 * 0.75 * n[3] + n[4] - score * score

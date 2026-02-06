@@ -24,7 +24,7 @@ def main() -> int:
     parser.add_argument("--host", type=str, help="host", default="jalagaoi.se")
     parser.add_argument("--port", type=int, help="port", default=2718)
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
     if args.alpha <= 0.0 or args.beta <= 0.0 or args.alpha + args.beta >= 0.5:
         print("bad alpha or beta")
         return 1
@@ -75,7 +75,7 @@ def main() -> int:
             files={"patch": patch},
             auth=("", password)
         )
-    except requests.exceptions.ConnectionError as e:
+    except requests.exceptions.ConnectionError:
         print("Connection to %s:%d refused" % (args.host, args.port))
         return 1
     finally:

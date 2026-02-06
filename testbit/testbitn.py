@@ -8,8 +8,7 @@ import atexit
 import cgroup
 import sys
 import threading
-from docker.errors import ImageNotFound, ContainerError
-from typing import List
+from docker.errors import ImageNotFound
 from cgroup import CPU
 import argparse
 
@@ -47,11 +46,11 @@ def worker(cpu: CPU, host: str):
                 detach=True,
                 parent_cgroup="testbit-%d" % cpu.cpu
             )
-        except ImageNotFound as e:
+        except ImageNotFound:
             response = requests.put(host + "/test/docker/%d" % id)
 
         result = container.wait()
-        logs = container.logs().decode("utf-8")
+        logs: str = container.logs().decode("utf-8")
 
         losses = 0
         draws = 0
@@ -79,7 +78,7 @@ def worker(cpu: CPU, host: str):
             response = requests.put(host + "/test/error/%d" % id, data={"data": json.dumps({"errorlog": container.logs().decode("utf-8")})})
             print(response.json())
         else:
-            response = requests.put(host + "/test/%d" % id, data={"data" : json.dumps({"losses": losses, "draws": draws, "wins"})})
+            response = requests.put(host + "/test/%d" % id, data={"data" : json.dumps({"losses": losses, "draws": draws, "wins": wins})})
         container.remove()
         break
 
@@ -87,12 +86,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, help="Amount of workers.", default=-1)
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
     if args.workers < 1 and args.workers != -1:
         print("--workers must be positive or -1")
         return 1
 
-    cpus: Set[CPU] = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
+    cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
 
     if not cpus:
         print("Failed to make cpu claiming strategy.")
