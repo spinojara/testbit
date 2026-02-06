@@ -18,7 +18,7 @@ from . import elo
 from . import spwd
 
 dbcond = threading.Condition()
-con = sqlite3.connect("temp.sqlite", check_same_thread=False)
+con = None
 
 Dockerfile = """
 FROM alpine:3.23.3
@@ -539,8 +539,11 @@ def main() -> int:
     parser.add_argument("--port", type=int, help="port", default=2718)
     parser.add_argument("--cert-chain", type=str, help="SSL certificate chain", default="")
     parser.add_argument("--cert-key", type=str, help="SSL certificate key", default="")
+    parser.add_argument("--db", type=str, help="sqlite3 db path", default="")
 
     args, _ = parser.parse_known_args()
+
+    con = sqlite3.connect(args.db, check_same_thread=False)
 
     """
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
