@@ -87,13 +87,15 @@ def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
 
 
     C1 = sigmoid(elo1)
-    if C1 >= score:
+    if C1 <= score:
         C1 = score
         mu1 = 0.0
     else:
         mu1 = mu_bisect(C1, n)
 
 
+    print(f"mu0: {mu0}, C0: {C0}")
+    print(f"mu1: {mu1}, C1: {C1}")
     return N * (loglikelihood(mu1, C1, n) - loglikelihood(mu0, C0, n))
 
 def calculate_elo(p: List[int]) -> tuple[float, float | None]:
@@ -117,3 +119,7 @@ def calculate_elo(p: List[int]) -> tuple[float, float | None]:
     pm = lam * sigma / (math.sqrt(N) * dsigmoiddx(elo))
 
     return elo, pm
+
+p = [1,5,24,5,1]
+
+print(loglikelihoodratio(p, 0.0, 2.0))
