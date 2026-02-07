@@ -18,6 +18,25 @@ def dsigmoiddx(x: float) -> float:
 def sigmoidinv(y: float) -> float:
     return -400.0 * math.log(1.0 / y - 1.0) / math.log(10.0)
 
+def normalize_clamp(p: List[int]) -> List[int]:
+    N = sum(p)
+
+    if N <= 0:
+        return None
+
+    n = []
+    for i in range(len(p)):
+        if i == 0 or i == 4:
+            n.append(max(p[i], eps))
+        else:
+            n.append(p[i])
+
+    s = sum(n)
+
+    n = [nx / s for nx in n]
+
+    return n
+
 def f_calc(mu: float, C: float, n: List[float]) -> float:
     s = 0.0
 
@@ -33,7 +52,7 @@ def mu_bisect(C: float, n: List[float]) -> float:
     while True:
         c = (a + b) / 2
         f = f_calc(c, C, n)
-        if abs(f) < eps:
+        if abs(a - b) < eps or abs(f) < eps:
             return c
         if f > 0.0:
             a = c
@@ -53,10 +72,11 @@ def loglikelihood(mu: float, C: float, n: List[float]) -> float:
 def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
     N = sum(p)
 
-    n = [px / N for px in p]
+    n = normalize_clamp(p)
+    if not n:
+        return None
 
     score = 0.25 * n[1] + 0.5 * n[2] + 0.75 * n[3] + n[4]
-
 
     C0 = sigmoid(elo0)
     if C0 >= score:
@@ -72,6 +92,7 @@ def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
         mu1 = 0.0
     else:
         mu1 = mu_bisect(C1, n)
+
 
     return N * (loglikelihood(mu1, C1, n) - loglikelihood(mu0, C0, n))
 
