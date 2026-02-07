@@ -149,34 +149,35 @@ def create_table():
     cursor = con.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tests (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            type       TEXT NOT NULL,
-            status     TEXT DEFAULT "building",
-            tc         TEXT NOT NULL,
-            alpha      REAL,
-            beta       REAL,
-            elo0       REAL,
-            elo1       REAL,
-            eloe       REAL,
-            adjudicate TEXT NOT NULL,
-            queuetime  INTEGER,
-            starttime  INTEGER,
-            donetime   INTEGER,
-            elo        REAL,
-            pm         REAL,
-            llr        REAL,
-            t0         INTEGER DEFAULT 0,
-            t1         INTEGER DEFAULT 0,
-            t2         INTEGER DEFAULT 0,
-            p0         INTEGER DEFAULT 0,
-            p1         INTEGER DEFAULT 0,
-            p2         INTEGER DEFAULT 0,
-            p3         INTEGER DEFAULT 0,
-            p4         INTEGER DEFAULT 0,
-            commithash TEXT NOT NULL,
-            simd       TEXT NOT NULL,
-            patch      BLOB NOT NULL,
-            errorlog   BLOB,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            description TEXT DEFAULT "empty",
+            type        TEXT NOT NULL,
+            status      TEXT DEFAULT "building",
+            tc          TEXT NOT NULL,
+            alpha       REAL,
+            beta        REAL,
+            elo0        REAL,
+            elo1        REAL,
+            eloe        REAL,
+            adjudicate  TEXT NOT NULL,
+            queuetime   INTEGER,
+            starttime   INTEGER,
+            donetime    INTEGER,
+            elo         REAL,
+            pm          REAL,
+            llr         REAL,
+            t0          INTEGER DEFAULT 0,
+            t1          INTEGER DEFAULT 0,
+            t2          INTEGER DEFAULT 0,
+            p0          INTEGER DEFAULT 0,
+            p1          INTEGER DEFAULT 0,
+            p2          INTEGER DEFAULT 0,
+            p3          INTEGER DEFAULT 0,
+            p4          INTEGER DEFAULT 0,
+            commithash  TEXT NOT NULL,
+            simd        TEXT NOT NULL,
+            patch       BLOB NOT NULL,
+            errorlog    BLOB,
             UNIQUE (type, queuetime, patch, commithash)
         );
     """)
@@ -210,6 +211,7 @@ async def test_new(request):
     if not isinstance(tc, str) or not validatetc(tc):
         return web.json_response({"message": "bad tc"}, status=400)
 
+    description = data.get("description")
     alpha = data.get("alpha")
     beta = data.get("beta")
     elo0 = data.get("elo0")
@@ -218,6 +220,9 @@ async def test_new(request):
     commit = data.get("commit")
     adjudicate = data.get("adjudicate")
     simd = data.get("simd")
+
+    if not isinstance(description, str) or not description:
+        return web.json_response({"message": "bad description"}, status=400)
 
     if type == "sprt":
         if not isinstance(alpha, float) or alpha <= 0.0:
@@ -253,6 +258,7 @@ async def test_new(request):
         cursor = con.cursor()
         cursor.execute("""
             INSERT INTO tests (
+                description,
                 type,
                 tc,
                 alpha,
@@ -275,24 +281,26 @@ async def test_new(request):
                 ?,
                 ?,
                 ?,
+                ?,
                 unixepoch(),
                 ?,
                 ?,
                 ?
             );
         """, (
-                type,
-                tc,
-                alpha,
-                beta,
-                elo0,
-                elo1,
-                eloe,
-                adjudicate,
-                commit,
-                simd,
-                patch_contents
-             ))
+            description,
+            type,
+            tc,
+            alpha,
+            beta,
+            elo0,
+            elo1,
+            eloe,
+            adjudicate,
+            commit,
+            simd,
+            patch_contents
+        ))
         con.commit()
         dbcond.notify()
 
@@ -300,7 +308,7 @@ async def test_new(request):
 
 async def test_data(request):
     id = request.match_info.get("id")
-    if not id:
+    if not id or not isinstance(id, int):
         return web.json_response({"message": "bad id"}, status=400)
 
     try:
@@ -405,7 +413,7 @@ async def test_data(request):
 
 async def test_cancel(request):
     id = request.match_info.get("id")
-    if not id:
+    if not id or not isinstance(id, int):
         return web.json_response({"message": "bad id"}, status=400)
     with dbcond:
         cursor = con.cursor()
@@ -425,7 +433,7 @@ async def test_cancel(request):
 
 async def test_error(request):
     id = request.match_info.get("id")
-    if not id:
+    if not id or not isinstance(id, int):
         return web.json_response({"message": "bad id"}, status=400)
 
     try:
@@ -451,7 +459,7 @@ async def test_error(request):
 
 async def test_docker(request):
     id = request.match_info.get("id")
-    if not id:
+    if not id or not isinstance(id, int):
         return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
@@ -491,8 +499,160 @@ async def get_task(request):
     id, tc, adjudicate = row
     return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate})
 
-async def test_fetch(request):
-    return web.json_response({"message": "ok"})
+async def test_fetch_single(request):
+    id = request.match_info.get("id")
+    if not id or not isinstance(id, int):
+        return web.json_response({"message": "bad id"}, status=400)
+
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            id,
+            description,
+            type,
+            status,
+            tc,
+            alpha,
+            beta,
+            elo0,
+            elo1,
+            eloe,
+            adjudicate,
+            queuetime,
+            starttime,
+            donetime,
+            elo,
+            pm,
+            llr,
+            t0,
+            t1,
+            t2,
+            p0,
+            p1,
+            p2,
+            p3,
+            p4,
+            commithash,
+            simd,
+            patch,
+            errorlog
+        FROM tests
+        WHERE id = ?;
+    """, (id, ))
+
+    row = cursor.fetchone()
+    if not row:
+        return web.json_response({"message": "bad id"}, status=400)
+
+    patch = row[27]
+    if patch:
+        patch = patch.decode("utf-8")
+    errorlog = row[28]
+    if errorlog:
+        errorlog = errorlog.decode("utf-8")
+
+    test = {
+        "id": row[0],
+        "description": row[1],
+        "type": row[2],
+        "status": row[3],
+        "tc": row[4],
+        "alpha": row[5],
+        "beta": row[6],
+        "elo0": row[7],
+        "elo1": row[8],
+        "eloe": row[9],
+        "adjudicate": row[10],
+        "queuetime": row[11],
+        "starttime": row[12],
+        "donetime": row[13],
+        "elo": row[14],
+        "pm": row[15],
+        "llr": row[16],
+        "t0": row[17],
+        "t1": row[18],
+        "t2": row[19],
+        "p0": row[20],
+        "p1": row[21],
+        "p2": row[22],
+        "p3": row[23],
+        "p4": row[24],
+        "commithash": row[25],
+        "simd": row[26],
+        "patch": patch,
+        "errorlog": errorlog
+    }
+
+    return web.json_response({"message": "ok", "test": test})
+
+async def test_fetch_all(request):
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            id,
+            description,
+            type,
+            status,
+            tc,
+            alpha,
+            beta,
+            elo0,
+            elo1,
+            eloe,
+            adjudicate,
+            queuetime,
+            starttime,
+            donetime,
+            elo,
+            pm,
+            llr,
+            t0,
+            t1,
+            t2,
+            p0,
+            p1,
+            p2,
+            p3,
+            p4,
+            commithash,
+            simd
+        FROM tests;
+    """)
+
+    tests = []
+
+    for row in cursor.fetchall():
+        tests.append({
+            "id": row[0],
+            "description": row[1],
+            "type": row[2],
+            "status": row[3],
+            "tc": row[4],
+            "alpha": row[5],
+            "beta": row[6],
+            "elo0": row[7],
+            "elo1": row[8],
+            "eloe": row[9],
+            "adjudicate": row[10],
+            "queuetime": row[11],
+            "starttime": row[12],
+            "donetime": row[13],
+            "elo": row[14],
+            "pm": row[15],
+            "llr": row[16],
+            "t0": row[17],
+            "t1": row[18],
+            "t2": row[19],
+            "p0": row[20],
+            "p1": row[21],
+            "p2": row[22],
+            "p3": row[23],
+            "p4": row[24],
+            "commithash": row[25],
+            "simd": row[26]
+        })
+
+    return web.json_response({"message": "ok", "tests": tests})
 
 @web.middleware
 async def enforce_https(request, handler):
@@ -540,7 +700,8 @@ def create_app():
     app.router.add_put("/test/error/{id}", test_error)
     app.router.add_put("/test/docker/{id}", test_docker)
     app.router.add_get("/test/task", get_task)
-    app.router.add_get("/test", test_fetch)
+    app.router.add_get("/test/{id}", test_fetch_single)
+    app.router.add_get("/test", test_fetch_all)
 
     return app
 
