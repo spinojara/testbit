@@ -731,7 +731,7 @@ def main() -> int:
 
     app = create_app()
 
-    web.run_app(app, host="0.0.0.0", port=args.port)
+    web.run_app(app, host="0.0.0.0", port=args.port, ssl_context=ctx)
 
     thread.join()
     con.close()
