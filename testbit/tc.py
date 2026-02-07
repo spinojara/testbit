@@ -57,10 +57,7 @@ def validatetc(tc: str) -> bool:
             except:
                 False
 
-def tcadjust(tc: str) -> str:
-    with open("/etc/bitbit/tcfactor", "r") as f:
-        tcfactor = float(f.read().strip())
-
+def tcadjust(tc: str, tcfactor: float) -> str:
     moves = 0
     maintime = 0
     increment = 0

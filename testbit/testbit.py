@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument("--simd", type=str, help="simd", default="avx2")
     parser.add_argument("--adjudicate", type=str, help="adjudication", default="both")
     parser.add_argument("--tc", type=str, help="time control", default="40/10+0.1")
-    parser.add_argument("--host", type=str, help="host", default="jalagaoi.se")
+    parser.add_argument("--host", type=str, help="host", default="localhost")
     parser.add_argument("--port", type=int, help="port", default=2718)
 
     args, _ = parser.parse_known_args()
@@ -73,7 +73,8 @@ def main() -> int:
                 "tc": args.tc,
             })},
             files={"patch": patch},
-            auth=("", password)
+            auth=("", password),
+            verify=host != "localhost"
         )
     except requests.exceptions.ConnectionError:
         print("Connection to %s:%d refused" % (args.host, args.port))
