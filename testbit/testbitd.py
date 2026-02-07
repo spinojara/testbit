@@ -14,7 +14,7 @@ import ssl
 import argparse
 import string
 
-from . import tc
+from . import tc as timecontrol
 from . import elo
 from . import spwd
 
@@ -208,7 +208,7 @@ async def test_new(request):
     if type not in ["elo", "sprt"]:
         return web.json_response({"message": "bad type"}, status=400)
     tc = data.get("tc")
-    if not isinstance(tc, str) or not validatetc(tc):
+    if not isinstance(tc, str) or not timecontrol.validatetc(tc):
         return web.json_response({"message": "bad tc"}, status=400)
 
     description = data.get("description")
@@ -656,7 +656,7 @@ async def test_fetch_all(request):
 
 @web.middleware
 async def enforce_https(request, handler):
-    if request.scheme != "https" and False:
+    if request.scheme != "https":
         return web.json_response({"message": "use https"})
     return await handler(request)
 
@@ -717,14 +717,12 @@ def main() -> int:
     global con
     con = sqlite3.connect(args.db, check_same_thread=False)
 
-    """
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
     try:
         ctx.load_cert_chain(args.cert_chain, args.cert_key)
     except FileNotFoundError:
         print("failed to find cert or key file")
         return 1
-    """
 
     create_table()
 
