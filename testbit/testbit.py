@@ -5,6 +5,7 @@ import json
 import sys
 import argparse
 import getpass
+import string
 
 from . import tc
 
@@ -23,6 +24,7 @@ def main() -> int:
     parser.add_argument("--tc", type=str, help="time control", default="40/10+0.1")
     parser.add_argument("--host", type=str, help="host", default="localhost")
     parser.add_argument("--port", type=int, help="port", default=2718)
+    parser.add_argument("--description", type=str, help="description")
 
     args, _ = parser.parse_known_args()
     if args.alpha <= 0.0 or args.beta <= 0.0 or args.alpha + args.beta >= 0.5:
@@ -34,10 +36,10 @@ def main() -> int:
     if args.type not in ["sprt", "elo"]:
         print("type must be either sprt or elo")
         return 1
-    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in commit):
+    if not isinstance(args.commit, str) or not args.commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in args.commit):
         print("commit can't be empty")
         return 1
-    if not args.simd or not simd.isalnum():
+    if not args.simd or not args.simd.isalnum():
         print("simd must contain only alpha numeric characters")
         return 1
     if args.adjudicate not in ["none", "draw", "resign", "both"]:
@@ -46,14 +48,19 @@ def main() -> int:
     if not tc.validatetc(args.tc):
         print("bad tc")
         return 1
+    if not args.description:
+        print("bad description")
+        return 1
     try:
         patch = open(args.patch, "r")
     except FileNotFoundError:
         print("failed to open '%s'" % args.patch)
         return 1
 
-    if not args.host.startswith("http://"):
-        args.host = "http://" + args.host
+    verify = not args.host in ["localhost", "127.0.0.1"]
+
+    if not args.host.startswith("https://"):
+        args.host = "https://" + args.host
 
     password = getpass.getpass("Enter passphrase: ")
 
@@ -71,10 +78,11 @@ def main() -> int:
                 "simd": args.simd,
                 "adjudicate": args.adjudicate,
                 "tc": args.tc,
+                "description": args.description
             })},
             files={"patch": patch},
             auth=("", password),
-            verify=host != "localhost"
+            verify=verify
         )
     except requests.exceptions.ConnectionError:
         print("Connection to %s:%d refused" % (args.host, args.port))
