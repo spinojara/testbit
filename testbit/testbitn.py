@@ -12,6 +12,8 @@ from docker.errors import ImageNotFound
 from cgroup import CPU
 import argparse
 
+from . import tc
+
 def cleanup(cpu: CPU):
     cpu.release()
 
@@ -32,6 +34,12 @@ def worker(cpu: CPU, host: str):
         id = response.get("id")
         tc = response.get("tc")
         adjudicate = response.get("adjudicate")
+        adjudicatestring = ""
+        if adjudicate = "draw" or adjudicate = "both":
+            adjudicatestring += "-draw movenumber=40 movecount=8 score=10"
+        if adjudicate = "resign" or adjudicate = "both":
+            adjudicatestring += "-resign twosided=true movecount=3 score=800"
+
         print(response)
         if None in [id, tc, adjudicate]:
             cpu.release()
@@ -42,7 +50,7 @@ def worker(cpu: CPU, host: str):
         try:
             container = client.containers.run(
                 image="testbit:%d" % id,
-                command="fastchess -testEnv -concurrency 1 -each tc=%s proto=uci timemargin=10000 option.Debug=true -rounds 1 -games 2 -openings format=epd file=./book.epd order=random -repeat -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old" % tc,
+                command="fastchess -testEnv -concurrency 1 -each tc=%s proto=uci timemargin=10000 option.Debug=true -rounds 1 -games 2 -openings format=epd file=./book.epd order=random -repeat -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s" % (timecontrol.tcadjust(tc), adjudicatestring),
                 detach=True,
                 parent_cgroup="testbit-%d" % cpu.cpu
             )
