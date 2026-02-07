@@ -12,6 +12,7 @@ import math
 import base64
 import ssl
 import argparse
+import string
 
 from . import tc
 from . import elo
@@ -135,7 +136,10 @@ def build_docker_images():
             cursor = con.cursor()
             cursor.execute("""
                 UPDATE tests
-                SET status = "queued"
+                SET status = CASE
+                        WHEN starttime IS NULL THEN "queued"
+                        ELSE "running"
+                    END
                 WHERE id = ? AND status = "building";
             """, (id, ))
             con.commit()
@@ -172,7 +176,8 @@ def create_table():
             commithash TEXT NOT NULL,
             simd       TEXT NOT NULL,
             patch      BLOB NOT NULL,
-            errorlog   BLOB
+            errorlog   BLOB,
+            UNIQUE (type, queuetime, patch, commithash)
         );
     """)
     con.commit()
@@ -227,16 +232,21 @@ async def test_new(request):
             return web.json_response({"message": "need elo0 < elo1"}, status=400)
         if alpha + beta >= 0.5:
             return web.json_response({"message": "need alpha + beta < 0.5"}, status=400)
+        eloe = None
     elif type == "elo":
         if not isinstance(eloe, float) or eloe <= 0.0:
             return web.json_response({"message": "bad eloe"}, status=400)
+        alpha = None
+        beta = None
+        elo0 = None
+        elo1 = None
 
-    if not commit:
+    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in commit):
         return web.json_response({"message": "no commit"}, status=400)
     if adjudicate not in ["none", "draw", "resign", "both"]:
         return web.json_response({"message": "bad adjudicate"}, status=400)
 
-    if simd not in ["none", "avx2"]:
+    if not isinstance(simd, str) or not simd or not simd.isalnum():
         return web.json_response({"message": "bad simd"}, status=400)
 
     with dbcond:
@@ -543,6 +553,7 @@ def main() -> int:
 
     args, _ = parser.parse_known_args()
 
+    global con
     con = sqlite3.connect(args.db, check_same_thread=False)
 
     """

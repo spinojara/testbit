@@ -34,11 +34,11 @@ def main() -> int:
     if args.type not in ["sprt", "elo"]:
         print("type must be either sprt or elo")
         return 1
-    if not args.commit:
+    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in commit):
         print("commit can't be empty")
         return 1
-    if args.simd not in ["none", "avx2"]:
-        print("simd must be either none or avx2")
+    if not args.simd or not simd.isalnum():
+        print("simd must contain only alpha numeric characters")
         return 1
     if args.adjudicate not in ["none", "draw", "resign", "both"]:
         print("adjudicate must be either none, draw, resign or both")
