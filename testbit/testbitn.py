@@ -84,6 +84,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         except ImageNotFound:
             response = requests.put(host + "/test/docker/%d" % id, auth=("", password), verify=verify)
+            continue
 
         should_exit = False
         # If this fails it's probably because the container was killed
