@@ -11,27 +11,46 @@ from docker.errors import ImageNotFound
 import argparse
 import getpass
 import configparser
+import urllib3
 
-from . import tc
+from . import tc as timecontrol
 from .cgroup import CPU
 from . import cgroup
+
+container_lock = threading.Lock()
+containers = []
+cleanup_done = False
+
+def cleanup_docker():
+    global cleanup_done
+    print("cleaning up docker")
+    with container_lock:
+        print("clean up aquired lock")
+        cleanup_done = True
+        for container in containers:
+            try:
+                container.stop(timeout=0)
+            except:
+                pass
 
 def cleanup(cpu: CPU):
     cpu.release()
 
 def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
     client = docker.from_env()
-    verify = host != "localhost"
+    verify = not host in ["localhost", "127.0.0.1"]
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    host = "https://" + host + ":2718"
 
     while True:
-        print("beginning loop")
         try:
             response = requests.get(host + "/test/task", auth=("", password), verify=verify)
             response = response.json()
         except json.JSONDecodeError:
             sys.exit(1)
-        except:
+        except Exception as e:
             cpu.release()
+            print(e)
             time.sleep(60)
             continue
         id = response.get("id")
@@ -41,13 +60,14 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         if adjudicate == "draw" or adjudicate == "both":
             adjudicatestring += "-draw movenumber=40 movecount=8 score=10"
         if adjudicate == "resign" or adjudicate == "both":
-            adjudicatestring += "-resign twosided=true movecount=3 score=800"
+            adjudicatestring += " -resign twosided=true movecount=3 score=800"
 
         if None in [id, tc, adjudicate]:
             cpu.release()
+            print("nothing to do, sleeping...")
             time.sleep(10)
             continue
-        print("tc is: " + str(tcfactor))
+        print("got task")
 
         cpu.claim()
         try:
@@ -55,13 +75,39 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                 image="testbit:%d" % id,
                 command="fastchess -testEnv -concurrency 1 -each tc=%s proto=uci timemargin=10000 option.Debug=true -rounds 1 -games 2 -openings format=epd file=./book.epd order=random -repeat -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s" % (timecontrol.tcadjust(tc, tcfactor), adjudicatestring),
                 detach=True,
-                parent_cgroup="testbit-%d" % cpu.cpu
+                cgroup_parent="testbit-%d" % cpu.cpu,
+                auto_remove=True,
             )
+
+            with container_lock:
+                containers.append(container)
+
         except ImageNotFound:
             response = requests.put(host + "/test/docker/%d" % id, auth=("", password), verify=verify)
 
-        result = container.wait()
-        logs: str = container.logs().decode("utf-8")
+        should_exit = False
+        # If this fails it's probably because the container was killed
+        # by cleanup_docker, so let's just exit
+        try:
+            result = container.wait()
+            logs: str = container.logs().decode("utf-8")
+        except:
+            should_exit = True
+
+        with container_lock:
+            print("aquired lock")
+            try:
+                containers.remove(container)
+            except:
+                pass
+            if cleanup_done:
+                print("cleanup done")
+                break
+            else:
+                print("cleanup not done...")
+
+        if should_exit:
+            break
 
         losses = 0
         draws = 0
@@ -85,12 +131,15 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                 if " 1/2-1/2 " in line:
                     draws += 1
 
-        if result["StatusCode"] or losses + draws + wins != 2:
-            response = requests.put(host + "/test/error/%d" % id, data={"data": json.dumps({"errorlog": container.logs().decode("utf-8")})}, auth=("", password), verify=verify)
-            print(response.json())
-        else:
-            response = requests.put(host + "/test/%d" % id, data={"data" : json.dumps({"losses": losses, "draws": draws, "wins": wins})}, auth=("", password), verify=verify)
-        container.remove()
+        try:
+            if result["StatusCode"] or losses + draws + wins != 2:
+                response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs}, auth=("", password), verify=verify)
+                print(response.json())
+            else:
+                response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins}, auth=("", password), verify=verify)
+                print(response.json())
+        except:
+            pass
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -112,9 +161,9 @@ def main() -> int:
 
     config = configparser.ConfigParser()
     config.read("/etc/bitbit.ini")
-    tcfactor = config.get("timecontrol", "tcfactor")
+    tcfactor = config.getfloat("timecontrol", "tcfactor")
     if args.daemon:
-        args.workers = config.get("testbitn", "workers")
+        args.workers = config.getint("testbitn", "workers")
         args.host = config.get("testbitn", "host")
 
     cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
@@ -123,10 +172,12 @@ def main() -> int:
         print("Failed to make cpu claiming strategy.")
         return 1
 
-    threads = [threading.Thread(target=worker, args=(cpu, "https://" + args.host + ":2718", password, tcfactor), daemon=True) for cpu in cpus]
+    threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor), daemon=True) for cpu in cpus]
 
     for cpu in cpus:
         atexit.register(cleanup, cpu)
+    # Register dockerclean up last, so that it runs first
+    atexit.register(cleanup_docker)
 
     for thread in threads:
         thread.start()
@@ -137,4 +188,7 @@ def main() -> int:
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except:
+        sys.exit(1)
