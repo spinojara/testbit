@@ -25,7 +25,7 @@ class CPU:
             return
         self.claimed = True
         cgroup = Path("/sys/fs/cgroup/testbit-%d" % self.cpu)
-        cgroup.mkdir()
+        cgroup.mkdir(exist_ok=True)
 
         with open(cgroup / "cpuset.cpus", "w") as f:
             f.write("%d" % self.cpu)
@@ -39,10 +39,14 @@ class CPU:
     def release(self: Self):
         if not self.claimed:
             return
-        Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
         for cpu in self.thread_siblings:
             with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
                 f.write("1")
+        try:
+            Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
+        except OSError:
+            pass
+
         self.claimed = False
 
 def is_performance(cpu: int) -> bool:
