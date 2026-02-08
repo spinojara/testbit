@@ -12,6 +12,8 @@ import argparse
 import getpass
 import configparser
 import urllib3
+import os
+import signal
 
 from . import tc as timecontrol
 from .cgroup import CPU
@@ -133,6 +135,8 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                 print(str(cpu.cpu) + " " + response.json())
         except:
             pass
+
+    os.kill(os.getpid(), signal.SIGINT)
 
 def main() -> int:
     parser = argparse.ArgumentParser()
