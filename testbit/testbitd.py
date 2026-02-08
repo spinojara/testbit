@@ -15,7 +15,7 @@ import argparse
 import string
 
 from . import tc as timecontrol
-from . import elo
+from . import elo as elocalc
 from . import spwd
 
 dbcond = threading.Condition()
@@ -61,6 +61,7 @@ def get_next_image_to_build():
     return cursor.fetchone()
 
 def build_docker_images():
+    client = docker.from_env()
     while True:
         with dbcond:
             while not (row := get_next_image_to_build()):
@@ -82,13 +83,14 @@ def build_docker_images():
             f.write(Dockerfile)
 
         try:
-            client = docker.from_env()
             print("building docker image")
             client.images.build(
                 path=str(tempdir),
                 dockerfile=str(dockerfile),
                 buildargs={"COMMIT": commit, "SIMD": simd},
                 tag="testbit:%d" % id,
+                rm=True,
+                forcerm=True,
             )
         except BuildError as e:
             errorlog = ""
@@ -307,13 +309,16 @@ async def test_new(request):
     return web.json_response({"message": "ok"})
 
 async def test_data(request):
-    id = request.match_info.get("id")
-    if not id or not isinstance(id, int):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
         return web.json_response({"message": "bad id"}, status=400)
 
+    print(request)
     try:
         data = await request.json()
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(e)
         return web.json_response({"message": "invalid json"}, status=400)
     except Exception:
         return web.json_response({"message": "no json"}, status=400)
@@ -351,16 +356,21 @@ async def test_data(request):
         t1 += draws
         t2 += wins
         p[draws + 2 * wins] += 1
+        print(f"got: {t0}-{t1}-{t2} {p[0]}-{p[1]}-{p[2]}-{p[3]}-{p[4]}")
 
-        elo, pm = elo.calculate_elo(p)
+        elo, pm = elocalc.calculate_elo(p)
+        print(f"{elo}+-{pm}")
+        status = "running"
         if type == "sprt":
-            llr = elo.loglikelihoodratio(p, elo0, elo1)
+            llr = elocalc.loglikelihoodratio(p, elo0, elo1)
+            print(f"{llr}")
             A = math.log(beta / (1.0 - alpha))
             B = math.log((1.0 - beta) / alpha)
             if llr < A:
                 status = "H0 accepted"
             elif llr > B:
                 status = "H1 accepted"
+            print("inserting...")
 
             cursor.execute("""
                 UPDATE tests
@@ -380,13 +390,14 @@ async def test_data(request):
                         WHEN ? IN ("H0 accepted", "H1 accepted")
                             THEN unixepoch()
                         ELSE NULL
-                    END,
-                WHERE id = ?
+                    END
+                WHERE id = ?;
             """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], status, llr, elo, pm, status, id))
             con.commit()
         else:
-            if pm < eloe:
+            if pm is not None and pm < eloe:
                 status = "done"
+
             cursor.execute("""
                 UPDATE tests
                 SET t0 = ?,
@@ -404,17 +415,19 @@ async def test_data(request):
                         WHEN ? = "done")
                             THEN unixepoch()
                         ELSE NULL
-                    END,
-                WHERE id = ?
+                    END
+                WHERE id = ?;
             """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], status, elo, pm, status, id))
             con.commit()
 
     return web.json_response({"message": "ok"})
 
 async def test_cancel(request):
-    id = request.match_info.get("id")
-    if not id or not isinstance(id, int):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
         return web.json_response({"message": "bad id"}, status=400)
+
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
@@ -432,8 +445,9 @@ async def test_cancel(request):
     return web.json_response({"message": "ok"})
 
 async def test_error(request):
-    id = request.match_info.get("id")
-    if not id or not isinstance(id, int):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
         return web.json_response({"message": "bad id"}, status=400)
 
     try:
@@ -458,8 +472,9 @@ async def test_error(request):
     return web.json_response({"message": "ok"})
 
 async def test_docker(request):
-    id = request.match_info.get("id")
-    if not id or not isinstance(id, int):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
         return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
@@ -478,10 +493,12 @@ async def get_task(request):
         cursor = con.cursor()
         cursor.execute("""
             UPDATE tests
-                SET starttime = CASE
-                    WHEN status = "queued" THEN unixepoch()
-                    ELSE starttime
-                END
+                SET
+                    starttime = CASE
+                        WHEN status = "queued" THEN unixepoch()
+                        ELSE starttime
+                    END,
+                    status = "running"
             WHERE id = (
                 SELECT id FROM tests
                 WHERE status IN ("running", "queued")
@@ -500,8 +517,9 @@ async def get_task(request):
     return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate})
 
 async def test_fetch_single(request):
-    id = request.match_info.get("id")
-    if not id or not isinstance(id, int):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
         return web.json_response({"message": "bad id"}, status=400)
 
     cursor = con.cursor()
@@ -662,11 +680,7 @@ async def enforce_https(request, handler):
 
 @web.middleware
 async def authenticate(request, handler):
-    public_endpoints = [
-        ("/test", "GET"),
-    ]
-
-    if (request.path, request.method) in public_endpoints:
+    if request.method == "GET" and request.path != "/test/task":
         return await handler(request)
 
     auth_header = request.headers.get("Authorization")
@@ -710,7 +724,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, help="port", default=2718)
     parser.add_argument("--cert-chain", type=str, help="SSL certificate chain", default="")
     parser.add_argument("--cert-key", type=str, help="SSL certificate key", default="")
-    parser.add_argument("--db", type=str, help="sqlite3 db path", default="")
+    parser.add_argument("--db", type=str, help="sqlite3 db path", default=None)
 
     args, _ = parser.parse_known_args()
 
