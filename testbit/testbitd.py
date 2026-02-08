@@ -106,7 +106,8 @@ def build_docker_images():
                         starttime = CASE
                             WHEN starttime IS NULL THEN unixepoch()
                             ELSE starttime
-                        END
+                        END,
+                        buildtime = unixepoch(),
                         donetime = unixepoch()
                     WHERE id = ? AND status = "building";
                 """, (errorlog.encode("utf-8"), id))
@@ -124,7 +125,8 @@ def build_docker_images():
                         starttime = CASE
                             WHEN starttime IS NULL THEN unixepoch()
                             ELSE starttime
-                        END
+                        END,
+                        buildtime = unixepoch(),
                         donetime = unixepoch()
                     WHERE id = ? AND status = "building";
                 """, (errorlog.encode("utf-8"), id))
@@ -141,7 +143,8 @@ def build_docker_images():
                 SET status = CASE
                         WHEN starttime IS NULL THEN "queued"
                         ELSE "running"
-                    END
+                    END,
+                    buildtime = unixepoch()
                 WHERE id = ? AND status = "building";
             """, (id, ))
             con.commit()
@@ -162,6 +165,7 @@ def create_table():
             elo1        REAL,
             eloe        REAL,
             adjudicate  TEXT NOT NULL,
+            buildtime   INTEGER,
             queuetime   INTEGER,
             starttime   INTEGER,
             donetime    INTEGER,
@@ -476,16 +480,21 @@ async def test_docker(request):
         id = int(request.match_info.get("id"))
     except:
         return web.json_response({"message": "bad id"}, status=400)
+    print("got docker request")
 
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
             UPDATE tests
             SET status = "building"
-            WHERE status = "running" AND id = ?;
-        """, (errorlog.encode("utf-8"), id))
+            WHERE status = "running"
+                AND id = ?
+                AND unixepoch() - buildtime > 300;
+        """, (id, ))
+        if cursor.rowcount > 0:
+            print("notified")
+            dbcond.notify()
         con.commit()
-        dbcond.notify()
     return web.json_response({"message": "ok"})
 
 async def get_task(request):
