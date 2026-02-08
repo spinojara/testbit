@@ -19,17 +19,18 @@ from . import cgroup
 
 container_lock = threading.Lock()
 containers = []
-cleanup_done = False
 
 def cleanup_docker():
-    global cleanup_done
     print("cleaning up docker")
     with container_lock:
         print("clean up aquired lock")
-        cleanup_done = True
         for container in containers:
             try:
                 container.stop(timeout=0)
+            except:
+                pass
+            try:
+                container.remove(force=True)
             except:
                 pass
 
@@ -50,7 +51,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             sys.exit(1)
         except Exception as e:
             cpu.release()
-            print(e)
+            print(str(cpu.cpu) + " " + str(e))
             time.sleep(60)
             continue
         id = response.get("id")
@@ -64,10 +65,10 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         if None in [id, tc, adjudicate]:
             cpu.release()
-            print("nothing to do, sleeping...")
+            print(str(cpu.cpu) + " " + "nothing to do, sleeping...")
             time.sleep(10)
             continue
-        print("got task")
+        print(str(cpu.cpu) + " " + "got task")
 
         cpu.claim()
         try:
@@ -76,15 +77,16 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                 command="fastchess -testEnv -concurrency 1 -each tc=%s proto=uci timemargin=10000 option.Debug=true -rounds 1 -games 2 -openings format=epd file=./book.epd order=random -repeat -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s" % (timecontrol.tcadjust(tc, tcfactor), adjudicatestring),
                 detach=True,
                 cgroup_parent="testbit-%d" % cpu.cpu,
-                auto_remove=True,
             )
 
             with container_lock:
                 containers.append(container)
 
         except ImageNotFound:
-            response = requests.put(host + "/test/docker/%d" % id, auth=("", password), verify=verify)
-            continue
+            try:
+                response = requests.put(host + "/test/docker/%d" % id, auth=("", password), verify=verify)
+            finally:
+                continue
 
         should_exit = False
         # If this fails it's probably because the container was killed
@@ -92,22 +94,12 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         try:
             result = container.wait()
             logs: str = container.logs().decode("utf-8")
-        except:
-            should_exit = True
-
-        with container_lock:
-            print("aquired lock")
-            try:
+            container.remove(force=True)
+            with container_lock:
                 containers.remove(container)
-            except:
-                pass
-            if cleanup_done:
-                print("cleanup done")
-                break
-            else:
-                print("cleanup not done...")
-
-        if should_exit:
+        except Exception as e:
+            print(str(cpu.cpu) + " " + str(e))
+            print(str(cpu.cpu) + " " + "exiting...")
             break
 
         losses = 0
@@ -115,7 +107,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         wins = 0
 
         for line in logs.splitlines():
-            print(line)
+            print(str(cpu.cpu) + " " + line)
             if "Finished game " in line:
                 if "(bitbit-new vs bitbit-old)" in line:
                     if " 1-0 " in line:
@@ -135,10 +127,10 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
                 response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs}, auth=("", password), verify=verify)
-                print(response.json())
+                print(str(cpu.cpu) + " " + response.json())
             else:
                 response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins}, auth=("", password), verify=verify)
-                print(response.json())
+                print(str(cpu.cpu) + " " + response.json())
         except:
             pass
 
@@ -186,6 +178,7 @@ def main() -> int:
     for thread in threads:
         thread.join()
 
+    print("joined all threads")
     return 0
 
 if __name__ == "__main__":
