@@ -40,11 +40,11 @@ COPY patch patch
 
 RUN git clone https://github.com/spinojara/bitbit.git && \
     git -C bitbit checkout $COMMIT && \
-    make -C bitbit clean && make -C bitbit SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     mv bitbit/bitbit bitbit-old && \
     git -C bitbit apply ../patch && \
-    make -C bitbit clean && make -C bitbit SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
     rm -rf bitbit patch nnue
 """
@@ -84,11 +84,11 @@ def build_docker_images():
 
         try:
             print("building docker image")
-            client.images.build(
+            image, _ = client.images.build(
                 path=str(tempdir),
                 dockerfile=str(dockerfile),
                 buildargs={"COMMIT": commit, "SIMD": simd},
-                tag="testbit:%d" % id,
+                tag="jalagaoi.se:5000/testbit:%d" % id,
                 rm=True,
                 forcerm=True,
             )
@@ -135,6 +135,14 @@ def build_docker_images():
             dockerfile.unlink()
             patch_path.unlink()
             tempdir.rmdir()
+
+        print("pushing image")
+        try:
+            for line in client.images.push("jalagaoi.se:5000/testbit", tag=str(id), stream=True, decode=True):
+                print(line)
+        except Exception as e:
+            print(e)
+        break
 
         with dbcond:
             cursor = con.cursor()
