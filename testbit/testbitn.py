@@ -14,10 +14,10 @@ import configparser
 import urllib3
 import os
 import signal
+import random
 
-from . import tc as timecontrol
+from .tc import tcadjust
 from .cgroup import CPU
-from . import cgroup
 
 container_lock = threading.Lock()
 containers = []
@@ -44,6 +44,8 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
     verify = not host in ["localhost", "127.0.0.1"]
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     host = "https://" + host + ":2718"
+
+    rng = random.Random()
 
     while True:
         try:
@@ -72,11 +74,26 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             continue
         print(str(cpu.cpu) + " " + "got task")
 
+        command="""
+            fastchess -testEnv
+                      -concurrency 1
+                      -each tc=%s proto=uci timemargin=10000 option.Debug=true
+                      -rounds 1
+                      -games 2
+                      -openings format=epd file=./book.epd order=random
+                      -repeat
+        """
+        # Remove potential bias
+        if rng.choice([True, False]):
+            command += " -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s"
+        else:
+            command += " -engine cmd=./bitbit-old name=bitbit-old %s -engine cmd=./bitbit-new name=bitbit-new"
+
         cpu.claim()
         try:
             container = client.containers.run(
-                image="testbit:%d" % id,
-                command="fastchess -testEnv -concurrency 1 -each tc=%s proto=uci timemargin=10000 option.Debug=true -rounds 1 -games 2 -openings format=epd file=./book.epd order=random -repeat -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s" % (timecontrol.tcadjust(tc, tcfactor), adjudicatestring),
+                image="jalagaoi.se:5000/testbit:%d" % id,
+                command=command % (tcadjust(tc, tcfactor), adjudicatestring),
                 detach=True,
                 cgroup_parent="testbit-%d" % cpu.cpu,
             )
