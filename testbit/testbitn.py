@@ -83,12 +83,13 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                       -games 2
                       -openings format=epd file=./book.epd order=random
                       -repeat
+                      %s
         """
         # Remove potential bias
         if rng.choice([True, False]):
-            command += " -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old %s"
+            command += " -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old"
         else:
-            command += " -engine cmd=./bitbit-old name=bitbit-old %s -engine cmd=./bitbit-new name=bitbit-new"
+            command += " -engine cmd=./bitbit-old name=bitbit-old -engine cmd=./bitbit-new name=bitbit-new"
 
         cpu.claim()
         try:
@@ -108,7 +109,6 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             finally:
                 continue
 
-        should_exit = False
         # If this fails it's probably because the container was killed
         # by cleanup_docker, so let's just exit
         try:
@@ -121,6 +121,9 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             print(str(cpu.cpu) + " " + str(e))
             print(str(cpu.cpu) + " " + "exiting...")
             break
+
+        print(result)
+        print("return code: " + str(result["StatusCode"]))
 
         losses = 0
         draws = 0
@@ -143,6 +146,10 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
                     continue
                 if " 1/2-1/2 " in line:
                     draws += 1
+
+        # We were killed by a signal so just exit here
+        if result["StatusCode"] >= 128:
+            break
 
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
