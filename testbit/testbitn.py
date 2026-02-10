@@ -18,6 +18,7 @@ import random
 
 from .tc import tcadjust
 from .cgroup import CPU
+from . import cgroup
 
 container_lock = threading.Lock()
 containers = []
