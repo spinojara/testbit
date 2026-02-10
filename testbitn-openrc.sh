@@ -11,7 +11,7 @@ supervisor="supervise-daemon"
 retry="SIGINT/5"
 
 depend() {
-	need net
+	need net docker
 	use testbitd
 }
 
@@ -21,8 +21,8 @@ start_pre() {
 		return 1
 	fi
 
-	if [[ ! -f "/etc/testbit.conf" ]]; then
-		eerror "Please create the configuration file /etc/testbit.conf"
+	if [[ ! -f "/etc/bitbit.ini" ]]; then
+		eerror "Please create the configuration file /etc/bitbit.ini"
 		return 2
 	fi
 	return 0

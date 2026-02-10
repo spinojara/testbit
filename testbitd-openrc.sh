@@ -4,23 +4,21 @@ pidfile="/var/run/testbitd.pid"
 name="testbitd"
 description="testbitd - A test server for bitbit."
 command="testbitd"
-command_args="--daemon"
+command_args="--db /var/lib/bitbit/bitbit.sqlite3 \
+	--cert-key /etc/letsencrypt/live/jalagaoi.se/privkey.pem \
+	--cert-chain /etc/letsencrypt/live/jalagaoi.se/fullchain.pem"
 output_log="/var/log/testbitd.log"
 error_log="/var/log/testbitd.err"
 supervisor="supervise-daemon"
 retry="SIGINT/5"
 
 depend() {
-	need net
+	need net docker
 }
 
 start_pre() {
-	if [[ ! -d "/var/lib/bitbit/patch" ]]; then
-		eerror "Please create the patch directory /var/lib/bitbit/patch"
-		return 1
-	fi
-	if [[ ! -d "/var/lib/bitbit/nnue" ]]; then
-		eerror "Please create the nnue directory /var/lib/bitbit/nnue"
+	if [[ ! -d "/var/lib/bitbit" ]]; then
+		eerror "Please create the directory /var/lib/bitbit"
 		return 1
 	fi
 	if [[ ! -f "/etc/letsencrypt/live/jalagaoi.se/privkey.pem" ]]; then
