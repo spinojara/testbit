@@ -182,6 +182,7 @@ def create_table():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tests (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            legacy      INTEGER DEFAULT FALSE,
             description TEXT DEFAULT "empty",
             type        TEXT NOT NULL,
             status      TEXT DEFAULT "building",
@@ -564,6 +565,7 @@ async def test_fetch_single(request):
     cursor.execute("""
         SELECT
             id,
+            legacy,
             description,
             type,
             status,
@@ -600,39 +602,40 @@ async def test_fetch_single(request):
     if not row:
         return web.json_response({"message": "bad id"}, status=400)
 
-    patch = row[27]
+    patch = row[28]
     if patch:
         patch = patch.decode("utf-8")
-    errorlog = row[28]
+    errorlog = row[29]
 
     test = {
         "id": row[0],
-        "description": row[1],
-        "type": row[2],
-        "status": row[3],
-        "tc": row[4],
-        "alpha": row[5],
-        "beta": row[6],
-        "elo0": row[7],
-        "elo1": row[8],
-        "eloe": row[9],
-        "adjudicate": row[10],
-        "queuetime": row[11],
-        "starttime": row[12],
-        "donetime": row[13],
-        "elo": row[14],
-        "pm": row[15],
-        "llr": row[16],
-        "t0": row[17],
-        "t1": row[18],
-        "t2": row[19],
-        "p0": row[20],
-        "p1": row[21],
-        "p2": row[22],
-        "p3": row[23],
-        "p4": row[24],
-        "commithash": row[25],
-        "simd": row[26],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "type": row[3],
+        "status": row[4],
+        "tc": row[5],
+        "alpha": row[6],
+        "beta": row[7],
+        "elo0": row[8],
+        "elo1": row[9],
+        "eloe": row[10],
+        "adjudicate": row[11],
+        "queuetime": row[12],
+        "starttime": row[13],
+        "donetime": row[14],
+        "elo": row[15],
+        "pm": row[16],
+        "llr": row[17],
+        "t0": row[18],
+        "t1": row[19],
+        "t2": row[20],
+        "p0": row[21],
+        "p1": row[22],
+        "p2": row[23],
+        "p3": row[24],
+        "p4": row[25],
+        "commithash": row[26],
+        "simd": row[27],
         "patch": patch,
         "errorlog": errorlog
     }
@@ -644,6 +647,7 @@ async def test_fetch_all(request):
     cursor.execute("""
         SELECT
             id,
+            legacy,
             description,
             type,
             status,
@@ -678,32 +682,33 @@ async def test_fetch_all(request):
     for row in cursor.fetchall():
         tests.append({
             "id": row[0],
-            "description": row[1],
-            "type": row[2],
-            "status": row[3],
-            "tc": row[4],
-            "alpha": row[5],
-            "beta": row[6],
-            "elo0": row[7],
-            "elo1": row[8],
-            "eloe": row[9],
-            "adjudicate": row[10],
-            "queuetime": row[11],
-            "starttime": row[12],
-            "donetime": row[13],
-            "elo": row[14],
-            "pm": row[15],
-            "llr": row[16],
-            "t0": row[17],
-            "t1": row[18],
-            "t2": row[19],
-            "p0": row[20],
-            "p1": row[21],
-            "p2": row[22],
-            "p3": row[23],
-            "p4": row[24],
-            "commithash": row[25],
-            "simd": row[26]
+            "legacy": bool(row[1]),
+            "description": row[2],
+            "type": row[3],
+            "status": row[4],
+            "tc": row[5],
+            "alpha": row[6],
+            "beta": row[7],
+            "elo0": row[8],
+            "elo1": row[9],
+            "eloe": row[10],
+            "adjudicate": row[11],
+            "queuetime": row[12],
+            "starttime": row[13],
+            "donetime": row[14],
+            "elo": row[15],
+            "pm": row[16],
+            "llr": row[17],
+            "t0": row[18],
+            "t1": row[19],
+            "t2": row[20],
+            "p0": row[21],
+            "p1": row[22],
+            "p2": row[23],
+            "p3": row[24],
+            "p4": row[25],
+            "commithash": row[26],
+            "simd": row[27]
         })
 
     return web.json_response({"message": "ok", "tests": tests})
