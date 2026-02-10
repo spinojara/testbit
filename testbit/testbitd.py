@@ -18,8 +18,8 @@ import os
 import signal
 
 from .tc import validatetc
-from .elo import loglikelihood, calculate_elo
-from .spwd import authenticate
+from .elo import loglikelihoodratio, calculate_elo
+from .spwd import authenticate as spwdauthenticate
 
 dbcond = threading.Condition()
 con = None
@@ -120,10 +120,11 @@ def build_docker_images():
             tempdir.rmdir()
 
         if not error:
-            full_logs = ""
+            full_logs = "begin"
             for logs in build_logs:
                 if "stream" in logs and isinstance(logs["stream"], str):
                     full_logs += logs["stream"].strip()
+            full_logs += "end"
             full_logs = full_logs.split(build_uuid)
             if len(full_logs) == 3:
                 commit = full_logs[1]
@@ -209,7 +210,7 @@ def create_table():
             commithash  TEXT NOT NULL,
             simd        TEXT NOT NULL,
             patch       BLOB NOT NULL,
-            errorlog    BLOB,
+            errorlog    TEXT,
             UNIQUE (type, queuetime, patch, commithash)
         );
     """)
@@ -388,11 +389,11 @@ async def test_data(request):
         p[draws + 2 * wins] += 1
         print(f"got: {t0}-{t1}-{t2} {p[0]}-{p[1]}-{p[2]}-{p[3]}-{p[4]}")
 
-        elo, pm = elocalc.calculate_elo(p)
+        elo, pm = calculate_elo(p)
         print(f"{elo}+-{pm}")
         status = "running"
         if type == "sprt":
-            llr = elocalc.loglikelihoodratio(p, elo0, elo1)
+            llr = loglikelihoodratio(p, elo0, elo1)
             print(f"{llr}")
             A = math.log(beta / (1.0 - alpha))
             B = math.log((1.0 - beta) / alpha)
@@ -480,6 +481,8 @@ async def test_error(request):
     except:
         return web.json_response({"message": "bad id"}, status=400)
 
+    print("Got error for test %d" % id)
+
     try:
         data = await request.json()
     except json.JSONDecodeError:
@@ -497,7 +500,7 @@ async def test_error(request):
             UPDATE tests
             SET status = "error", errorlog = ?
             WHERE status IN ("running", "building") AND id = ?;
-        """, (errorlog.encode("utf-8"), id))
+        """, (errorlog, id))
         con.commit()
     return web.json_response({"message": "ok"})
 
@@ -601,8 +604,6 @@ async def test_fetch_single(request):
     if patch:
         patch = patch.decode("utf-8")
     errorlog = row[28]
-    if errorlog:
-        errorlog = errorlog.decode("utf-8")
 
     test = {
         "id": row[0],
@@ -730,11 +731,12 @@ async def authenticate(request, handler):
         decoded = base64.b64decode(credentials).decode("utf-8")
         _, password = decoded.split(":", 1)
 
-        status, message = authenticate(password)
+        status, message = spwdauthenticate(password)
         if not status:
             return web.json_response({"message": message}, status=401)
 
-    except Exception:
+    except Exception as e:
+        print(e)
         return web.json_response({"message": "an error occured"}, status=401)
 
     return await handler(request)
