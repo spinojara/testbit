@@ -1,0 +1,10 @@
+FROM alpine:3.23.3
+
+RUN apk add --no-cache make clang lld compiler-rt llvm git curl
+
+RUN curl -L -o bitbit.tar.gz https://github.com/spinojara/bitbit/archive/refs/tags/v1.6.tar.gz && \
+    mkdir bitbit-1.6 && \
+    tar -xf bitbit.tar.gz -C bitbit-1.6 --strip-components=1 && \
+    make -C bitbit-1.6 clean && make -C bitbit-1.6 ARCH=x86-64-v3 SIMD=avx2 bitbit-pgo && \
+    mv bitbit-1.6/bitbit bitbit && \
+    rm -rf bitbit-1.6
