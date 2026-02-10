@@ -254,7 +254,7 @@ async def test_new(request):
     adjudicate = data.get("adjudicate")
     simd = data.get("simd")
 
-    if not isinstance(description, str) or not description:
+    if not isinstance(description, str) or not description.strip():
         return web.json_response({"message": "bad description"}, status=400)
 
     if type == "sprt":
