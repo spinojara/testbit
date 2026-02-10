@@ -53,7 +53,7 @@ RUN git clone https://github.com/spinojara/bitbit.git && \
     git -C bitbit apply --allow-empty ../patch && \
     make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
-    rm -rf bitbit patch nnue
+    rm -rf bitbit patch
 """
 
 def get_next_image_to_build():
