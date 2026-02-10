@@ -74,6 +74,10 @@ def main():
             elo0 = None
             elo1 = None
 
+        if None in [t0, t1, t2, p0, p1, p2, p3, p4]:
+            t0 = t1 = t2 = p0 = p1 = p2 = p3 = p4 = 0
+            elo = pm = llr = 0.0
+
         if not queuetime:
             print("No queuetime for id %d, skipping..." % id)
             continue
@@ -101,9 +105,13 @@ def main():
             print("No patch for id %d, skipping..." % id)
             continue
 
+        if not patch_contents:
+            patch_contents = "Legacy NNUE patch"
+
         newcur = new.cursor()
         newcur.execute("""
             INSERT INTO tests (
+                legacy,
                 type,
                 status,
                 tc,
@@ -157,10 +165,12 @@ def main():
                 ?,
                 ?,
                 ?,
+                ?,
                 ?
             )
             ON CONFLICT(type, queuetime, patch, commithash) DO NOTHING;
         """, (
+            True,
             type,
             status,
             tc,
@@ -186,7 +196,7 @@ def main():
             p4,
             commit,
             simd,
-            patch_contents
+            patch_contents.encode("utf-8")
         ))
         new.commit()
 
