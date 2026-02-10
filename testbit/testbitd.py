@@ -13,10 +13,13 @@ import base64
 import ssl
 import argparse
 import string
+import uuid
+import os
+import signal
 
-from . import tc as timecontrol
-from . import elo as elocalc
-from . import spwd
+from .tc import validatetc
+from .elo import loglikelihood, calculate_elo
+from .spwd import authenticate
 
 dbcond = threading.Condition()
 con = None
@@ -33,17 +36,21 @@ RUN curl -L -o fastchess.tar.gz https://github.com/Disservin/fastchess/archive/r
     make -C fastchess install && \
     rm -rf fastchess fastchess.tar.gz
 
-ARG COMMIT
-ARG SIMD
-
 COPY patch patch
 
+ARG COMMIT
+ARG SIMD
+ARG CACHEBUST
+
 RUN git clone https://github.com/spinojara/bitbit.git && \
-    git -C bitbit checkout $COMMIT && \
+    git -C bitbit checkout "$COMMIT" && \
+    echo "$CACHEBUST" && \
+    git -C bitbit rev-parse HEAD && \
+    echo "$CACHEBUST" && \
     make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     mv bitbit/bitbit bitbit-old && \
-    git -C bitbit apply ../patch && \
+    git -C bitbit apply --allow-empty ../patch && \
     make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
     rm -rf bitbit patch nnue
@@ -77,72 +84,80 @@ def build_docker_images():
         patch_path = tempdir / "patch"
         dockerfile = tempdir / "Dockerfile"
         print(patch_path)
-        with open(patch_path, "wb") as f:
-            f.write(patch)
-        with open(dockerfile, "w") as f:
-            f.write(Dockerfile)
+        try:
+            with open(patch_path, "wb") as f:
+                f.write(patch)
+            with open(dockerfile, "w") as f:
+                f.write(Dockerfile)
+        except Exception as e:
+            print(e, file=sys.stderr)
+            break
 
+        build_uuid = str(uuid.uuid4())
+
+        error = False
         try:
             print("building docker image")
-            image, _ = client.images.build(
+            image, build_logs = client.images.build(
                 path=str(tempdir),
                 dockerfile=str(dockerfile),
-                buildargs={"COMMIT": commit, "SIMD": simd},
+                buildargs={"COMMIT": commit, "SIMD": simd, "CACHEBUST": build_uuid},
                 tag="jalagaoi.se:5000/testbit:%d" % id,
                 rm=True,
                 forcerm=True,
             )
         except BuildError as e:
+            error = True
             errorlog = ""
             for log in e.build_log:
                 errorlog += log.get("stream", "")
-
-            with dbcond:
-                cursor = con.cursor()
-                cursor.execute("""
-                    UPDATE tests
-                    SET status = "error",
-                        errorlog = ?,
-                        starttime = CASE
-                            WHEN starttime IS NULL THEN unixepoch()
-                            ELSE starttime
-                        END,
-                        buildtime = unixepoch(),
-                        donetime = unixepoch()
-                    WHERE id = ? AND status = "building";
-                """, (errorlog.encode("utf-8"), id))
-                con.commit()
-            print(errorlog)
         except Exception as e:
-            errorlog = str(e)
-            print(errorlog)
-            with dbcond:
-                cursor = con.cursor()
-                cursor.execute("""
-                    UPDATE tests
-                    SET status = "error",
-                        errorlog = ?,
-                        starttime = CASE
-                            WHEN starttime IS NULL THEN unixepoch()
-                            ELSE starttime
-                        END,
-                        buildtime = unixepoch(),
-                        donetime = unixepoch()
-                    WHERE id = ? AND status = "building";
-                """, (errorlog.encode("utf-8"), id))
-                con.commit()
+            print(e, file=sys.stderr)
+            break
         finally:
             dockerfile.unlink()
             patch_path.unlink()
             tempdir.rmdir()
 
+        if not error:
+            full_logs = ""
+            for logs in build_logs:
+                if "stream" in logs and isinstance(logs["stream"], str):
+                    full_logs += logs["stream"].strip()
+            full_logs = full_logs.split(build_uuid)
+            if len(full_logs) == 3:
+                commit = full_logs[1]
+                if len(commit) != 40 or not all(c in "0123456789abcdef" for c in commit):
+                    errorlog = "Commit ID: '%s' is not a SHA-1." % commit
+                    error = True
+            else:
+                errorlog = "Commit ID: UUID4 was not unique. This should never happen."
+                error = True
+
+        if error:
+            with dbcond:
+                cursor = con.cursor()
+                cursor.execute("""
+                    UPDATE tests
+                    SET status = "error",
+                        errorlog = ?,
+                        starttime = CASE
+                            WHEN starttime IS NULL THEN unixepoch()
+                            ELSE starttime
+                        END,
+                        buildtime = unixepoch(),
+                        donetime = unixepoch()
+                    WHERE id = ? AND status = "building";
+                """, (errorlog, id))
+                con.commit()
+            continue
+
         print("pushing image")
         try:
-            for line in client.images.push("jalagaoi.se:5000/testbit", tag=str(id), stream=True, decode=True):
-                print(line)
+            client.images.push("jalagaoi.se:5000/testbit", tag=str(id))
         except Exception as e:
-            print(e)
-        break
+            print(e, file=sys.stderr)
+            break
 
         with dbcond:
             cursor = con.cursor()
@@ -152,10 +167,13 @@ def build_docker_images():
                         WHEN starttime IS NULL THEN "queued"
                         ELSE "running"
                     END,
-                    buildtime = unixepoch()
+                    buildtime = unixepoch(),
+                    commithash = ?
                 WHERE id = ? AND status = "building";
-            """, (id, ))
+            """, (commit, id))
             con.commit()
+
+    os.kill(os.getpid(), signal.SIGINT)
 
 
 def create_table():
@@ -222,7 +240,7 @@ async def test_new(request):
     if type not in ["elo", "sprt"]:
         return web.json_response({"message": "bad type"}, status=400)
     tc = data.get("tc")
-    if not isinstance(tc, str) or not timecontrol.validatetc(tc):
+    if not isinstance(tc, str) or not validatetc(tc):
         return web.json_response({"message": "bad tc"}, status=400)
 
     description = data.get("description")
@@ -712,7 +730,7 @@ async def authenticate(request, handler):
         decoded = base64.b64decode(credentials).decode("utf-8")
         _, password = decoded.split(":", 1)
 
-        status, message = spwd.authenticate(password)
+        status, message = authenticate(password)
         if not status:
             return web.json_response({"message": message}, status=401)
 
