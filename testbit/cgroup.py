@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import List, Self, Set
+import time
 
 class CPU:
     cpu: int
@@ -28,20 +29,27 @@ class CPU:
         cgroup.mkdir(exist_ok=True)
 
         with open(cgroup / "cpuset.cpus", "w") as f:
-            f.write("%d" % self.cpu)
+            f.write("%d\n" % self.cpu)
         with open(cgroup / "cpuset.cpus.partition", "w") as f:
-            f.write("isolated")
+            f.write("isolated\n")
 
         for cpu in self.thread_siblings:
             with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
-                f.write("0")
+                f.write("0\n")
 
     def release(self: Self):
         if not self.claimed:
             return
         for cpu in self.thread_siblings:
             with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
-                f.write("1")
+                f.write("1\n")
+        try:
+            with open("/sys/fs/cgroup/testbit-%d/cgroup.kill", "w") as f:
+                f.write("1\n")
+        except:
+            pass
+        # TODO: Improve this
+        time.sleep(0.01)
         try:
             Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
         except OSError:
