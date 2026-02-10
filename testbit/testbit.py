@@ -24,7 +24,8 @@ def main() -> int:
     parser.add_argument("--tc", type=str, help="time control", default="40/10+0.1")
     parser.add_argument("--host", type=str, help="host", default="localhost")
     parser.add_argument("--port", type=int, help="port", default=2718)
-    parser.add_argument("--description", type=str, help="description")
+    parser.add_argument("--description", type=str, help="description", default="")
+    parser.add_argument("--cancel", action="store_true", default=False)
 
     args, _ = parser.parse_known_args()
     if args.alpha <= 0.0 or args.beta <= 0.0 or args.alpha + args.beta >= 0.5:
@@ -48,9 +49,10 @@ def main() -> int:
     if not tc.validatetc(args.tc):
         print("bad tc")
         return 1
-    if not args.description:
-        print("bad description")
-        return 1
+
+    while not args.description.strip():
+        args.description = input("Description: ")
+
     try:
         patch = open(args.patch, "r")
     except FileNotFoundError:
