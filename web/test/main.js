@@ -4,6 +4,17 @@ async function getData(id) {
 	return await json;
 }
 
+async function putData(endpoint, credentials) {
+	const response = await fetch(endpoint, {
+		method: 'PUT',
+		headers: {
+			'Authorization': 'Basic ' + credentials
+		}
+	});
+	const json = await response.json();
+	return await json;
+}
+
 function redirectHome() {
 	window.location.href = '/';
 }
@@ -57,7 +68,7 @@ function parseEscapeCodes(text) {
 	var open = 0;
 
 	for (let i = 0; i < text.length; i++) {
-		const c = text[i];
+		var c = text[i];
 		if (c == '\u001b') {
 			readingEscape = true;
 			escapeCode = '';
@@ -65,6 +76,25 @@ function parseEscapeCodes(text) {
 		}
 
 		if (!readingEscape) {
+			switch (c) {
+			case '<':
+				c = '&lt;';
+				break;
+			case '>':
+				c = '&gt;';
+				break;
+			case '&':
+				c = '&amp;';
+				break;
+			case '"':
+				c = '&quot;';
+				break;
+			case '\'':
+				c = '&#039;';
+				break;
+			default:
+				break;
+			}
 			parsedText += c;
 			continue;
 		}
@@ -178,8 +208,13 @@ function parseEscapeCodes(text) {
 	return parsedText;
 }
 
-const params = new URLSearchParams(window.location.search);
-const id = params.get('id') || null;
+function getid() {
+	const params = new URLSearchParams(window.location.search);
+	const id = params.get('id') || null;
+	return id;
+}
+
+id = getid();
 
 if (!id)
 	redirectHome();
@@ -295,19 +330,59 @@ getData(id).then(data => {
 	if (!test.errorlog)
 		preerrorlog.style.display = 'none';
 
+	const button = document.getElementById('actionbutton');
+	button.onclick = promptpassword;
 	if (test.status == 'cancelled') {
-		const button = document.createElement('button');
 		button.textContent = 'Resume';
-		buttondiv.appendChild(button);
 	}
 	else if (test.status == 'running' || test.status == 'building' || test.status == 'queued') {
-		const button = document.createElement('button');
 		button.textContent = 'Cancel';
-		buttondiv.appendChild(button);
 	}
 	else {
-		const button = document.createElement('button');
 		button.textContent = 'Requeue';
-		buttondiv.appendChild(button);
 	}
 });
+
+function promptpassword() {
+	const passwordprompt = document.getElementById('passwordprompt');
+	passwordprompt.classList = '';
+}
+
+function continuerequest() {
+	const passwordprompt = document.getElementById('passwordprompt');
+	passwordprompt.classList = 'hidden';
+	const passwordinput = document.getElementById('passwordinput');
+	const password = passwordinput.value;
+	passwordinput.value = '';
+	const credentials = btoa(':' + password);
+	console.log(credentials);
+
+	const button = document.getElementById('actionbutton');
+	var endpoint = 'https://jalagaoi.se:2718/test/';
+	switch (button.textContent) {
+	case 'Resume':
+		endpoint += 'resume/';
+		break;
+	case 'Cancel':
+		endpoint += 'cancel/';
+		break;
+	case 'Requeue':
+		endpoint += 'requeue/';
+		break;
+	default:
+		console.log('What?');
+		return;
+	}
+	endpoint += getid();
+	console.log(endpoint);
+	putData(endpoint, credentials).then(data => {
+		console.log(data);
+	});
+}
+
+function cancelrequest() {
+	const passwordprompt = document.getElementById('passwordprompt');
+	passwordprompt.classList = 'hidden';
+	const passwordinput = document.getElementById('passwordinput');
+	passwordinput.value = '';
+}

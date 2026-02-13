@@ -4,14 +4,30 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <div>
+    <div class="margindiv">
       <table id="testtable"></table>
     </div>
-    <div id="buttondiv"></div>
-    <div>
+    <div id="passwordprompt" class="hidden">
+      <div class="password">
+        <div class="passwordbox">
+          <div>
+            <span class="noselect">Password:</span>
+            <input id="passwordinput" type="password"></input>
+          </div>
+          <div class="buttondiv">
+            <button onclick="continuerequest()">Continue</button>
+            <button onclick="cancelrequest()"> Cancel </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="buttondiv" class="margindiv">
+      <button id="actionbutton"></button>
+    </div>
+    <div class="margindiv">
       <pre id="errorlog"></pre>
     </div>
-    <div>
+    <div class="margindiv">
       <pre id="patch"></pre>
     </div>
     <script src="main.js"></script>

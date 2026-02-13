@@ -7,7 +7,7 @@ body {
   font-size: 14px;
 }
 
-div {
+.margindiv {
   margin: 10px;
 }
 
@@ -16,6 +16,7 @@ div {
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
+  -ms-user-select: none;
   border: 2px solid;
   width: 100%;
   border-collapse: collapse;
@@ -24,7 +25,14 @@ div {
 
 td, th {
   border: 1px solid #404040;
-  padding: 0px 5px;
+  padding: 2px 5px;
+}
+
+.noselect {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 pre {
@@ -33,6 +41,8 @@ pre {
   padding: 10px;
   overflow-x: auto;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   font-size: 12px;
 }
 
@@ -43,6 +53,38 @@ button {
   border-radius: 0px;
   padding: 5px 10px;
   cursor: pointer;
+  margin: 0px 10px 0px 0px;
+  white-space: pre;
+}
+
+.buttondiv {
+  margin: 10px 0px 0px 0px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hidden {
+  display: none;
+}
+
+.password {
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.passwordbox {
+  border: 2px solid #ebdbb2;
+  padding: 10px;
+  background-color: #282828;
 }
 
 .clickable-row {
@@ -88,7 +130,7 @@ button {
   color: #d79921;
 }
 .bold.yellow,
-.yellow.bold {
+.yellow.bold,
 .bold .yellow,
 .yellow .bold {
   color: #fabd2f;
