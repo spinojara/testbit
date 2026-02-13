@@ -480,6 +480,33 @@ async def test_cancel(request):
         con.commit()
     return web.json_response({"message": "ok"})
 
+async def test_resume(request):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
+        return web.json_response({"message": "bad id"}, status=400)
+
+    with dbcond:
+        cursor = con.cursor()
+        cursor.execute("""
+            UPDATE tests
+            SET status = "running",
+                donetime = NULL
+            WHERE status = "cancelled"
+                AND id = ?;
+        """, (id, ))
+        con.commit()
+    return web.json_response({"message": "ok"})
+
+async def test_requeue(request):
+    print("Requeueing")
+    try:
+        id = int(request.match_info.get("id"))
+    except:
+        return web.json_response({"message": "bad id"}, status=400)
+
+    return web.json_response({"message": "ok"})
+
 async def test_error(request):
     try:
         id = int(request.match_info.get("id"))
@@ -725,7 +752,7 @@ async def enforce_https(request, handler):
 
 @web.middleware
 async def authenticate(request, handler):
-    if request.method == "GET" and request.path != "/test/task":
+    if (request.method == "GET" and request.path != "/test/task") or request.method == "OPTIONS":
         return await handler(request)
 
     auth_header = request.headers.get("Authorization")
@@ -750,13 +777,32 @@ async def authenticate(request, handler):
 
     return await handler(request)
 
+@web.middleware
+async def add_headers(request, handler):
+    if (request.method == "OPTIONS"):
+        return web.Response(
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                })
+
+    response = await handler(request)
+
+    response.headers["Access-Control-Allow-Origin"] = "*"
+
+    return response
+
+
 
 def create_app():
-    app = web.Application(middlewares=[enforce_https, authenticate])
+    app = web.Application(middlewares=[add_headers, enforce_https, authenticate])
 
     app.router.add_post("/test", test_new)
     app.router.add_put("/test/{id}", test_data)
     app.router.add_put("/test/cancel/{id}", test_cancel)
+    app.router.add_put("/test/resume/{id}", test_resume)
+    app.router.add_put("/test/requeue/{id}", test_requeue)
     app.router.add_put("/test/error/{id}", test_error)
     app.router.add_put("/test/docker/{id}", test_docker)
     app.router.add_get("/test/task", get_task)
