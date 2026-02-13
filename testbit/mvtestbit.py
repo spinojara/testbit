@@ -74,9 +74,9 @@ def main():
             elo0 = None
             elo1 = None
 
-        if None in [t0, t1, t2, p0, p1, p2, p3, p4]:
+        if None in [t0, t1, t2, p0, p1, p2, p3, p4] or (t0 == 0 and t1 == 0 and t2 == 0):
             t0 = t1 = t2 = p0 = p1 = p2 = p3 = p4 = 0
-            elo = pm = llr = 0.0
+            elo = pm = llr = None
 
         if not queuetime:
             print("No queuetime for id %d, skipping..." % id)
@@ -111,6 +111,7 @@ def main():
         newcur = new.cursor()
         newcur.execute("""
             INSERT INTO tests (
+                description,
                 legacy,
                 type,
                 status,
@@ -140,6 +141,7 @@ def main():
                 patch
             )
             VALUES (
+                'No description',
                 ?,
                 ?,
                 ?,
