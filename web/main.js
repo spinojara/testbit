@@ -74,8 +74,6 @@ getData().then(data => {
 		stat = row.insertCell();
 		stat.textContent = test.status;
 		elo = row.insertCell();
-		if (!test.elo)
-			test.elo = 123.0;
 		if (test.elo) {
 			var elotext = test.elo.toFixed(3).toString();
 			if (test.pm) {
