@@ -14,3 +14,4 @@ src/.*
 include/.*
 !doc/src
 !testbit
+!web
