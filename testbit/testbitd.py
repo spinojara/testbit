@@ -27,14 +27,14 @@ con = None
 Dockerfile = """
 FROM alpine:3.23.3
 
-RUN apk add --no-cache make clang lld compiler-rt llvm git curl
+RUN apk add --no-cache make clang lld compiler-rt llvm git curl 2>&1
 
-RUN curl -L -o fastchess.tar.gz https://github.com/Disservin/fastchess/archive/refs/tags/v1.8.0-alpha.tar.gz && \
+RUN { curl -L -o fastchess.tar.gz https://github.com/Disservin/fastchess/archive/refs/tags/v1.8.0-alpha.tar.gz && \
     mkdir fastchess && \
     tar -xf fastchess.tar.gz -C fastchess --strip-components=1 && \
     make -C fastchess CXX=clang++ && \
     make -C fastchess install && \
-    rm -rf fastchess fastchess.tar.gz
+    rm -rf fastchess fastchess.tar.gz; } 2>&1
 
 COPY patch patch
 
@@ -42,18 +42,18 @@ ARG COMMIT
 ARG SIMD
 ARG CACHEBUST
 
-RUN git clone https://github.com/spinojara/bitbit.git && \
+RUN { git clone https://github.com/spinojara/bitbit.git && \
     git -C bitbit checkout "$COMMIT" && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
-    make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     mv bitbit/bitbit bitbit-old && \
     git -C bitbit apply --allow-empty ../patch && \
-    make -C bitbit clean && make -C bitbit ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
-    rm -rf bitbit patch
+    rm -rf bitbit patch; } 2>&1
 """
 
 def get_next_image_to_build():
@@ -106,11 +106,19 @@ def build_docker_images():
                 rm=True,
                 forcerm=True,
             )
+            full_logs = "begin"
+            for logs in build_logs:
+                if "stream" in logs and isinstance(logs["stream"], str):
+                    full_logs += logs["stream"].strip()
+            full_logs += "end"
         except BuildError as e:
+            full_logs = "begin"
             error = True
             errorlog = ""
             for log in e.build_log:
                 errorlog += log.get("stream", "")
+                full_logs += log.get("stream", "").strip()
+            full_logs += "end"
         except Exception as e:
             print(e, file=sys.stderr)
             break
@@ -119,21 +127,16 @@ def build_docker_images():
             patch_path.unlink()
             tempdir.rmdir()
 
-        if not error:
-            full_logs = "begin"
-            for logs in build_logs:
-                if "stream" in logs and isinstance(logs["stream"], str):
-                    full_logs += logs["stream"].strip()
-            full_logs += "end"
-            full_logs = full_logs.split(build_uuid)
-            if len(full_logs) == 3:
-                commit = full_logs[1]
-                if len(commit) != 40 or not all(c in "0123456789abcdef" for c in commit):
-                    errorlog = "Commit ID: '%s' is not a SHA-1." % commit
-                    error = True
-            else:
-                errorlog = "Commit ID: UUID4 was not unique. This should never happen."
+        full_logs = full_logs.split(build_uuid)
+        if isinstance(full_logs, list) and len(full_logs) == 3:
+            newcommit = full_logs[1]
+            if len(newcommit) != 40 or not all(c in "0123456789abcdef" for c in newcommit):
+                errorlog = "Commit ID: '%s' is not a SHA-1." % newcommit
                 error = True
+                newcommit = commit
+        elif not error:
+            errorlog = "Commit ID: UUID4 was not unique. This should never happen."
+            error = True
 
         if error:
             with dbcond:
@@ -147,9 +150,10 @@ def build_docker_images():
                             ELSE starttime
                         END,
                         buildtime = unixepoch(),
-                        donetime = unixepoch()
+                        donetime = unixepoch(),
+                        commithash = ?
                     WHERE id = ? AND status = "building";
-                """, (errorlog, id))
+                """, (errorlog, newcommit, id))
                 con.commit()
             continue
 
@@ -171,7 +175,7 @@ def build_docker_images():
                     buildtime = unixepoch(),
                     commithash = ?
                 WHERE id = ? AND status = "building";
-            """, (commit, id))
+            """, (newcommit, id))
             con.commit()
 
     os.kill(os.getpid(), signal.SIGINT)
@@ -183,7 +187,7 @@ def create_table():
         CREATE TABLE IF NOT EXISTS tests (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             legacy      INTEGER DEFAULT FALSE,
-            description TEXT DEFAULT "empty",
+            description TEXT,
             type        TEXT NOT NULL,
             status      TEXT DEFAULT "building",
             tc          TEXT NOT NULL,
@@ -634,7 +638,7 @@ async def test_fetch_single(request):
         "p2": row[23],
         "p3": row[24],
         "p4": row[25],
-        "commithash": row[26],
+        "commit": row[26],
         "simd": row[27],
         "patch": patch,
         "errorlog": errorlog
