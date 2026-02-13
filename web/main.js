@@ -74,18 +74,50 @@ getData().then(data => {
 		stat = row.insertCell();
 		stat.textContent = test.status;
 		elo = row.insertCell();
+		if (!test.elo)
+			test.elo = 123.0;
 		if (test.elo) {
-			elo.textContent = test.elo.toFixed(3);
-			if (test.pm)
-				elo.textContent += '\u00B1' + test.pm.toFixed(3);
+			var elotext = test.elo.toFixed(3).toString();
+			if (test.pm) {
+				var pmtext = test.pm.toFixed(3).toString();
+				if (elotext.length < pmtext.length)
+					elotext = ' '.repeat(pmtext.length - elotext.length) + elotext + '\u00B1' + pmtext;
+				else
+					elotext += '\u00B1' + pmtext + ' '.repeat(elotext.length - pmtext.length);
+			}
+			else {
+				var split = elotext.split('.');
+				var beforedot = split[0].length;
+				var afterdot = split[1].length;
+				if (beforedot < afterdot)
+					elotext = ' '.repeat(afterdot - beforedot) + elotext;
+				else
+					elotext += ' '.repeat(beforedot - afterdot);
+			}
+			elo.textContent = elotext;
 		}
 		elo.style.textAlign = 'center';
+		elo.style.whiteSpace = 'pre';
 		trinomial = row.insertCell();
 		trinomial.textContent = test.t0 + '-' + test.t1 + '-' + test.t2;
+		var righttext = test.t0.toString().length;
+		var lefttext = test.t2.toString().length;
+		if (righttext < lefttext)
+			trinomial.textContent = ' '.repeat(lefttext - righttext) + trinomial.textContent;
+		else
+			trinomial.textContent += ' '.repeat(righttext - lefttext);
 		trinomial.style.textAlign = 'center';
+		trinomial.style.whiteSpace = 'pre';
 		pentanomial = row.insertCell();
 		pentanomial.textContent = test.p0 + '-' + test.p1 + '-' + test.p2 + '-' + test.p3 + '-' + test.p4;
+		var righttext = test.p0.toString().length + test.p1.toString().length;
+		var lefttext = test.p3.toString().length + test.p4.toString().length;
+		if (righttext < lefttext)
+			pentanomial.textContent = ' '.repeat(lefttext - righttext) + pentanomial.textContent;
+		else
+			pentanomial.textContent += ' '.repeat(righttext - lefttext);
 		pentanomial.style.textAlign = 'center';
+		pentanomial.style.whiteSpace = 'pre';
 		llr = row.insertCell();
 		llr.style.textAlign = 'right';
 		if (test.llr)
