@@ -38,6 +38,7 @@ function formatPatch(patch) {
 	open = false;
 	openatat = false;
 	betweengitdiffandatat = false;
+	readingBinary = false;
 
 	for (let i = 0; i < patch.length; i++) {
 		var c = patch[i];
@@ -49,12 +50,19 @@ function formatPatch(patch) {
 			parsedPatch += '<span class=\'white\'>';
 			open = true;
 			betweengitdiffandatat = true;
+			readingBinary = false;
 		}
 
 		if (!betweengitdiffandatat && c == '\n') {
 			if (open)
 				parsedPatch += '</span>';
 			open = false;
+		}
+
+		if (patch.substring(i - 18, i) == '\nGIT binary patch\n') {
+			console.log('binary');
+			readingBinary = true;
+			betweengitdiffandatat = false;
 		}
 
 		if (patch.substring(i, i + 4) == '\n@@ ') {
@@ -88,6 +96,9 @@ function formatPatch(patch) {
 			parsedPatch += '<span class=\'bold red\'>';
 			open = true;
 		}
+
+		if (readingBinary)
+			continue;
 
 		switch (c) {
 		case '<':
