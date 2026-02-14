@@ -36,25 +36,83 @@ function formatDate(unixepoch) {
 function formatPatch(patch) {
 	parsedPatch = '';
 	open = false;
+	openatat = false;
+	betweengitdiffandatat = false;
 
 	for (let i = 0; i < patch.length; i++) {
-		const c = patch[i];
-		if (c == '\n' && i < patch.length - 1) {
+		var c = patch[i];
+
+		if (!betweengitdiffandatat && ((i == 0 && patch.substring(0, 11) == 'diff --git ') || patch.substring(i, i + 12) == '\ndiff --git ')) {
+			console.log('diff --git');
+			if (open)
+				parsedPatch += '</span>';
+			parsedPatch += '<span class=\'white\'>';
+			open = true;
+			betweengitdiffandatat = true;
+		}
+
+		if (!betweengitdiffandatat && c == '\n') {
 			if (open)
 				parsedPatch += '</span>';
 			open = false;
-			if (patch[i + 1] == '+') {
-				parsedPatch += '<span class=\'green bold\'>'
-				open = true;
-			}
-			if (patch[i + 1] == '-') {
-				parsedPatch += '<span class=\'red bold\'>'
-				open = true;
+		}
+
+		if (patch.substring(i, i + 4) == '\n@@ ') {
+			console.log('opening @@' + i);
+			if (open)
+				parsedPatch += '</span>';
+			parsedPatch += '<span class=\'bold cyan\'>';
+			open = true;
+			openatat = true;
+			betweengitdiffandatat = false;
+		}
+
+		if (i > 3 && patch.substring(i - 3, i + 1) == ' @@ ') {
+			console.log('closing @@' + i);
+			if (openatat) {
+				parsedPatch += '</span>';
+				openatat = false;
+				open = false;
 			}
 		}
 
+		if (!betweengitdiffandatat && patch.substring(i, i + 2) == '\n+') {
+			if (open)
+				parsedPatch += '</span>';
+			parsedPatch += '<span class=\'bold green\'>';
+			open = true;
+		}
+		else if (!betweengitdiffandatat && patch.substring(i, i + 2) == '\n-') {
+			if (open)
+				parsedPatch += '</span>';
+			parsedPatch += '<span class=\'bold red\'>';
+			open = true;
+		}
+
+		switch (c) {
+		case '<':
+			c = '&lt;';
+			break;
+		case '>':
+			c = '&gt;';
+			break;
+		case '&':
+			c = '&amp;';
+			break;
+		case '"':
+			c = '&quot;';
+			break;
+		case '\'':
+			c = '&#039;';
+			break;
+		default:
+			break;
+		}
 		parsedPatch += c;
 	}
+
+	if (open)
+		parsedPatch += '</span>';
 
 	return parsedPatch;
 }
