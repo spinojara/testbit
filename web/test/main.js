@@ -225,6 +225,7 @@ const prepatch = document.getElementById('patch')
 const preerrorlog = document.getElementById('errorlog')
 const thead = table.createTHead();
 const headerRow = thead.insertRow();
+let shouldUpdate = true;
 
 getData(id).then(data => {
 	if (data.message != 'ok')
@@ -238,6 +239,7 @@ getData(id).then(data => {
 		headers.push('Elo Error');
 
 	headers.push(...['TC', 'Commit ID'])
+	shouldUpdate = test.donetime == null;
 
 	if (test.donetime)
 		headers.push('Done Timestamp');
@@ -314,15 +316,12 @@ getData(id).then(data => {
 	commit.style.textAlign = 'center';
 
 	time = row.insertCell();
-	if (time.donetime) {
+	if (time.donetime)
 		time.textContent = formatDate(test.donetime);
-	}
-	else if (test.starttime) {
+	else if (test.starttime)
 		time.textContent = formatDate(test.starttime);
-	}
-	else if (test.queuetime) {
+	else if (test.queuetime)
 		time.textContent = formatDate(test.queuetime);
-	}
 	time.style.textAlign = 'center';
 
 	prepatch.innerHTML = formatPatch(test.patch);
@@ -332,16 +331,40 @@ getData(id).then(data => {
 
 	const button = document.getElementById('actionbutton');
 	button.onclick = promptpassword;
-	if (test.status == 'cancelled') {
+	if (test.status == 'cancelled')
 		button.textContent = 'Resume';
-	}
-	else if (test.status == 'running' || test.status == 'building' || test.status == 'queued') {
+	else if (test.status == 'running' || test.status == 'building' || test.status == 'queued')
 		button.textContent = 'Cancel';
+	else
+		button.textContent = 'Requeue';
+});
+
+let intervalId;
+
+function startUpdating() {
+	if (intervalId)
+		clearInterval(intervalId);
+	intervalId = setInterval(updateTable, 10000);
+}
+
+function stopUpdating() {
+	if (intervalId) {
+		clearInterval(intervalId);
+		intervalId = null;
+	}
+}
+
+document.addEventListener('visibilitychange', () => {
+	if (document.hidden) {
+		stopUpdating();
 	}
 	else {
-		button.textContent = 'Requeue';
+		updateTable();
+		startUpdating();
 	}
 });
+
+startUpdating();
 
 function promptpassword() {
 	const passwordprompt = document.getElementById('passwordprompt');
@@ -355,7 +378,6 @@ function continuerequest() {
 	const password = passwordinput.value;
 	passwordinput.value = '';
 	const credentials = btoa(':' + password);
-	console.log(credentials);
 
 	const button = document.getElementById('actionbutton');
 	var endpoint = 'https://jalagaoi.se:2718/test/';
@@ -370,14 +392,22 @@ function continuerequest() {
 		endpoint += 'requeue/';
 		break;
 	default:
-		console.log('What?');
 		return;
 	}
 	endpoint += getid();
-	console.log(endpoint);
 	putData(endpoint, credentials).then(data => {
-		console.log(data);
+		if (data.message == 'wrong password') {
+			const wrongpassword = document.getElementById('wrongpassword');
+			wrongpassword.classList = '';
+		}
 	});
+	shouldUpdate = true;
+	updateTable();
+}
+
+function wrongpasswordok() {
+	const wrongpassword = document.getElementById('wrongpassword');
+	wrongpassword.classList = 'hidden';
 }
 
 function cancelrequest() {
@@ -385,4 +415,50 @@ function cancelrequest() {
 	passwordprompt.classList = 'hidden';
 	const passwordinput = document.getElementById('passwordinput');
 	passwordinput.value = '';
+}
+
+function updateTable() {
+	if (!shouldUpdate)
+		return;
+	getData(id).then(data => {
+		if (data.message != 'ok')
+			redirectHome();
+		test = data.test;
+		shouldUpdate = test.donetime == null;
+		const statusCell = table.rows[1].cells[2];
+		statusCell.textContent = test.status;
+		const elo = table.rows[1].cells[3];
+		if (test.elo) {
+			elo.textContent = test.elo.toFixed(3);
+			if (test.pm)
+				elo.textContent += '\u00B1' + test.pm.toFixed(3);
+		}
+		const trinomial = table.rows[1].cells[4];
+		trinomial.textContent = test.t0 + '-' + test.t1 + '-' + test.t2;
+		const pentanomial = table.rows[1].cells[5];
+		pentanomial.textContent = test.p0 + '-' + test.p1 + '-' + test.p2 + '-' + test.p3 + '-' + test.p4;
+		var index = 8;
+		if (test.type == 'sprt') {
+			const llr = table.rows[1].cells[6];
+			if (test.llr)
+				llr.textContent = test.llr.toFixed(3);
+			index = 13;
+		}
+		const commit = table.rows[1].cells[index];
+		commit.textContent = test.commit;
+		const time = table.rows[1].cells[index + 1];
+		const timeheader = table.tHead.rows[0].cells[index + 1];
+		if (test.donetime) {
+			timeheader.textContent = 'Done Timestamp';
+			time.textContent = formatDate(test.donetime);
+		}
+		else if (test.starttime) {
+			timeheader.textContent = 'Start Timestamp';
+			time.textContent = formatDate(test.starttime);
+		}
+		else if (test.queuetime) {
+			timeheader.textContent = 'Queue Timestamp';
+			time.textContent = formatDate(test.queuetime);
+		}
+	});
 }

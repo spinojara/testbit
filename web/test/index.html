@@ -15,14 +15,26 @@
             <input id="passwordinput" type="password"></input>
           </div>
           <div class="buttondiv">
-            <button onclick="continuerequest()">Continue</button>
-            <button onclick="cancelrequest()"> Cancel </button>
+            <button onclick="continuerequest()" class="buttons">Continue</button>
+            <button onclick="cancelrequest()" class="button"> Cancel </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="wrongpassword" class="hidden">
+      <div class="password">
+        <div class="passwordbox">
+          <div>
+            <span class="noselect">Wrong password!</span>
+          </div>
+          <div class="buttondiv">
+            <button onclick="wrongpasswordok()" class="button">Ok</button>
           </div>
         </div>
       </div>
     </div>
     <div id="buttondiv" class="margindiv">
-      <button id="actionbutton"></button>
+      <button id="actionbutton" class="button"></button>
     </div>
     <div class="margindiv">
       <pre id="errorlog"></pre>
