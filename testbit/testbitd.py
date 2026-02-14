@@ -152,7 +152,7 @@ def build_docker_images():
                         buildtime = unixepoch(),
                         donetime = unixepoch(),
                         commithash = ?
-                    WHERE id = ? AND status = "building";
+                    WHERE id = ?;
                 """, (errorlog, newcommit, id))
                 con.commit()
             continue
@@ -169,6 +169,7 @@ def build_docker_images():
             cursor.execute("""
                 UPDATE tests
                 SET status = CASE
+                        WHEN status != "building" THEN status
                         WHEN starttime IS NULL THEN "queued"
                         ELSE "running"
                     END,
