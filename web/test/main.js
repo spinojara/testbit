@@ -400,9 +400,9 @@ function continuerequest() {
 			const wrongpassword = document.getElementById('wrongpassword');
 			wrongpassword.classList = '';
 		}
+		shouldUpdate = true;
+		updateTable();
 	});
-	shouldUpdate = true;
-	updateTable();
 }
 
 function wrongpasswordok() {
@@ -460,5 +460,12 @@ function updateTable() {
 			timeheader.textContent = 'Queue Timestamp';
 			time.textContent = formatDate(test.queuetime);
 		}
+		const button = document.getElementById('actionbutton');
+		if (test.status == 'cancelled')
+			button.textContent = 'Resume';
+		else if (test.status == 'running' || test.status == 'building' || test.status == 'queued')
+			button.textContent = 'Cancel';
+		else
+			button.textContent = 'Requeue';
 	});
 }
