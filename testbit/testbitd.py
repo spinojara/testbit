@@ -469,7 +469,7 @@ async def test_cancel(request):
         cursor.execute("""
             UPDATE tests
             SET status = "cancelled",
-                startime = CASE
+                starttime = CASE
                     WHEN starttime IS NULL THEN unixepoch()
                     ELSE starttime
                 END,
@@ -499,11 +499,48 @@ async def test_resume(request):
     return web.json_response({"message": "ok"})
 
 async def test_requeue(request):
-    print("Requeueing")
     try:
         id = int(request.match_info.get("id"))
     except:
         return web.json_response({"message": "bad id"}, status=400)
+
+    with dbcond:
+        cursor = con.cursor()
+        cursor.execute("""
+            INSERT INTO tests (
+                description,
+                type,
+                tc,
+                alpha,
+                beta,
+                elo0,
+                elo1,
+                eloe,
+                adjudicate,
+                queuetime,
+                commithash,
+                simd,
+                patch
+            )
+            SELECT
+                concat(description, " (requeue)"),
+                type,
+                tc,
+                alpha,
+                beta,
+                elo0,
+                elo1,
+                eloe,
+                adjudicate,
+                unixepoch(),
+                commithash,
+                simd,
+                patch
+            FROM tests
+            WHERE id = ?;
+        """, (id, ))
+        con.commit()
+        dbcond.notify()
 
     return web.json_response({"message": "ok"})
 
