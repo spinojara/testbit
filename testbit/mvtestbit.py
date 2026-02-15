@@ -79,6 +79,13 @@ def main():
             elo = pm = llr = None
             print("Skipping cancelled test which didn't run...")
             continue
+        elif elo is None:
+            print("Elo is none but test ran, skipping...")
+            continue
+
+        if t0 >= 10 and t1 == 0 and t2 == 0:
+            print("Test with trinomial %d-%d-%d is probably a debugging test, skipping..." % (t0, t1, t2))
+            continue
 
         if not queuetime:
             print("No queuetime for id %d, skipping..." % id)
