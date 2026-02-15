@@ -5,6 +5,7 @@ name="testbitd"
 description="testbitd - A test server for bitbit."
 command="testbitd"
 command_args="--db /var/lib/bitbit/bitbit.sqlite3 \
+	--db-backup /var/lib/bitbit/backup \
 	--cert-key /etc/letsencrypt/live/jalagaoi.se/privkey.pem \
 	--cert-chain /etc/letsencrypt/live/jalagaoi.se/fullchain.pem"
 output_log="/var/log/testbitd.log"
@@ -19,6 +20,10 @@ depend() {
 start_pre() {
 	if [[ ! -d "/var/lib/bitbit" ]]; then
 		eerror "Please create the directory /var/lib/bitbit"
+		return 1
+	fi
+	if [[ ! -d "/var/lib/bitbit/backup" ]]; then
+		eerror "Please create the directory /var/lib/bitbit/backup"
 		return 1
 	fi
 	if [[ ! -f "/etc/letsencrypt/live/jalagaoi.se/privkey.pem" ]]; then

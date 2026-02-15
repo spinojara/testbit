@@ -16,13 +16,16 @@ import string
 import uuid
 import os
 import signal
+from datetime import datetime
 
 from .tc import validatetc
 from .elo import loglikelihoodratio, calculate_elo
 from .spwd import authenticate as spwdauthenticate
 
 dbcond = threading.Condition()
+backuplock = threading.Lock()
 con = None
+backup_directory = None
 
 Dockerfile = """
 FROM alpine:3.23.3
@@ -596,6 +599,20 @@ async def test_docker(request):
         con.commit()
     return web.json_response({"message": "ok"})
 
+async def backup_database(request):
+    if not backup_directory:
+        return web.json_response({"message": "backup directory not set"}, status=400)
+
+
+    with backuplock:
+        backup_path = Path(backup_directory) / ("bitbit.sqlite3.backup-" + datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+        backupcon = sqlite3.connect(backup_path)
+        with dbcond:
+            con.backup(backupcon)
+
+    return web.json_response({"message": "ok"})
+
+
 async def get_task(request):
     with dbcond:
         cursor = con.cursor()
@@ -831,8 +848,6 @@ async def add_headers(request, handler):
 
     return response
 
-
-
 def create_app():
     app = web.Application(middlewares=[add_headers, enforce_https, authenticate])
 
@@ -846,6 +861,7 @@ def create_app():
     app.router.add_get("/test/task", get_task)
     app.router.add_get("/test/{id}", test_fetch_single)
     app.router.add_get("/test", test_fetch_all)
+    app.router.add_post("/test/backup", backup_database)
 
     return app
 
@@ -855,8 +871,11 @@ def main() -> int:
     parser.add_argument("--cert-chain", type=str, help="SSL certificate chain", default="")
     parser.add_argument("--cert-key", type=str, help="SSL certificate key", default="")
     parser.add_argument("--db", type=str, help="sqlite3 db path", default=None)
+    parser.add_argument("--db-backup", type=str, help="sqlite3 db backup directory", default=None)
 
     args, _ = parser.parse_known_args()
+    global backup_directory
+    backup_directory = args.db_backup
 
     global con
     con = sqlite3.connect(args.db, check_same_thread=False)
