@@ -44,7 +44,6 @@ function formatPatch(patch) {
 		var c = patch[i];
 
 		if (!betweengitdiffandatat && ((i == 0 && patch.substring(0, 11) == 'diff --git ') || patch.substring(i, i + 12) == '\ndiff --git ')) {
-			console.log('diff --git');
 			if (open)
 				parsedPatch += '</span>';
 			parsedPatch += '<span class=\'white\'>';
@@ -60,13 +59,11 @@ function formatPatch(patch) {
 		}
 
 		if (patch.substring(i - 18, i) == '\nGIT binary patch\n') {
-			console.log('binary');
 			readingBinary = true;
 			betweengitdiffandatat = false;
 		}
 
 		if (patch.substring(i, i + 4) == '\n@@ ') {
-			console.log('opening @@' + i);
 			if (open)
 				parsedPatch += '</span>';
 			parsedPatch += '<span class=\'bold cyan\'>';
@@ -76,7 +73,6 @@ function formatPatch(patch) {
 		}
 
 		if (i > 3 && patch.substring(i - 3, i + 1) == ' @@ ') {
-			console.log('closing @@' + i);
 			if (openatat) {
 				parsedPatch += '</span>';
 				openatat = false;
@@ -333,9 +329,11 @@ getData(id).then(data => {
 	stat = row.insertCell();
 	stat.textContent = test.status;
 	elo = row.insertCell();
-	if (test.elo) {
+	console.log('elo');
+	console.log(test.elo);
+	if (test.elo != null) {
 		elo.textContent = test.elo.toFixed(3);
-		if (test.pm)
+		if (test.pm != null)
 			elo.textContent += '\u00B1' + test.pm.toFixed(3);
 	}
 	elo.style.textAlign = 'center';
@@ -347,7 +345,7 @@ getData(id).then(data => {
 	pentanomial.style.textAlign = 'center';
 	if (test.type == 'sprt') {
 		llr = row.insertCell();
-		if (test.llr)
+		if (test.llr != null)
 			llr.textContent = test.llr.toFixed(3);
 
 		AB = row.insertCell();
@@ -497,9 +495,11 @@ function updateTable() {
 		const statusCell = table.rows[1].cells[2];
 		statusCell.textContent = test.status;
 		const elo = table.rows[1].cells[3];
-		if (test.elo) {
+		console.log('elo');
+		console.log(test.elo);
+		if (test.elo != null) {
 			elo.textContent = test.elo.toFixed(3);
-			if (test.pm)
+			if (test.pm != null)
 				elo.textContent += '\u00B1' + test.pm.toFixed(3);
 		}
 		const trinomial = table.rows[1].cells[4];
@@ -509,7 +509,7 @@ function updateTable() {
 		var index = 8;
 		if (test.type == 'sprt') {
 			const llr = table.rows[1].cells[6];
-			if (test.llr)
+			if (test.llr != null)
 				llr.textContent = test.llr.toFixed(3);
 			index = 13;
 		}

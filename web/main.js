@@ -110,9 +110,9 @@ function drawTable() {
 			stat = row.cells[2];
 			stat.textContent = test.status;
 			elo = row.cells[3];
-			if (test.elo) {
+			if (test.elo != null) {
 				var elotext = test.elo.toFixed(3).toString();
-				if (test.pm) {
+				if (test.pm != null) {
 					var pmtext = test.pm.toFixed(3).toString();
 					if (elotext.length < pmtext.length)
 						elotext = ' '.repeat(pmtext.length - elotext.length) + elotext + '\u00B1' + pmtext;
@@ -156,7 +156,7 @@ function drawTable() {
 			pentanomial.style.whiteSpace = 'pre';
 			llr = row.cells[6];
 			llr.style.textAlign = 'right';
-			if (test.llr)
+			if (test.llr != null)
 				llr.textContent = test.llr.toFixed(3);
 			else
 				llr.textContent = '';
