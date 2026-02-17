@@ -223,6 +223,21 @@ def create_table():
             UNIQUE (type, queuetime, patch, commithash)
         );
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS games (
+            id        TEXT PRIMARY KEY,
+            testid    INTEGER,
+            w         INTEGER,
+            d         INTEGER,
+            l         INTEGER,
+            starttime INTEGER NOT NULL,
+            donetime  INTEGER
+        );
+    """)
+    cursor.execute("""
+        DELETE FROM games
+        WHERE donetime IS NULL;
+    """)
     con.commit()
 
 async def test_new(request):
@@ -366,6 +381,9 @@ async def test_data(request):
     wins = data.get("wins")
     draws = data.get("draws")
     losses = data.get("losses")
+    task_uuid = data.get("uuid")
+    if not isinstance(task_uuid, str):
+        return web.json_response({"message": "bad uuid"}, status=400)
     if not isinstance(wins, int) or wins < 0:
         return web.json_response({"message": "bad wins"}, status=400)
     if not isinstance(losses, int) or losses < 0:
@@ -374,8 +392,23 @@ async def test_data(request):
         return web.json_response({"message": "bad draws"}, status=400)
     if wins + draws + losses != 2:
         return web.json_response({"message": "need losses + draws + wins = 2"}, status=400)
+    print(f"received task for {task_uuid}")
     with dbcond:
         cursor = con.cursor()
+
+        cursor.execute("""
+            UPDATE games
+            SET w = ?,
+                d = ?,
+                l = ?,
+                donetime = unixepoch()
+            WHERE id = ? AND testid = ? AND donetime IS NULL;
+        """, (wins, draws, losses, task_uuid, id))
+        if cursor.rowcount != 1:
+            con.rollback()
+            print("bad uuid")
+            return web.json_response({"message": "bad uuid"}, status=400)
+
         cursor.execute("""
             SELECT type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1
             FROM tests
@@ -433,7 +466,6 @@ async def test_data(request):
                     END
                 WHERE id = ?;
             """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], status, llr, elo, pm, status, id))
-            con.commit()
         else:
             if pm is not None and pm < eloe:
                 status = "done"
@@ -458,7 +490,7 @@ async def test_data(request):
                     END
                 WHERE id = ?;
             """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], status, elo, pm, status, id))
-            con.commit()
+        con.commit()
 
     return web.json_response({"message": "ok"})
 
@@ -564,11 +596,21 @@ async def test_error(request):
         return web.json_response({"message": "no json"}, status=400)
 
     errorlog = data.get("errorlog")
+    task_uuid = data.get("uuid")
     if not isinstance(errorlog, str):
         return web.json_response({"message": "bad errorlog"}, status=400)
+    if not isinstance(task_uuid, str):
+        return web.json_response({"message": "bad uuid"}, status=400)
 
     with dbcond:
         cursor = con.cursor()
+        cursor.execute("""
+            DELETE FROM games
+            WHERE id = ? AND testid = ? AND donetime IS NULL;
+        """, (task_uuid, id))
+        if cursor.rowcount != 1:
+            con.rollback()
+            return web.json_response({"message": "bad uuid"}, status=400)
         cursor.execute("""
             UPDATE tests
             SET status = "error", errorlog = ?
@@ -583,9 +625,26 @@ async def test_docker(request):
     except:
         return web.json_response({"message": "bad id"}, status=400)
     print("got docker request")
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"message": "invalid json"}, status=400)
+    except Exception:
+        return web.json_response({"message": "no json"}, status=400)
+
+    task_uuid = data.get("uuid")
+    if not isinstance(task_uuid, str):
+        return web.json_response({"message": "bad uuid"}, status=400)
 
     with dbcond:
         cursor = con.cursor()
+        cursor.execute("""
+            DELETE FROM games
+            WHERE id = ? AND testid = ? AND donetime IS NULL;
+        """, (task_uuid, id))
+        if cursor.rowcount != 1:
+            con.rollback()
+            return web.json_response({"message": "bad uuid"}, status=400)
         cursor.execute("""
             UPDATE tests
             SET status = "building"
@@ -614,6 +673,7 @@ async def backup_database(request):
 
 
 async def get_task(request):
+    print(request)
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
@@ -633,13 +693,28 @@ async def get_task(request):
             RETURNING id, tc, adjudicate;
         """)
         row = cursor.fetchone()
+
+        if not row:
+            return web.json_response({"id": None, "tc": None, "adjudicate": None})
+
+        id, tc, adjudicate = row
+        task_uuid = str(uuid.uuid4())
+        cursor = con.cursor()
+        cursor.execute("""
+            INSERT INTO games (
+                id,
+                testid,
+                starttime
+            )
+            VALUES (
+                ?,
+                ?,
+                unixepoch()
+            );
+        """, (task_uuid, id))
         con.commit()
-
-    if not row:
-        return web.json_response({"id": None, "tc": None, "adjudicate": None})
-
-    id, tc, adjudicate = row
-    return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate})
+        print(f"created task for {task_uuid}")
+    return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate, "uuid": task_uuid})
 
 async def test_fetch_single(request):
     try:
@@ -647,42 +722,57 @@ async def test_fetch_single(request):
     except:
         return web.json_response({"message": "bad id"}, status=400)
 
+    delta = -1
+    try:
+        data = await request.json()
+        delta_temp = data.get("delta")
+        if isinstance(delta_temp, int):
+            delta = delta_temp
+    except:
+        pass
+
     cursor = con.cursor()
     cursor.execute("""
         SELECT
-            id,
-            legacy,
-            description,
-            type,
-            status,
-            tc,
-            alpha,
-            beta,
-            elo0,
-            elo1,
-            eloe,
-            adjudicate,
-            queuetime,
-            starttime,
-            donetime,
-            elo,
-            pm,
-            llr,
-            t0,
-            t1,
-            t2,
-            p0,
-            p1,
-            p2,
-            p3,
-            p4,
-            commithash,
-            simd,
-            patch,
-            errorlog
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.type,
+            tests.status,
+            tests.tc,
+            tests.alpha,
+            tests.beta,
+            tests.elo0,
+            tests.elo1,
+            tests.eloe,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.elo,
+            tests.pm,
+            tests.llr,
+            tests.t0,
+            tests.t1,
+            tests.t2,
+            tests.p0,
+            tests.p1,
+            tests.p2,
+            tests.p3,
+            tests.p4,
+            tests.commithash,
+            tests.simd,
+            tests.patch,
+            tests.errorlog,
+            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
         FROM tests
-        WHERE id = ?;
-    """, (id, ))
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND (? < 0 OR unixepoch() - ? <= games.donetime)
+        WHERE tests.id = ?
+        GROUP BY tests.id;
+    """, (delta, delta, id))
 
     row = cursor.fetchone()
     if not row:
@@ -723,45 +813,61 @@ async def test_fetch_single(request):
         "commit": row[26],
         "simd": row[27],
         "patch": patch,
-        "errorlog": errorlog
+        "errorlog": errorlog,
+        "gametimeavg": row[30]
     }
 
     return web.json_response({"message": "ok", "test": test})
 
 async def test_fetch_all(request):
+    delta = -1
+    try:
+        data = await request.json()
+        delta_temp = data.get("delta")
+        if isinstance(delta_temp, int):
+            delta = delta_temp
+    except:
+        pass
+
     cursor = con.cursor()
     cursor.execute("""
         SELECT
-            id,
-            legacy,
-            description,
-            type,
-            status,
-            tc,
-            alpha,
-            beta,
-            elo0,
-            elo1,
-            eloe,
-            adjudicate,
-            queuetime,
-            starttime,
-            donetime,
-            elo,
-            pm,
-            llr,
-            t0,
-            t1,
-            t2,
-            p0,
-            p1,
-            p2,
-            p3,
-            p4,
-            commithash,
-            simd
-        FROM tests;
-    """)
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.type,
+            tests.status,
+            tests.tc,
+            tests.alpha,
+            tests.beta,
+            tests.elo0,
+            tests.elo1,
+            tests.eloe,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.elo,
+            tests.pm,
+            tests.llr,
+            tests.t0,
+            tests.t1,
+            tests.t2,
+            tests.p0,
+            tests.p1,
+            tests.p2,
+            tests.p3,
+            tests.p4,
+            tests.commithash,
+            tests.simd,
+            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
+        FROM tests
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND (? < 0 OR unixepoch() - ? <= games.donetime)
+        GROUP BY tests.id;
+    """, (delta, delta))
 
     tests = []
 
@@ -794,7 +900,8 @@ async def test_fetch_all(request):
             "p3": row[24],
             "p4": row[25],
             "commithash": row[26],
-            "simd": row[27]
+            "simd": row[27],
+            "gametimeavg": row[28]
         })
 
     return web.json_response({"message": "ok", "tests": tests})

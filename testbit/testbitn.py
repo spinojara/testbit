@@ -62,13 +62,14 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         id = response.get("id")
         tc = response.get("tc")
         adjudicate = response.get("adjudicate")
+        task_uuid = response.get("uuid")
         adjudicatestring = ""
         if adjudicate == "draw" or adjudicate == "both":
             adjudicatestring += "-draw movenumber=40 movecount=8 score=10"
         if adjudicate == "resign" or adjudicate == "both":
             adjudicatestring += " -resign twosided=true movecount=3 score=800"
 
-        if None in [id, tc, adjudicate]:
+        if None in [id, tc, adjudicate, task_uuid]:
             cpu.release()
             print(str(cpu.cpu) + " " + "nothing to do, sleeping...")
             time.sleep(10)
@@ -105,7 +106,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         except ImageNotFound:
             try:
-                response = requests.put(host + "/test/docker/%d" % id, auth=("", password), verify=verify)
+                response = requests.put(host + "/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
             finally:
                 continue
 
@@ -153,13 +154,11 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
-                response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs}, auth=("", password), verify=verify)
-                print(str(cpu.cpu) + " " + response.json())
+                response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
             else:
-                response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins}, auth=("", password), verify=verify)
-                print(str(cpu.cpu) + " " + response.json())
-        except:
-            pass
+                response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
+        except Exception as e:
+            print(e)
 
     os.kill(os.getpid(), signal.SIGINT)
 
