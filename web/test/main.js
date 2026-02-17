@@ -19,6 +19,26 @@ function redirectHome() {
 	window.location.href = '/';
 }
 
+function truncate(text, n) {
+	if (text.length > n)
+		return text.substring(0, n - 3) + '...';
+	return text;
+}
+
+function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
+	var N_needed;
+	if (type == 'sprt') {
+		const A = Math.log(beta / (1.0 - alpha));
+		const B = Math.log((1.0 - beta) / alpha);
+		const target = llr < 0.0 ? A : B;
+		N_needed = N * (target / llr - 1.0);
+	}
+	else {
+		N_needed = N * ((pm / eloe) ** 2 - 1.0);
+	}
+	return Date.now() / 1000 + N_needed * gametimeavg;
+}
+
 function formatDate(unixepoch) {
 	if (!unixepoch) {
 		return ''
@@ -306,12 +326,15 @@ getData(id).then(data => {
 	headers.push(...['TC', 'Commit ID'])
 	shouldUpdate = test.donetime == null;
 
-	if (test.donetime)
-		headers.push('Done Timestamp');
-	else if (test.starttime)
+	if (test.starttime)
 		headers.push('Start Timestamp');
 	else if (test.queuetime)
 		headers.push('Queue Timestamp');
+
+	if (test.donetime)
+		headers.push('Done Timestamp');
+	else
+		headers.push('ETA');
 
 	headers.forEach(text => {
 		const th = document.createElement('th');
@@ -322,15 +345,13 @@ getData(id).then(data => {
 	const row = table.insertRow();
 	row.dataset.id = test.id;
 	desc = row.insertCell();
-	desc.textContent = test.description;
+	desc.textContent = truncate(test.description, 33);
 	type = row.insertCell();
 	type.textContent = test.type;
 	type.style.textAlign = 'center';
 	stat = row.insertCell();
 	stat.textContent = test.status;
 	elo = row.insertCell();
-	console.log('elo');
-	console.log(test.elo);
 	if (test.elo != null) {
 		elo.textContent = test.elo.toFixed(3);
 		if (test.pm != null)
@@ -343,6 +364,7 @@ getData(id).then(data => {
 	pentanomial = row.insertCell();
 	pentanomial.textContent = test.p0 + '-' + test.p1 + '-' + test.p2 + '-' + test.p3 + '-' + test.p4;
 	pentanomial.style.textAlign = 'center';
+	var index = 8;
 	if (test.type == 'sprt') {
 		llr = row.insertCell();
 		if (test.llr != null)
@@ -367,6 +389,7 @@ getData(id).then(data => {
 		elo1 = row.insertCell();
 		elo1.textContent = test.elo1.toFixed(3);
 		elo1.style.textAlign = 'right';
+		index = 13;
 	}
 	else {
 		eloe = row.insertCell();
@@ -379,17 +402,35 @@ getData(id).then(data => {
 	tc.style.textAlign = 'center';
 
 	commit = row.insertCell();
-	commit.textContent = test.commit;
+	commit.textContent = truncate(test.commit, 12);
 	commit.style.textAlign = 'center';
 
-	time = row.insertCell();
-	if (time.donetime)
-		time.textContent = formatDate(test.donetime);
-	else if (test.starttime)
-		time.textContent = formatDate(test.starttime);
-	else if (test.queuetime)
-		time.textContent = formatDate(test.queuetime);
-	time.style.textAlign = 'center';
+	start = row.insertCell();
+	done = row.insertCell();
+	start.style.textAlign = 'center';
+	done.style.textAlign = 'center';
+	const startheader = table.tHead.rows[0].cells[index + 1];
+	const doneheader = table.tHead.rows[0].cells[index + 2];
+	if (test.donetime) {
+		doneheader.textContent = 'Done Timestamp';
+		done.textContent = formatDate(test.donetime);
+	}
+	else {
+		doneheader.textContent = 'ETA';
+		const N = test.t0 + test.t1 + test.t2;
+		if (test.gametimeavg >= 0 && N > 0 && ((test.type == 'elo' && test.pm > 0 && test.eloe > 0) || (test.type == 'sprt' && test.llr != 0)))
+			done.textContent = formatDate(eta(test.type, N, test.alpha, test.beta, test.llr, test.eloe, test.pm, test.gametimeavg));
+		else
+			done.textContent = '';
+	}
+	if (test.starttime) {
+		startheader.textContent = 'Start Timestamp';
+		start.textContent = formatDate(test.starttime);
+	}
+	else if (test.queuetime) {
+		startheader.textContent = 'Queue Timestamp';
+		start.textContent = formatDate(test.queuetime);
+	}
 
 	prepatch.innerHTML = formatPatch(test.patch);
 	preerrorlog.innerHTML = parseEscapeCodes(test.errorlog);
@@ -495,8 +536,6 @@ function updateTable() {
 		const statusCell = table.rows[1].cells[2];
 		statusCell.textContent = test.status;
 		const elo = table.rows[1].cells[3];
-		console.log('elo');
-		console.log(test.elo);
 		if (test.elo != null) {
 			elo.textContent = test.elo.toFixed(3);
 			if (test.pm != null)
@@ -514,20 +553,30 @@ function updateTable() {
 			index = 13;
 		}
 		const commit = table.rows[1].cells[index];
-		commit.textContent = test.commit;
-		const time = table.rows[1].cells[index + 1];
-		const timeheader = table.tHead.rows[0].cells[index + 1];
+		commit.textContent = truncate(test.commit, 12);
+		const start = table.rows[1].cells[index + 1];
+		const done = table.rows[1].cells[index + 2];
+		const startheader = table.tHead.rows[0].cells[index + 1];
+		const doneheader = table.tHead.rows[0].cells[index + 2];
 		if (test.donetime) {
-			timeheader.textContent = 'Done Timestamp';
-			time.textContent = formatDate(test.donetime);
+			doneheader.textContent = 'Done Timestamp';
+			done.textContent = formatDate(test.donetime);
 		}
-		else if (test.starttime) {
-			timeheader.textContent = 'Start Timestamp';
-			time.textContent = formatDate(test.starttime);
+		else {
+			doneheader.textContent = 'ETA';
+			const N = test.t0 + test.t1 + test.t2;
+			if (test.gametimeavg >= 0 && N > 0 && ((test.type == 'elo' && test.pm > 0 && test.eloe > 0) || (test.type == 'sprt' && test.llr != 0)))
+				done.textContent = formatDate(eta(test.type, N, test.alpha, test.beta, test.llr, test.eloe, test.pm, test.gametimeavg));
+			else
+				done.textContent = '';
+		}
+		if (test.starttime) {
+			startheader.textContent = 'Start Timestamp';
+			start.textContent = formatDate(test.starttime);
 		}
 		else if (test.queuetime) {
-			timeheader.textContent = 'Queue Timestamp';
-			time.textContent = formatDate(test.queuetime);
+			startheader.textContent = 'Queue Timestamp';
+			start.textContent = formatDate(test.queuetime);
 		}
 		const button = document.getElementById('actionbutton');
 		if (test.status == 'cancelled')

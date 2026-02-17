@@ -1,5 +1,5 @@
 async function getData() {
-	const response = await fetch('https://jalagaoi.se:2718/test');
+	const response = await fetch('https://jalagaoi.se:2718/test', data={"delta": 1800});
 	const json = await response.json();
 	return await json;
 }
@@ -18,8 +18,26 @@ function formatDate(unixepoch) {
 	return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
 }
 
-const params = new URLSearchParams(window.location.search);
-const testStatus = params.get('status') || 'all';
+function truncate(text, n) {
+	if (text.length > n)
+		return text.substring(0, n - 3) + '...';
+	return text;
+}
+
+function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
+	var N_needed;
+	if (type == 'sprt') {
+		const A = Math.log(beta / (1.0 - alpha));
+		const B = Math.log((1.0 - beta) / alpha);
+		const target = llr < 0.0 ? A : B;
+		console.log(target);
+		N_needed = N * (target / llr - 1.0);
+	}
+	else {
+		N_needed = N * ((pm / eloe) ** 2 - 1.0);
+	}
+	return Date.now() / 1000 + N_needed * gametimeavg;
+}
 
 const table = document.getElementById('testtable');
 table.addEventListener('click', function(event) {
@@ -31,12 +49,7 @@ table.addEventListener('click', function(event) {
 
 const thead = table.createTHead();
 const headerRow = thead.insertRow();
-const headers = ['Description', 'Type', 'Status', 'Elo', 'Trinomial', 'Pentanomial', 'LLR'];
-
-if (testStatus != 'error' && testStatus != 'done' && testStatus != 'cancelled')
-	headers.push(...['Queue Timestamp', 'Start Timestamp']);
-if (testStatus != 'running')
-	headers.push('Done Timestamp');
+const headers = ['Description', 'Type', 'Status', 'Elo', 'Trinomial', 'Pentanomial', 'LLR', 'Queue Timestamp', 'Start Timestamp', 'Done Timestamp'];
 
 headers.forEach(text => {
 	const th = document.createElement('th');
@@ -100,10 +113,7 @@ function drawTable() {
 			row.classList.add('clickable-row');
 			row.dataset.id = test.id;
 			desc = row.cells[0];
-			var description = test.description;
-			if (description.length > 33)
-				description = description.slice(0, 30).trimRight() + "...";
-			desc.textContent = description;
+			desc.textContent = truncate(test.description, 33);
 			type = row.cells[1];
 			type.textContent = test.type;
 			type.style.textAlign = 'center';
@@ -175,12 +185,22 @@ function drawTable() {
 			else
 				start.textContent = '';
 			done = row.cells[9];
+			done.style.textAlign = 'center';
+			done.style.whiteSpace = 'pre';
+			const N = test.t0 + test.t1 + test.t2;
+			if (index == 0) {
+				console.log('N: ' + N);
+				console.log('llr: ' + test.llr);
+			}
 			if (test.donetime) {
 				done.textContent = formatDate(test.donetime);
-				done.style.textAlign = 'center';
 			}
-			else
+			else if (test.gametimeavg >= 0 && N > 0 && ((test.type == 'elo' && test.pm > 0 && test.eloe > 0) || (test.type == 'sprt' && test.llr != 0))) {
+				done.textContent = '      ' + formatDate(eta(test.type, N, test.alpha, test.beta, test.llr, test.eloe, test.pm, test.gametimeavg)) + ' (ETA)';
+			}
+			else {
 				done.textContent = '';
+			}
 		})
 	})
 }
