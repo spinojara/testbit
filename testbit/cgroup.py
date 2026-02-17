@@ -44,12 +44,12 @@ class CPU:
             with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
                 f.write("1\n")
         try:
-            with open("/sys/fs/cgroup/testbit-%d/cgroup.kill", "w") as f:
+            with open("/sys/fs/cgroup/testbit-%d/cgroup.kill" % self.cpu, "w") as f:
                 f.write("1\n")
         except:
             pass
         # TODO: Improve this
-        time.sleep(0.01)
+        # time.sleep(0.01)
         try:
             Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
         except OSError:
