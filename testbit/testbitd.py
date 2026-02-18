@@ -484,7 +484,7 @@ async def test_data(request):
                     elo = ?,
                     pm = ?,
                     donetime = CASE
-                        WHEN ? = "done")
+                        WHEN ? = "done"
                             THEN unixepoch()
                         ELSE NULL
                     END
