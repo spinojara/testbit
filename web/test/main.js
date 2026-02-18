@@ -422,7 +422,7 @@ getData(id).then(data => {
 	}
 	else {
 		doneheader.textContent = 'ETA';
-		const N = test.t0 + test.t1 + test.t2;
+		const N = (test.t0 + test.t1 + test.t2) / 2;
 		if (test.gametimeavg >= 0 && N > 0 && ((test.type == 'elo' && test.pm > 0 && test.eloe > 0) || (test.type == 'sprt' && test.llr != 0)))
 			done.textContent = formatDate(eta(test.type, N, test.alpha, test.beta, test.llr, test.eloe, test.pm, test.gametimeavg));
 		else
@@ -569,7 +569,7 @@ function updateTable() {
 		}
 		else {
 			doneheader.textContent = 'ETA';
-			const N = test.t0 + test.t1 + test.t2;
+			const N = (test.t0 + test.t1 + test.t2) / 2;
 			if (test.gametimeavg >= 0 && N > 0 && ((test.type == 'elo' && test.pm > 0 && test.eloe > 0) || (test.type == 'sprt' && test.llr != 0)))
 				done.textContent = formatDate(eta(test.type, N, test.alpha, test.beta, test.llr, test.eloe, test.pm, test.gametimeavg));
 			else

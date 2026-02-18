@@ -195,7 +195,7 @@ function drawTable() {
 			done = row.cells[9];
 			done.style.textAlign = 'center';
 			done.style.whiteSpace = 'pre';
-			const N = test.t0 + test.t1 + test.t2;
+			const N = (test.t0 + test.t1 + test.t2) / 2;
 			if (index == 0) {
 				console.log('N: ' + N);
 				console.log('llr: ' + test.llr);
