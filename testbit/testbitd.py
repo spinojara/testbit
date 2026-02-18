@@ -825,7 +825,11 @@ async def test_fetch_single(request):
         "gametimeavg": row[30]
     }
 
-    return web.json_response({"message": "ok", "test": test})
+    resp = web.json_response({"message": "ok", "test": test})
+    if not fullnnue:
+        resp.enable_compression()
+
+    return resp
 
 async def test_fetch_all(request):
     delta = -1
