@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--old", type=str, help="old sqlite3 db file", required=True)
     parser.add_argument("--new", type=str, help="new sqlite3 db file", required=True)
     parser.add_argument("--patch-dir", type=str, help="directory containing patches", required=True)
+    parser.add_argument("--nnue-dir", type=str, help="directory containing NNUEs", required=True)
 
     args, _ = parser.parse_known_args()
 
@@ -107,15 +108,22 @@ def main():
             print("bad simd '%s', skipping..." % simd)
             continue
 
+        patch_contents = ""
+        try:
+            path = Path(args.nnue_dir) / (str(id) + ".nnue")
+            if path.is_file() and path.stat().st_size > 0:
+                print("Legacy NNUE patch")
+                patch_contents = "Legacy NNUE patch\n"
+        except:
+            print("No NNUE for id %d" % id)
+            pass
+
         try:
             with open(Path(args.patch_dir) / str(id), "r") as f:
-                patch_contents = f.read()
+                patch_contents += f.read()
         except:
             print("No patch for id %d, skipping..." % id)
             continue
-
-        if not patch_contents:
-            patch_contents = "Legacy NNUE patch"
 
         newcur = new.cursor()
         newcur.execute("""
