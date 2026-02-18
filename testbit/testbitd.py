@@ -17,6 +17,7 @@ import uuid
 import os
 import signal
 from datetime import datetime
+import re
 
 from .tc import validatetc
 from .elo import loglikelihoodratio, calculate_elo
@@ -723,11 +724,15 @@ async def test_fetch_single(request):
         return web.json_response({"message": "bad id"}, status=400)
 
     delta = -1
+    fullnnue = False
     try:
         data = await request.json()
         delta_temp = data.get("delta")
         if isinstance(delta_temp, int):
             delta = delta_temp
+        fullnnue_temp = data.get("fullnnue")
+        if isinstance(fullnnue_temp, bool):
+            fullnnue = fullnnue_temp
     except:
         pass
 
@@ -781,6 +786,9 @@ async def test_fetch_single(request):
     patch = row[28]
     if patch:
         patch = patch.decode("utf-8")
+        # Reduce size of sent patch
+        if not fullnnue:
+            patch = re.sub(r"(?<=\nGIT binary patch\n).*?(?=\ndiff --git |\Z)", "", patch, flags=re.DOTALL)
     errorlog = row[29]
 
     test = {
