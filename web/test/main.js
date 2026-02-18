@@ -63,6 +63,11 @@ function formatPatch(patch) {
 	for (let i = 0; i < patch.length; i++) {
 		var c = patch[i];
 
+		if (i == 0 && patch.substring(0, 18) == 'Legacy NNUE patch\n') {
+			parsedPatch += '<span class=\'magenta\'>';
+			open = true;
+		}
+
 		if (!betweengitdiffandatat && ((i == 0 && patch.substring(0, 11) == 'diff --git ') || patch.substring(i, i + 12) == '\ndiff --git ')) {
 			if (open)
 				parsedPatch += '</span>';
