@@ -46,6 +46,14 @@ table.addEventListener('click', function(event) {
 		window.location.href = `/test?id=${row.dataset.id}`;
 	}
 });
+table.addEventListener('mousedown', function(event) {
+	if (event.button === 1) event.preventDefault();
+});
+table.addEventListener('auxclick', function(event) {
+	const row = event.target.closest('tr');
+	if (row && row.dataset.id && event.button === 1)
+		window.open(`/test?id=${row.dataset.id}`);
+});
 
 const thead = table.createTHead();
 const headerRow = thead.insertRow();
