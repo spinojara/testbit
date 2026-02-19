@@ -23,7 +23,7 @@ def validatetc(tc: str) -> bool:
                     float(increment) > 0
                 )
             except:
-                False
+                return False
         else:
             moves, maintime = tc.split("/", 1)
             try:
@@ -34,7 +34,7 @@ def validatetc(tc: str) -> bool:
                     float(maintime) > 0
                 )
             except:
-                False
+                return False
     else:
         if "+" in tc:
             maintime, increment = tc.split("+", 1)
@@ -46,7 +46,7 @@ def validatetc(tc: str) -> bool:
                     float(increment) > 0
                 )
             except:
-                False
+                return False
         else:
             maintime = tc
             try:
@@ -55,7 +55,7 @@ def validatetc(tc: str) -> bool:
                     float(maintime) > 0
                 )
             except:
-                False
+                return False
 
 def tcadjust(tc: str, tcfactor: float) -> str:
     moves = 0

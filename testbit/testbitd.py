@@ -18,10 +18,12 @@ import os
 import signal
 from datetime import datetime
 import re
+import traceback
 
 from .tc import validatetc
 from .elo import loglikelihoodratio, calculate_elo
 from .spwd import authenticate as spwdauthenticate
+from .exception import log_exception
 
 dbcond = threading.Condition()
 backuplock = threading.Lock()
@@ -76,32 +78,25 @@ def build_docker_images():
     while True:
         with dbcond:
             while not (row := get_next_image_to_build()):
-                print("waiting")
                 dbcond.wait()
-                print("woke up")
-        print(f"got row: {row}")
         id, commit, simd, patch = row
 
-
         tempdir = Path(tempfile.mkdtemp(prefix="testbit-docker-"))
-        print(tempdir)
         patch_path = tempdir / "patch"
         dockerfile = tempdir / "Dockerfile"
-        print(patch_path)
         try:
             with open(patch_path, "wb") as f:
                 f.write(patch)
             with open(dockerfile, "w") as f:
                 f.write(Dockerfile)
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except:
+            log_exception()
             break
 
         build_uuid = str(uuid.uuid4())
 
         error = False
         try:
-            print("building docker image")
             image, build_logs = client.images.build(
                 path=str(tempdir),
                 dockerfile=str(dockerfile),
@@ -123,8 +118,9 @@ def build_docker_images():
                 errorlog += log.get("stream", "")
                 full_logs += log.get("stream", "").strip()
             full_logs += "end"
-        except Exception as e:
-            print(e, file=sys.stderr)
+            log_exception()
+        except:
+            log_exception()
             break
         finally:
             dockerfile.unlink()
@@ -161,11 +157,10 @@ def build_docker_images():
                 con.commit()
             continue
 
-        print("pushing image")
         try:
             client.images.push("jalagaoi.se:5000/testbit", tag=str(id))
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except:
+            log_exception()
             break
 
         with dbcond:
@@ -244,10 +239,11 @@ def create_table():
 async def test_new(request):
     try:
         data = await request.json()
-    except json.JSONDecodeError as e:
-        print(e)
+    except json.JSONDecodeError:
+        log_exception()
         return web.json_response({"message": "invalid json"}, status=400)
-    except Exception as e:
+    except:
+        log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
     patch_contents = data.get("patch")
@@ -361,15 +357,16 @@ async def test_data(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
-    print(request)
     try:
         data = await request.json()
-    except json.JSONDecodeError as e:
-        print(e)
+    except json.JSONDecodeError:
+        log_exception()
         return web.json_response({"message": "invalid json"}, status=400)
-    except Exception:
+    except:
+        log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
     wins = data.get("wins")
@@ -386,7 +383,6 @@ async def test_data(request):
         return web.json_response({"message": "bad draws"}, status=400)
     if wins + draws + losses != 2:
         return web.json_response({"message": "need losses + draws + wins = 2"}, status=400)
-    print(f"received task for {task_uuid}")
     with dbcond:
         cursor = con.cursor()
 
@@ -400,7 +396,6 @@ async def test_data(request):
         """, (wins, draws, losses, task_uuid, id))
         if cursor.rowcount != 1:
             con.rollback()
-            print("bad uuid")
             return web.json_response({"message": "bad uuid"}, status=400)
 
         cursor.execute("""
@@ -423,21 +418,17 @@ async def test_data(request):
         t1 += draws
         t2 += wins
         p[draws + 2 * wins] += 1
-        print(f"got: {t0}-{t1}-{t2} {p[0]}-{p[1]}-{p[2]}-{p[3]}-{p[4]}")
 
         elo, pm = calculate_elo(p)
-        print(f"{elo}+-{pm}")
         status = "running"
         if type == "sprt":
             llr = loglikelihoodratio(p, elo0, elo1)
-            print(f"{llr}")
             A = math.log(beta / (1.0 - alpha))
             B = math.log((1.0 - beta) / alpha)
             if llr < A:
                 status = "H0 accepted"
             elif llr > B:
                 status = "H1 accepted"
-            print("inserting...")
 
             cursor.execute("""
                 UPDATE tests
@@ -492,6 +483,7 @@ async def test_cancel(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
@@ -514,6 +506,7 @@ async def test_resume(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
@@ -532,6 +525,7 @@ async def test_requeue(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
@@ -578,15 +572,16 @@ async def test_error(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
-
-    print("Got error for test %d" % id)
 
     try:
         data = await request.json()
     except json.JSONDecodeError:
+        log_exception()
         return web.json_response({"message": "invalid json"}, status=400)
-    except Exception:
+    except:
+        log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
     errorlog = data.get("errorlog")
@@ -617,13 +612,15 @@ async def test_docker(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
-    print("got docker request")
     try:
         data = await request.json()
     except json.JSONDecodeError:
+        log_exception()
         return web.json_response({"message": "invalid json"}, status=400)
-    except Exception:
+    except:
+        log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
     task_uuid = data.get("uuid")
@@ -647,7 +644,6 @@ async def test_docker(request):
                 AND unixepoch() - buildtime > 300;
         """, (id, ))
         if cursor.rowcount > 0:
-            print("notified")
             dbcond.notify()
         con.commit()
     return web.json_response({"message": "ok"})
@@ -667,7 +663,6 @@ async def backup_database(request):
 
 
 async def get_task(request):
-    print(request)
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
@@ -707,13 +702,13 @@ async def get_task(request):
             );
         """, (task_uuid, id))
         con.commit()
-        print(f"created task for {task_uuid}")
     return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate, "uuid": task_uuid})
 
 async def test_fetch_single(request):
     try:
         id = int(request.match_info.get("id"))
     except:
+        log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
     delta = -1
@@ -938,8 +933,8 @@ async def authenticate(request, handler):
         if not status:
             return web.json_response({"message": message}, status=401)
 
-    except Exception as e:
-        print(e)
+    except:
+        log_exception()
         return web.json_response({"message": "an error occured"}, status=401)
 
     return await handler(request)
@@ -996,7 +991,7 @@ def main() -> int:
     try:
         ctx.load_cert_chain(args.cert_chain, args.cert_key)
     except FileNotFoundError:
-        print("failed to find cert or key file")
+        log_exception()
         return 1
 
     create_table()

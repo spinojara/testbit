@@ -19,14 +19,13 @@ import random
 from .tc import tcadjust
 from .cgroup import CPU
 from . import cgroup
+from .exception import log_exception
 
 container_lock = threading.Lock()
 containers = []
 
 def cleanup_docker():
-    print("cleaning up docker")
     with container_lock:
-        print("clean up aquired lock")
         for container in containers:
             try:
                 container.stop(timeout=0)
@@ -53,10 +52,12 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             response = requests.get(host + "/test/task", auth=("", password), verify=verify)
             response = response.json()
         except json.JSONDecodeError:
+            log_exception()
             sys.exit(1)
-        except Exception as e:
+        except:
             cpu.release()
-            print(str(cpu.cpu) + " " + str(e))
+            log_exception()
+            print(f"{threading.get_ident()}: No connection, sleeping for 1 minute")
             time.sleep(60)
             continue
         id = response.get("id")
@@ -71,11 +72,11 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         if None in [id, tc, adjudicate, task_uuid]:
             cpu.release()
-            print(str(cpu.cpu) + " " + "nothing to do, sleeping...")
+            print(f"{threading.get_ident()}: No task, sleeping for 10 seconds")
             time.sleep(10)
             continue
-        print(str(cpu.cpu) + " " + "got task")
 
+        print(f"{threading.get_ident()}: Got task")
         command="""
             fastchess -testEnv
                       -concurrency 1
@@ -92,7 +93,9 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         else:
             command += " -engine cmd=./bitbit-old name=bitbit-old -engine cmd=./bitbit-new name=bitbit-new"
 
+        print(f"{threading.get_ident()}: Claiming cpu")
         cpu.claim()
+        print(f"{threading.get_ident()}: Running docker container")
         try:
             container = client.containers.run(
                 image="jalagaoi.se:5000/testbit:%d" % id,
@@ -107,6 +110,8 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         except ImageNotFound:
             try:
                 response = requests.put(host + "/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
+            except:
+                log_exception()
             finally:
                 continue
 
@@ -118,20 +123,17 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             container.remove(force=True)
             with container_lock:
                 containers.remove(container)
-        except Exception as e:
-            print(str(cpu.cpu) + " " + str(e))
-            print(str(cpu.cpu) + " " + "exiting...")
+        except:
+            log_exception()
             break
 
-        print(result)
-        print("return code: " + str(result["StatusCode"]))
+        print(f"{threading.get_ident()}: Docker container exited")
 
         losses = 0
         draws = 0
         wins = 0
 
         for line in logs.splitlines():
-            print(str(cpu.cpu) + " " + line)
             if "Finished game " in line:
                 if "(bitbit-new vs bitbit-old)" in line:
                     if " 1-0 " in line:
@@ -150,15 +152,18 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         # We were killed by a signal so just exit here
         if result["StatusCode"] >= 128:
+            print(f"{threading.get_ident()}: Killed by signal {result["statusCode"]}")
             break
 
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
+                print(f"{threading.get_ident()}: Docker container had errors")
                 response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
             else:
+                print(f"{threading.get_ident()}: Docker container had no errors")
                 response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
-        except Exception as e:
-            print(e)
+        except:
+            log_exception()
 
     os.kill(os.getpid(), signal.SIGINT)
 
@@ -171,7 +176,7 @@ def main() -> int:
 
     args, _ = parser.parse_known_args()
     if args.workers < 1 and args.workers != -1:
-        print("--workers must be positive or -1")
+        print("--workers must be positive or -1", file=sys.stderr)
         return 1
 
     if not args.stdin:
@@ -190,7 +195,7 @@ def main() -> int:
     cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
 
     if not cpus:
-        print("Failed to make cpu claiming strategy.")
+        print("Failed to make cpu claiming strategy.", file=sys.stderr)
         return 1
 
     threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor), daemon=True) for cpu in cpus]
@@ -206,11 +211,7 @@ def main() -> int:
     for thread in threads:
         thread.join()
 
-    print("joined all threads")
     return 0
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except:
-        sys.exit(1)
+    sys.exit(main())

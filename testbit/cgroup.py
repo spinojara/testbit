@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import List, Self, Set
 import time
 
+from .exception import log_exception
+
 class CPU:
     cpu: int
     claimed: bool
