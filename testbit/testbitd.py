@@ -961,7 +961,7 @@ async def add_headers(request, handler):
     return response
 
 def create_app():
-    app = web.Application(middlewares=[add_headers, enforce_https, authenticate])
+    app = web.Application(middlewares=[add_headers, enforce_https, authenticate], client_max_size=20 * (1024 ** 2))
 
     app.router.add_post("/test", test_new)
     app.router.add_put("/test/{id}", test_data)
