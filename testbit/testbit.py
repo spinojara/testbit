@@ -54,7 +54,8 @@ def main() -> int:
         args.description = input("Description: ")
 
     try:
-        patch = open(args.patch, "r")
+        with open(args.patch, "r") as f:
+            patch = f.read()
     except FileNotFoundError:
         print("failed to open '%s'" % args.patch)
         return 1
@@ -69,7 +70,7 @@ def main() -> int:
     try:
         response = requests.post(
             url="%s:%d/test" % (args.host, args.port),
-            data={"data": json.dumps({
+            json={
                 "type": args.type,
                 "alpha": args.alpha,
                 "beta": args.beta,
@@ -80,9 +81,9 @@ def main() -> int:
                 "simd": args.simd,
                 "adjudicate": args.adjudicate,
                 "tc": args.tc,
-                "description": args.description
-            })},
-            files={"patch": patch},
+                "description": args.description,
+                "patch": patch
+            },
             auth=("", password),
             verify=verify
         )

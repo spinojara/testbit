@@ -243,24 +243,17 @@ def create_table():
 
 async def test_new(request):
     try:
-        reader = await request.multipart()
-        patch_contents = None
-        data = None
-        async for part in reader:
-            if part.name == "patch":
-                patch_contents = await part.read()
-            elif part.name == "data":
-                data = await part.text()
-                data = json.loads(data)
-    except json.JSONDecodeError:
+        data = await request.json()
+    except json.JSONDecodeError as e:
+        print(e)
         return web.json_response({"message": "invalid json"}, status=400)
-    except Exception:
+    except Exception as e:
         return web.json_response({"message": "no json"}, status=400)
 
-    if not isinstance(data, Dict):
-        return web.json_response({"message": "no data"}, status=400)
-    if not patch_contents:
-        return web.json_response({"message": "no patch"}, status=400)
+    patch_contents = data.get("patch")
+
+    if not isinstance(patch_contents, str) or not patch_contents:
+        return web.json_response({"message": "bad patch"}, status=400)
 
     type = data.get("type")
     if type not in ["elo", "sprt"]:
