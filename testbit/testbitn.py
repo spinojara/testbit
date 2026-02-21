@@ -214,6 +214,7 @@ def main() -> int:
     if args.daemon:
         args.workers = config.getint("testbitn", "workers")
         args.host = config.get("testbitn", "host")
+        args.syzygy = config.get("testbitn", "syzygy", fallback=None)
 
     cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
 
