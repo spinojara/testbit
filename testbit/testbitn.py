@@ -39,13 +39,23 @@ def cleanup_docker():
 def cleanup(cpu: CPU):
     cpu.release()
 
-def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
+def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: str | None):
     client = docker.from_env()
     verify = not host in ["localhost", "127.0.0.1"]
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     host = "https://" + host + ":2718"
 
     rng = random.Random()
+
+    if syzygy:
+        syzygy_paths = syzygy.split(":")
+    else:
+        syzygy_paths = []
+
+    for path in syzygy_paths:
+        if not path.startswith("/"):
+            print(f"syzygy path '{path}' is not absolute.", file=sys.stderr)
+            return
 
     while True:
         try:
@@ -64,6 +74,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         tc = response.get("tc")
         adjudicate = response.get("adjudicate")
         task_uuid = response.get("uuid")
+
         adjudicatestring = ""
         if adjudicate == "draw" or adjudicate == "both":
             adjudicatestring += "-draw movenumber=40 movecount=8 score=10"
@@ -77,31 +88,38 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
             continue
 
         print(f"{threading.get_ident()}: Got task")
-        command="""
+        command=f"""
             fastchess -testEnv
                       -concurrency 1
-                      -each tc=%s proto=uci timemargin=10000 option.Debug=true
+                      -each tc={tcadjust(tc, tcfactor)} proto=uci timemargin=10000 option.Debug=true
                       -rounds 1
                       -games 2
                       -openings format=epd file=./book.epd order=random
                       -repeat
-                      %s
         """
+
+        command += adjudicatestring
+
         # Remove potential bias
         if rng.choice([True, False]):
             command += " -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old"
         else:
             command += " -engine cmd=./bitbit-old name=bitbit-old -engine cmd=./bitbit-new name=bitbit-new"
 
+        if syzygy:
+            command += f" -tb {syzygy} -tbadjudicate BOTH"
+
         print(f"{threading.get_ident()}: Claiming cpu")
         cpu.claim()
         print(f"{threading.get_ident()}: Running docker container")
+        print(f"{threading.get_ident()}: {" ".join(command.split())}")
         try:
             container = client.containers.run(
                 image="jalagaoi.se:5000/testbit:%d" % id,
-                command=command % (tcadjust(tc, tcfactor), adjudicatestring),
+                command=command,
                 detach=True,
                 cgroup_parent="testbit-%d" % cpu.cpu,
+                volumes={path: {"bind": path, "mode": "ro"} for path in syzygy_paths},
             )
 
             with container_lock:
@@ -120,12 +138,16 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
         try:
             result = container.wait()
             logs: str = container.logs().decode("utf-8")
+        except:
+            log_exception()
+            break
+
+        try:
             container.remove(force=True)
             with container_lock:
                 containers.remove(container)
         except:
-            log_exception()
-            break
+            pass
 
         print(f"{threading.get_ident()}: Docker container exited")
 
@@ -152,7 +174,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float):
 
         # We were killed by a signal so just exit here
         if result["StatusCode"] >= 128:
-            print(f"{threading.get_ident()}: Killed by signal {result["statusCode"]}")
+            print(f"{threading.get_ident()}: Killed by signal {result["StatusCode"]}")
             break
 
         try:
@@ -173,6 +195,7 @@ def main() -> int:
     parser.add_argument("--stdin", type=str, help="Read stdin from file.")
     parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="localhost")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
+    parser.add_argument("--syzygy", help="Colon separated list of syzygy tablebases directories.", default=None)
 
     args, _ = parser.parse_known_args()
     if args.workers < 1 and args.workers != -1:
@@ -198,7 +221,7 @@ def main() -> int:
         print("Failed to make cpu claiming strategy.", file=sys.stderr)
         return 1
 
-    threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor), daemon=True) for cpu in cpus]
+    threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor, args.syzygy), daemon=True) for cpu in cpus]
 
     for cpu in cpus:
         atexit.register(cleanup, cpu)

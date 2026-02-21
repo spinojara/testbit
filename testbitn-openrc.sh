@@ -4,7 +4,11 @@ pidfile="/var/run/testbitn.pid"
 name="testbitn"
 description="testbitn - A test server for bitbit."
 command="testbitn"
-command_args="--daemon --stdin /var/lib/bitbit/private/passphrase"
+command_args="
+	--daemon
+	--stdin /var/lib/bitbit/private/passphrase
+	--syzygy /srv/e/chess/syzygy/3-4-5-wdl:/srv/e/chess/syzygy/6-wdl
+"
 output_log="/var/log/testbitn.log"
 error_log="/var/log/testbitn.err"
 supervisor="supervise-daemon"
