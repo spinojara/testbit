@@ -180,7 +180,6 @@ def build_docker_images():
 
     os.kill(os.getpid(), signal.SIGINT)
 
-
 def create_table():
     cursor = con.cursor()
     cursor.execute("""
@@ -1003,8 +1002,10 @@ def main() -> int:
 
     web.run_app(app, host="0.0.0.0", port=args.port, ssl_context=ctx)
 
-    thread.join()
-    con.close()
+    with dbcond:
+        con.close()
+        con = None
+
     return 0
 
 if __name__ == "__main__":

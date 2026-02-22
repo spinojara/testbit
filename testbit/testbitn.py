@@ -23,6 +23,15 @@ from .exception import log_exception
 
 container_lock = threading.Lock()
 containers = []
+cpu_lock = threading.Lock()
+
+running = True
+
+def handle_sigint(signum, frame):
+    with cpu_lock:
+        global running
+        running = False
+    sys.exit(0)
 
 def cleanup_docker():
     with container_lock:
@@ -37,7 +46,8 @@ def cleanup_docker():
                 pass
 
 def cleanup(cpu: CPU):
-    cpu.release()
+    with cpu_lock:
+        cpu.release()
 
 def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: str | None):
     client = docker.from_env()
@@ -65,9 +75,11 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
             log_exception()
             sys.exit(1)
         except:
-            cpu.release()
+            has_critical_exception = cpu.release()
             log_exception()
             print(f"{threading.get_ident()}: No connection, sleeping for 1 minute")
+            if has_critical_exception:
+                break
             time.sleep(60)
             continue
         id = response.get("id")
@@ -82,8 +94,10 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
             adjudicatestring += " -resign twosided=true movecount=3 score=800"
 
         if None in [id, tc, adjudicate, task_uuid]:
-            cpu.release()
+            has_critical_exception = cpu.release()
             print(f"{threading.get_ident()}: No task, sleeping for 10 seconds")
+            if has_critical_exception:
+                break
             time.sleep(10)
             continue
 
@@ -110,7 +124,11 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
             command += f" -tb {syzygy} -tbadjudicate BOTH"
 
         print(f"{threading.get_ident()}: Claiming cpu")
-        cpu.claim()
+        with cpu_lock:
+            if running:
+                cpu.claim()
+            else:
+                break
         print(f"{threading.get_ident()}: Running docker container")
         print(f"{threading.get_ident()}: {" ".join(command.split())}")
         try:
@@ -187,7 +205,10 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
         except:
             log_exception()
 
-    os.kill(os.getpid(), signal.SIGINT)
+    with cpu_lock:
+        if running:
+            print(f"{threading.get_ident()}: Loop exited, sending SIGINT", file=sys.stderr)
+            os.kill(os.getpid(), signal.SIGINT)
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -224,10 +245,11 @@ def main() -> int:
 
     threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor, args.syzygy), daemon=True) for cpu in cpus]
 
+    signal.signal(signal.SIGINT, handle_sigint)
+
+    atexit.register(cleanup_docker)
     for cpu in cpus:
         atexit.register(cleanup, cpu)
-    # Register dockerclean up last, so that it runs first
-    atexit.register(cleanup_docker)
 
     for thread in threads:
         thread.start()

@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import List, Self, Set
 import time
+import sys
 
 from .exception import log_exception
 
@@ -39,25 +40,51 @@ class CPU:
             with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
                 f.write("0\n")
 
-    def release(self: Self):
+    def release(self: Self) -> bool:
         if not self.claimed:
-            return
+            return False
+
+        has_critical_exception = False
         for cpu in self.thread_siblings:
-            with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
-                f.write("1\n")
+            try:
+                with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
+                    f.write("1\n")
+            except:
+                has_critical_exception = True
+                log_exception()
+                print("Failed to turn cpu%d back online" % cpu, file=sys.stderr)
+
+        try:
+            with open("/sys/fs/cgroup/testbit-%d/cpuset.cpus" % self.cpu, "w") as f:
+                f.write("\n")
+        except:
+            has_critical_exception = True
+            log_exception()
+            print("Failed to release cpu%d from cgroup testbit-%d" % (self.cpu, self.cpu), file=sys.stderr)
+
         try:
             with open("/sys/fs/cgroup/testbit-%d/cgroup.kill" % self.cpu, "w") as f:
                 f.write("1\n")
         except:
-            pass
+            has_critical_exception = True
+            log_exception()
+            print("Failed to kill cgroup testbit-%d" % self.cpu, file=sys.stderr)
+
         # TODO: Improve this
         # time.sleep(0.01)
         try:
             Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
         except OSError:
             pass
+        except:
+            has_critical_exception = True
+            log_exception()
+            print("Failed to remove cgroup testbit-%d" % self.cpu, file=sys.stderr)
 
         self.claimed = False
+
+        return has_critical_exception
+
 
 def is_performance(cpu: int) -> bool:
     performance = True
