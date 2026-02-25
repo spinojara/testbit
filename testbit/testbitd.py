@@ -345,7 +345,7 @@ async def test_new(request):
             adjudicate,
             commit,
             simd,
-            patch_contents
+            patch_contents.encode("utf-8")
         ))
         con.commit()
         dbcond.notify()

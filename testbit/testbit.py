@@ -90,8 +90,6 @@ def main() -> int:
     except requests.exceptions.ConnectionError:
         print("Connection to %s:%d refused" % (args.host, args.port))
         return 1
-    finally:
-        patch.close()
 
     if response.status_code == 200:
         return 0
