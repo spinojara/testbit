@@ -129,7 +129,7 @@ def build_docker_images():
 
         full_logs = full_logs.split(build_uuid)
         if isinstance(full_logs, list) and len(full_logs) == 3:
-            newcommit = full_logs[1]
+            newcommit = full_logs[1].strip()
             if len(newcommit) != 40 or not all(c in "0123456789abcdef" for c in newcommit):
                 errorlog = "Commit ID: '%s' is not a SHA-1." % newcommit
                 error = True
