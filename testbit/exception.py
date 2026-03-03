@@ -15,3 +15,7 @@ def log_exception():
         for line in traceback.format_list(combined):
             print(line, file=sys.stderr, end="")
         print(f"{sys.exc_info()[0].__name__}: {sys.exc_info()[1]}", file=sys.stderr)
+
+def log(message: str):
+    with lock:
+        print(f"{datetime.now()}: {message}", file=sys.stdout)

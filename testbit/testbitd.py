@@ -23,7 +23,7 @@ import traceback
 from .tc import validatetc
 from .elo import loglikelihoodratio, calculate_elo
 from .spwd import authenticate as spwdauthenticate
-from .exception import log_exception
+from .exception import log_exception, log
 
 dbcond = threading.Condition()
 backuplock = threading.Lock()
@@ -651,12 +651,16 @@ async def backup_database(request):
     if not backup_directory:
         return web.json_response({"message": "backup directory not set"}, status=400)
 
-
+    log("Got valid backup request")
     with backuplock:
+        log("Aquired backup lock")
         backup_path = Path(backup_directory) / ("bitbit.sqlite3.backup-" + datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
         backupcon = sqlite3.connect(backup_path)
+        log(f"Connected to '{backup_path}'")
         with dbcond:
+            log("Aquired db lock")
             con.backup(backupcon)
+            log("Back up finished")
 
     return web.json_response({"message": "ok"})
 
