@@ -15,6 +15,7 @@ import urllib3
 import os
 import signal
 import random
+import re
 
 from .tc import tcadjust
 from .cgroup import CPU
@@ -49,9 +50,27 @@ def cleanup(cpu: CPU):
     with cpu_lock:
         cpu.release()
 
+def is_private_network(host: str) -> bool:
+    print(host)
+    if host == "localhost":
+        return True
+    match = re.search("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)", host)
+
+    if not match:
+        return False
+
+    a = int(match.group(1))
+    b = int(match.group(2))
+    c = int(match.group(3))
+    d = int(match.group(4))
+
+    return ((a == 10 and 0 <= b and b <= 255 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
+        or (a == 72 and 16 <= b and b <= 31 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
+        or (a == 192 and b == 168 and 0 <= c and c <= 255 and 0 <= d and d <= 255))
+
 def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: str | None):
     client = docker.from_env()
-    verify = not host in ["localhost", "127.0.0.1"]
+    verify = not is_private_network(host)
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     host = "https://" + host + ":2718"
 
@@ -236,6 +255,7 @@ def main() -> int:
         args.workers = config.getint("testbitn", "workers")
         args.host = config.get("testbitn", "host")
         args.syzygy = config.get("testbitn", "syzygy", fallback=None)
+
 
     cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
 
