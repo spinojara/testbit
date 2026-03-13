@@ -39,6 +39,10 @@ function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
 	return Date.now() / 1000 + N_needed * gametimeavg;
 }
 
+function tospsas() {
+	window.location.href = '/spsas';
+}
+
 const table = document.getElementById('testtable');
 table.addEventListener('click', function(event) {
 	const row = event.target.closest('tr');
