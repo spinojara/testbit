@@ -6,15 +6,25 @@ import sys
 import argparse
 import getpass
 import string
+import urllib3
 
 from . import tc
 
+tune_help = """The loss function is evaluated at f(θ+c∙Δ) and f(θ-c∙Δ) where Δ is ±1.
+The gradient is then estimated as f'(θ)≈(f(θ+cΔ)-f(θ-cΔ))/(2cΔ) and a
+step is taken in the direction af'(θ).
+"""
+
 def main() -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("patch", type=str, help="patch path")
-    parser.add_argument("--type", type=str, help="sprt or elo", default="sprt")
-    parser.add_argument("--alpha", type=float, help="alpha", default=0.025)
+    parser.add_argument("--type", type=str, help="sprt, elo or spsa", default="sprt")
+    parser.add_argument("--alpha", type=float, help="alpha", default=None)
     parser.add_argument("--beta", type=float, help="beta", default=0.025)
+    parser.add_argument("--gamma", type=float, help="gamma", default=0.101)
+    parser.add_argument("--A", type=int, help="A", default=100)
+    parser.add_argument("--c", type=float, help="c", default=None)
+    parser.add_argument("--a", type=float, help="a", default=None)
     parser.add_argument("--elo0", type=float, help="elo0", default=0.0)
     parser.add_argument("--elo1", type=float, help="elo1", default=2.0)
     parser.add_argument("--eloe", type=float, help="elo error", default=5.0)
@@ -26,16 +36,48 @@ def main() -> int:
     parser.add_argument("--port", type=int, help="port", default=2718)
     parser.add_argument("--description", type=str, help="description", default="")
     parser.add_argument("--cancel", action="store_true", default=False)
+    parser.add_argument("--tune", type=str, nargs=6, help=tune_help, default=[], action="append", metavar=("NAME", "VALUE", "MIN", "MAX", "A", "C"))
 
     args, _ = parser.parse_known_args()
-    if args.alpha <= 0.0 or args.beta <= 0.0 or args.alpha + args.beta >= 0.5:
-        print("bad alpha or beta")
+
+    if not args.alpha:
+        args.alpha = 0.025 if args.type == "sprt" else 0.602
+
+    if bool(args.tune) != (args.type == "spsa"):
+        print("needs --tune exactly when --type spsa")
         return 1
+
+    spsa = {}
+    if args.type == "spsa":
+        for param in args.tune:
+            if param[0] in spsa:
+                print(f"--tune {param[0]} ... was given twice")
+                return 1
+
+            floats = []
+            for f in param[1:]:
+                try:
+                    floats.append(float(f))
+                except:
+                    print(f"'{f}' is not a float")
+                    return 1
+            spsa[param[0]] = {
+                "theta": floats[0],
+                "min": floats[1],
+                "max": floats[2],
+                "a": floats[3],
+                "c": floats[4],
+            }
+
+    if args.type == "sprt":
+        if args.alpha <= 0.0 or args.beta <= 0.0 or args.alpha + args.beta >= 0.5:
+            print("bad alpha or beta")
+            return 1
     if args.elo0 >= args.elo1:
         print("bad elo0 or elo1")
         return 1
-    if args.type not in ["sprt", "elo"]:
-        print("type must be either sprt or elo")
+    if args.type not in ["sprt", "elo", "spsa"]:
+        print("type must be either sprt, elo or spsa")
         return 1
     if not isinstance(args.commit, str) or not args.commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in args.commit):
         print("commit can't be empty")
@@ -67,6 +109,7 @@ def main() -> int:
 
     password = getpass.getpass("Enter passphrase: ")
 
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     try:
         response = requests.post(
             url="%s:%d/test" % (args.host, args.port),
@@ -74,6 +117,10 @@ def main() -> int:
                 "type": args.type,
                 "alpha": args.alpha,
                 "beta": args.beta,
+                "gamma": args.gamma,
+                "A": args.A,
+                "a": args.a,
+                "c": args.c,
                 "elo0": args.elo0,
                 "elo1": args.elo1,
                 "eloe": args.eloe,
@@ -82,7 +129,8 @@ def main() -> int:
                 "adjudicate": args.adjudicate,
                 "tc": args.tc,
                 "description": args.description,
-                "patch": patch
+                "patch": patch,
+                "spsa": spsa,
             },
             auth=("", password),
             verify=verify

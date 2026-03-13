@@ -51,7 +51,6 @@ def cleanup(cpu: CPU):
         cpu.release()
 
 def is_private_network(host: str) -> bool:
-    print(host)
     if host == "localhost":
         return True
     match = re.search("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)", host)
@@ -68,11 +67,11 @@ def is_private_network(host: str) -> bool:
         or (a == 72 and 16 <= b and b <= 31 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
         or (a == 192 and b == 168 and 0 <= c and c <= 255 and 0 <= d and d <= 255))
 
-def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: str | None):
+def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float, syzygy: str | None):
     client = docker.from_env()
     verify = not is_private_network(host)
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    host = "https://" + host + ":2718"
+    host = f"https://{host}:{port}"
 
     rng = random.Random()
 
@@ -105,6 +104,8 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
         tc = response.get("tc")
         adjudicate = response.get("adjudicate")
         task_uuid = response.get("uuid")
+        argsplus = response.get("argsplus")
+        argsminus = response.get("argsminus")
 
         adjudicatestring = ""
         if adjudicate == "draw" or adjudicate == "both":
@@ -112,7 +113,7 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
         if adjudicate == "resign" or adjudicate == "both":
             adjudicatestring += " -resign twosided=true movecount=3 score=800"
 
-        if None in [id, tc, adjudicate, task_uuid]:
+        if None in [id, tc, adjudicate, task_uuid, argsplus, argsminus]:
             has_critical_exception = cpu.release()
             print(f"{threading.get_ident()}: No task, sleeping for 10 seconds")
             if has_critical_exception:
@@ -135,9 +136,9 @@ def worker(cpu: cgroup.CPU, host: str, password: str, tcfactor: float, syzygy: s
 
         # Remove potential bias
         if rng.choice([True, False]):
-            command += " -engine cmd=./bitbit-new name=bitbit-new -engine cmd=./bitbit-old name=bitbit-old"
+            command += f" -engine cmd=./bitbit-new name=bitbit-new {argsplus} -engine cmd=./bitbit-old name=bitbit-old {argsminus}"
         else:
-            command += " -engine cmd=./bitbit-old name=bitbit-old -engine cmd=./bitbit-new name=bitbit-new"
+            command += f" -engine cmd=./bitbit-old name=bitbit-old {argsminus} -engine cmd=./bitbit-new name=bitbit-new {argsplus}"
 
         if syzygy:
             command += f" -tb {syzygy} -tbadjudicate BOTH"
@@ -235,7 +236,8 @@ def main() -> int:
     parser.add_argument("--stdin", type=str, help="Read stdin from file.")
     parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="localhost")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
-    parser.add_argument("--syzygy", help="Colon separated list of syzygy tablebases directories.", default=None)
+    parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
+    parser.add_argument("--port", type=str, default="2718")
 
     args, _ = parser.parse_known_args()
     if args.workers < 1 and args.workers != -1:
@@ -263,7 +265,7 @@ def main() -> int:
         print("Failed to make cpu claiming strategy.", file=sys.stderr)
         return 1
 
-    threads = [threading.Thread(target=worker, args=(cpu, args.host, password, tcfactor, args.syzygy), daemon=True) for cpu in cpus]
+    threads = [threading.Thread(target=worker, args=(cpu, args.host, args.port, password, tcfactor, args.syzygy), daemon=True) for cpu in cpus]
 
     signal.signal(signal.SIGINT, handle_sigint)
 

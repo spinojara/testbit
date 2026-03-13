@@ -2,6 +2,7 @@
 
 from aiohttp import web
 import threading, sqlite3, json
+import random
 from typing import Dict
 from pathlib import Path
 import tempfile
@@ -53,8 +54,8 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
-    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
     mv bitbit/bitbit bitbit-old && \
     git -C bitbit apply --allow-empty ../patch && \
     make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
@@ -62,12 +63,43 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     rm -rf bitbit patch; } 2>&1
 """
 
+Dockerfile_spsa = """
+FROM alpine:3.23.3
+
+RUN apk add --no-cache make clang lld compiler-rt llvm git curl 2>&1
+
+RUN { curl -L -o fastchess.tar.gz https://github.com/Disservin/fastchess/archive/refs/tags/v1.8.0-alpha.tar.gz && \
+    mkdir fastchess && \
+    tar -xf fastchess.tar.gz -C fastchess --strip-components=1 && \
+    make -C fastchess CXX=clang++ && \
+    make -C fastchess install && \
+    rm -rf fastchess fastchess.tar.gz; } 2>&1
+
+COPY patch patch
+
+ARG COMMIT
+ARG SIMD
+ARG CACHEBUST
+
+RUN { git clone https://github.com/spinojara/bitbit.git && \
+    git -C bitbit checkout "$COMMIT" && \
+    echo "$CACHEBUST" && \
+    git -C bitbit rev-parse HEAD && \
+    echo "$CACHEBUST" && \
+    mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
+    git -C bitbit apply --allow-empty ../patch && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD tunebit && \
+    mv bitbit/tunebit bitbit-new && \
+    ln bitbit-new bitbit-old && \
+    rm -rf bitbit patch; } 2>&1
+"""
+
 def get_next_image_to_build():
     cursor = con.cursor()
     cursor.execute("""
-        SELECT id, commithash, simd, patch
+        SELECT id, commithash, simd, patch, type
         FROM tests
-        WHERE status = "building"
+        WHERE status = 'building'
         ORDER BY queuetime ASC
         LIMIT 1;
     """)
@@ -79,7 +111,7 @@ def build_docker_images():
         with dbcond:
             while not (row := get_next_image_to_build()):
                 dbcond.wait()
-        id, commit, simd, patch = row
+        id, commit, simd, patch, type = row
 
         tempdir = Path(tempfile.mkdtemp(prefix="testbit-docker-"))
         patch_path = tempdir / "patch"
@@ -88,7 +120,7 @@ def build_docker_images():
             with open(patch_path, "wb") as f:
                 f.write(patch)
             with open(dockerfile, "w") as f:
-                f.write(Dockerfile)
+                f.write(Dockerfile_spsa if type == "spsa" else Dockerfile)
         except:
             log_exception()
             break
@@ -143,7 +175,7 @@ def build_docker_images():
                 cursor = con.cursor()
                 cursor.execute("""
                     UPDATE tests
-                    SET status = "error",
+                    SET status = 'error',
                         errorlog = ?,
                         starttime = CASE
                             WHEN starttime IS NULL THEN unixepoch()
@@ -168,17 +200,27 @@ def build_docker_images():
             cursor.execute("""
                 UPDATE tests
                 SET status = CASE
-                        WHEN status != "building" THEN status
-                        WHEN starttime IS NULL THEN "queued"
-                        ELSE "running"
+                        WHEN status != 'building' THEN status
+                        WHEN starttime IS NULL THEN 'queued'
+                        ELSE 'running'
                     END,
                     buildtime = unixepoch(),
                     commithash = ?
-                WHERE id = ? AND status = "building";
+                WHERE id = ? AND status = 'building';
             """, (newcommit, id))
             con.commit()
 
-    os.kill(os.getpid(), signal.SIGINT)
+def cleanup_thread():
+    while True:
+        with dbcond:
+            cursor = con.cursor()
+            cursor.execute("""
+                DELETE FROM games
+                WHERE donetime IS NULL
+                    AND starttime < unixepoch() - 3600;
+            """)
+            con.commit()
+        time.sleep(3600)
 
 def create_table():
     cursor = con.cursor()
@@ -188,10 +230,12 @@ def create_table():
             legacy      INTEGER DEFAULT FALSE,
             description TEXT,
             type        TEXT NOT NULL,
-            status      TEXT DEFAULT "building",
+            status      TEXT DEFAULT 'building',
             tc          TEXT NOT NULL,
             alpha       REAL,
             beta        REAL,
+            gamma       REAL,
+            A           REAL,
             elo0        REAL,
             elo1        REAL,
             eloe        REAL,
@@ -215,6 +259,7 @@ def create_table():
             simd        TEXT NOT NULL,
             patch       BLOB NOT NULL,
             errorlog    TEXT,
+            spsa        TEXT,
             UNIQUE (type, queuetime, patch, commithash)
         );
     """)
@@ -226,12 +271,9 @@ def create_table():
             d         INTEGER,
             l         INTEGER,
             starttime INTEGER NOT NULL,
-            donetime  INTEGER
+            donetime  INTEGER,
+            spsa      TEXT
         );
-    """)
-    cursor.execute("""
-        DELETE FROM games
-        WHERE donetime IS NULL;
     """)
     con.commit()
 
@@ -247,11 +289,11 @@ async def test_new(request):
 
     patch_contents = data.get("patch")
 
-    if not isinstance(patch_contents, str) or not patch_contents:
+    if not isinstance(patch_contents, str):
         return web.json_response({"message": "bad patch"}, status=400)
 
     type = data.get("type")
-    if type not in ["elo", "sprt"]:
+    if type not in ["elo", "sprt", "spsa"]:
         return web.json_response({"message": "bad type"}, status=400)
     tc = data.get("tc")
     if not isinstance(tc, str) or not validatetc(tc):
@@ -260,12 +302,15 @@ async def test_new(request):
     description = data.get("description")
     alpha = data.get("alpha")
     beta = data.get("beta")
+    gamma = data.get("gamma")
+    A = data.get("A")
     elo0 = data.get("elo0")
     elo1 = data.get("elo1")
     eloe = data.get("eloe")
     commit = data.get("commit")
     adjudicate = data.get("adjudicate")
     simd = data.get("simd")
+    spsadata = data.get("spsa")
 
     if not isinstance(description, str) or not description.strip():
         return web.json_response({"message": "bad description"}, status=400)
@@ -284,6 +329,7 @@ async def test_new(request):
         if alpha + beta >= 0.5:
             return web.json_response({"message": "need alpha + beta < 0.5"}, status=400)
         eloe = None
+        spsa = None
     elif type == "elo":
         if not isinstance(eloe, float) or eloe <= 0.0:
             return web.json_response({"message": "bad eloe"}, status=400)
@@ -291,6 +337,51 @@ async def test_new(request):
         beta = None
         elo0 = None
         elo1 = None
+        spsa = None
+    elif type == "spsa":
+        if not isinstance(spsadata, dict) or not spsadata:
+            return web.json_response({"message": "bad spsa"}, status=400)
+        if not isinstance(A, int) or A < 0:
+            return web.json_response({"message": "bad A"}, status=400)
+        if not isinstance(alpha, float) or alpha <= 0.0:
+            return web.json_response({"message": "bad alpha"}, status=400)
+        if not isinstance(gamma, float) or gamma <= 0.0:
+            return web.json_response({"message": "bad gamma"}, status=400)
+
+        beta = None
+        elo0 = None
+        elo1 = None
+        eloe = None
+
+        spsa = {}
+        for name, param in spsadata.items():
+            theta = param.get("theta")
+            min = param.get("min")
+            max = param.get("max")
+            a = param.get("a")
+            c = param.get("c")
+            if not isinstance(name, str) or not name:
+                return web.json_response({"message": "bad spsa.param.name"}, status=400)
+            if not isinstance(theta, float):
+                return web.json_response({"message": "bad spsa.param.theta"}, status=400)
+            if not isinstance(min, float):
+                return web.json_response({"message": "bad spsa.param.min"}, status=400)
+            if not isinstance(max, float):
+                return web.json_response({"message": "bad spsa.param.max"}, status=400)
+            if theta < min or theta > max:
+                return web.json_response({"message": "need spsa.param.min <= spsa.param.theta <= spsa.param.max"}, status=400)
+            if not isinstance(a, float) or a <= 0.0:
+                return web.json_response({"message": "bad spsa.param.a"}, status=400)
+            if not isinstance(c, float) or c <= 0.0:
+                return web.json_response({"message": "bad spsa.param.c"}, status=400)
+
+            spsa[name] = {
+                "theta": theta,
+                "min": min,
+                "max": max,
+                "a": a,
+                "c": c,
+            }
 
     if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in commit):
         return web.json_response({"message": "no commit"}, status=400)
@@ -309,6 +400,8 @@ async def test_new(request):
                 tc,
                 alpha,
                 beta,
+                gamma,
+                A,
                 elo0,
                 elo1,
                 eloe,
@@ -316,9 +409,12 @@ async def test_new(request):
                 queuetime,
                 commithash,
                 simd,
-                patch
+                patch,
+                spsa
             )
             VALUES (
+                ?,
+                ?,
                 ?,
                 ?,
                 ?,
@@ -331,7 +427,8 @@ async def test_new(request):
                 unixepoch(),
                 ?,
                 ?,
-                ?
+                ?,
+                json(?)
             );
         """, (
             description,
@@ -339,13 +436,16 @@ async def test_new(request):
             tc,
             alpha,
             beta,
+            gamma,
+            A,
             elo0,
             elo1,
             eloe,
             adjudicate,
             commit,
             simd,
-            patch_contents.encode("utf-8")
+            patch_contents.encode("utf-8"),
+            json.dumps(spsa)
         ))
         con.commit()
         dbcond.notify()
@@ -391,27 +491,32 @@ async def test_data(request):
                 d = ?,
                 l = ?,
                 donetime = unixepoch()
-            WHERE id = ? AND testid = ? AND donetime IS NULL;
+            WHERE id = ? AND testid = ? AND donetime IS NULL
+            RETURNING spsa;
         """, (wins, draws, losses, task_uuid, id))
-        if cursor.rowcount != 1:
+
+        row = cursor.fetchone()
+        if not row:
             con.rollback()
             return web.json_response({"message": "bad uuid"}, status=400)
 
+        spsaargs = row[0]
+
         cursor.execute("""
-            SELECT type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1
+            SELECT type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1, spsa
             FROM tests
             WHERE id = ? AND (
-                status = "running"
-                OR (status = "building" AND starttime IS NOT NULL)
+                status = 'running'
+                OR (status = 'building' AND starttime IS NOT NULL)
             );
         """, (id, ))
         row = cursor.fetchone()
 
         if not row:
             # It could be that this id was already set to done.
-            return web.json_response({"message": "ok"}, status=400)
+            return web.json_response({"message": "ok"})
 
-        type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1 = row
+        type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1, spsa = row
         p = [p0, p1, p2, p3, p4]
         t0 += losses
         t1 += draws
@@ -450,6 +555,45 @@ async def test_data(request):
                     END
                 WHERE id = ?;
             """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], status, llr, elo, pm, status, id))
+        elif type == "spsa":
+            spsa = json.loads(spsa)
+            spsaargs = json.loads(spsaargs)
+            dy = wins - losses
+
+            if spsa.keys() != spsaargs.keys():
+                print("error: expected equal spsa keys", file=sys.stderr)
+                return web.json_response({"message": "internal error"}, status=400)
+
+            for name, param in spsa.items():
+                spsaarg = spsaargs.get(name)
+                Delta = spsaarg.get("Delta")
+                ck = spsaarg.get("ck")
+                ak = spsaarg.get("ak")
+                theta = param.get("theta")
+                param["theta"] = min(max(theta + ak * dy / (2 * ck * Delta), param.get("min")), param.get("max"))
+
+                spsaargs[name] = theta # theta before update
+
+            cursor.execute("""
+                UPDATE tests
+                SET t0 = ?,
+                    t1 = ?,
+                    t2 = ?,
+                    p0 = ?,
+                    p1 = ?,
+                    p2 = ?,
+                    p3 = ?,
+                    p4 = ?,
+                    spsa = json(?)
+                WHERE id = ?;
+            """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], json.dumps(spsa), id))
+
+            cursor.execute("""
+                UPDATE games
+                SET spsa = json(?)
+                WHERE id = ? AND testid = ?;
+            """, (json.dumps(spsaargs) if dy else None, task_uuid, id))
+
         else:
             if pm is not None and pm < eloe:
                 status = "done"
@@ -468,7 +612,7 @@ async def test_data(request):
                     elo = ?,
                     pm = ?,
                     donetime = CASE
-                        WHEN ? = "done"
+                        WHEN ? = 'done'
                             THEN unixepoch()
                         ELSE NULL
                     END
@@ -489,13 +633,13 @@ async def test_cancel(request):
         cursor = con.cursor()
         cursor.execute("""
             UPDATE tests
-            SET status = "cancelled",
+            SET status = 'cancelled',
                 starttime = CASE
                     WHEN starttime IS NULL THEN unixepoch()
                     ELSE starttime
                 END,
                 donetime = unixepoch()
-            WHERE status IN ("running", "building", "queued")
+            WHERE status IN ('running', 'building', 'queued')
                 AND id = ?;
         """, (id, ))
         con.commit()
@@ -512,9 +656,9 @@ async def test_resume(request):
         cursor = con.cursor()
         cursor.execute("""
             UPDATE tests
-            SET status = "running",
+            SET status = 'running',
                 donetime = NULL
-            WHERE status = "cancelled"
+            WHERE status = 'cancelled'
                 AND id = ?;
         """, (id, ))
         con.commit()
@@ -546,7 +690,7 @@ async def test_requeue(request):
                 patch
             )
             SELECT
-                concat(description, " (requeue)"),
+                concat(description, ' (requeue)'),
                 type,
                 tc,
                 alpha,
@@ -601,8 +745,8 @@ async def test_error(request):
             return web.json_response({"message": "bad uuid"}, status=400)
         cursor.execute("""
             UPDATE tests
-            SET status = "error", errorlog = ?
-            WHERE status IN ("running", "building") AND id = ?;
+            SET status = 'error', errorlog = ?
+            WHERE status IN ('running', 'building') AND id = ?;
         """, (errorlog, id))
         con.commit()
     return web.json_response({"message": "ok"})
@@ -637,8 +781,8 @@ async def test_docker(request):
             return web.json_response({"message": "bad uuid"}, status=400)
         cursor.execute("""
             UPDATE tests
-            SET status = "building"
-            WHERE status = "running"
+            SET status = 'building'
+            WHERE status = 'running'
                 AND id = ?
                 AND unixepoch() - buildtime > 300;
         """, (id, ))
@@ -672,40 +816,77 @@ async def get_task(request):
             UPDATE tests
                 SET
                     starttime = CASE
-                        WHEN status = "queued" THEN unixepoch()
+                        WHEN status = 'queued' THEN unixepoch()
                         ELSE starttime
                     END,
-                    status = "running"
+                    status = 'running'
             WHERE id = (
                 SELECT id FROM tests
-                WHERE status IN ("running", "queued")
+                WHERE status IN ('running', 'queued')
                 ORDER BY queuetime ASC
                 LIMIT 1
             )
-            RETURNING id, tc, adjudicate;
+            RETURNING id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2;
         """)
         row = cursor.fetchone()
 
         if not row:
-            return web.json_response({"id": None, "tc": None, "adjudicate": None})
+            return web.json_response({"id": None})
 
-        id, tc, adjudicate = row
+        id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2 = row
+        spsa = json.loads(spsa)
+        spsaargs = {}
+        k = (t0 + t1 + t2) // 2
+        argsplus = ""
+        argsminus = ""
+        if type == "spsa":
+            for name, param in spsa.items():
+                a = param.get("a")
+                c = param.get("c")
+                theta = param.get("theta")
+                _min = param.get("min")
+                _max = param.get("max")
+
+                Delta = random.choice([-1, 1])
+                ak = a / (A + k + 1) ** alpha
+                ck = c / (A + k + 1) ** gamma
+
+                thetaplus = min(max(theta + ck * Delta, _min), _max)
+                thetaminus = min(max(theta - ck * Delta, _min), _max)
+
+                argsplus += f" option.{name}={thetaplus}"
+                argsminus += f" option.{name}={thetaminus}"
+                spsaargs[name] = {
+                    "ak": ak,
+                    "ck": ck,
+                    "Delta": Delta,
+                }
+
         task_uuid = str(uuid.uuid4())
         cursor = con.cursor()
         cursor.execute("""
             INSERT INTO games (
                 id,
                 testid,
-                starttime
+                starttime,
+                spsa
             )
             VALUES (
                 ?,
                 ?,
-                unixepoch()
+                unixepoch(),
+                json(?)
             );
-        """, (task_uuid, id))
+        """, (task_uuid, id, json.dumps(spsaargs)))
         con.commit()
-    return web.json_response({"id": id, "tc": tc, "adjudicate": adjudicate, "uuid": task_uuid})
+    return web.json_response({
+        "id": id,
+        "tc": tc,
+        "adjudicate": adjudicate,
+        "uuid": task_uuid,
+        "argsplus": argsplus,
+        "argsminus": argsminus
+    })
 
 async def test_fetch_single(request):
     try:
@@ -766,7 +947,7 @@ async def test_fetch_single(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.id = ?
+        WHERE tests.id = ? AND tests.type != 'spsa'
         GROUP BY tests.id;
     """, (delta, delta, id))
 
@@ -869,50 +1050,194 @@ async def test_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
+        WHERE tests.type != 'spsa'
         GROUP BY tests.id;
     """, (delta, delta))
 
-    tests = []
-
-    for row in cursor.fetchall():
-        tests.append({
-            "id": row[0],
-            "legacy": bool(row[1]),
-            "description": row[2],
-            "type": row[3],
-            "status": row[4],
-            "tc": row[5],
-            "alpha": row[6],
-            "beta": row[7],
-            "elo0": row[8],
-            "elo1": row[9],
-            "eloe": row[10],
-            "adjudicate": row[11],
-            "queuetime": row[12],
-            "starttime": row[13],
-            "donetime": row[14],
-            "elo": row[15],
-            "pm": row[16],
-            "llr": row[17],
-            "t0": row[18],
-            "t1": row[19],
-            "t2": row[20],
-            "p0": row[21],
-            "p1": row[22],
-            "p2": row[23],
-            "p3": row[24],
-            "p4": row[25],
-            "commithash": row[26],
-            "simd": row[27],
-            "gametimeavg": row[28]
-        })
+    tests = [{
+        "id": row[0],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "type": row[3],
+        "status": row[4],
+        "tc": row[5],
+        "alpha": row[6],
+        "beta": row[7],
+        "elo0": row[8],
+        "elo1": row[9],
+        "eloe": row[10],
+        "adjudicate": row[11],
+        "queuetime": row[12],
+        "starttime": row[13],
+        "donetime": row[14],
+        "elo": row[15],
+        "pm": row[16],
+        "llr": row[17],
+        "t0": row[18],
+        "t1": row[19],
+        "t2": row[20],
+        "p0": row[21],
+        "p1": row[22],
+        "p2": row[23],
+        "p3": row[24],
+        "p4": row[25],
+        "commithash": row[26],
+        "simd": row[27],
+        "gametimeavg": row[28]
+    } for row in cursor.fetchall()]
 
     return web.json_response({"message": "ok", "tests": tests})
 
+async def spsa_fetch_all(request):
+    delta = -1
+    try:
+        data = await request.json()
+        delta_temp = data.get("delta")
+        if isinstance(delta_temp, int):
+            delta = delta_temp
+    except:
+        pass
+
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.type,
+            tests.status,
+            tests.tc,
+            tests.alpha,
+            tests.gamma,
+            tests.A,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.commithash,
+            tests.simd,
+            (tests.t0 + tests.t1 + tests.t2) / 2
+        FROM tests
+        WHERE tests.type = 'spsa';
+    """)
+
+    tests = [{
+        "id": row[0],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "type": row[3],
+        "status": row[4],
+        "tc": row[5],
+        "alpha": row[6],
+        "gamma": row[7],
+        "A": row[8],
+        "adjudicate": row[9],
+        "queuetime": row[10],
+        "starttime": row[11],
+        "donetime": row[12],
+        "commithash": row[13],
+        "simd": row[14],
+        "N": row[15],
+    } for row in cursor.fetchall()]
+
+    return web.json_response({"message": "ok", "tests": tests})
+
+async def spsa_fetch_single(request):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
+        log_exception()
+        return web.json_response({"message": "bad id"}, status=400)
+
+    delta = -1
+    fullnnue = False
+    try:
+        data = await request.json()
+        delta_temp = data.get("delta")
+        if isinstance(delta_temp, int):
+            delta = delta_temp
+        fullnnue_temp = data.get("fullnnue")
+        if isinstance(fullnnue_temp, bool):
+            fullnnue = fullnnue_temp
+    except:
+        pass
+
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.status,
+            tests.tc,
+            tests.alpha,
+            tests.gamma,
+            tests.A,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.commithash,
+            tests.simd,
+            tests.patch,
+            tests.errorlog,
+            tests.spsa,
+            (tests.t0 + tests.t1 + tests.t2) / 2,
+            (
+                SELECT json_group_array(json(spsa))
+                FROM games
+                WHERE games.testid = tests.id
+                    AND games.donetime IS NOT NULL
+                    AND games.spsa IS NOT NULL
+                ORDER BY donetime ASC
+            )
+        FROM tests
+        WHERE tests.id = ? AND tests.type = 'spsa';
+    """, (id, ))
+
+    row = cursor.fetchone()
+    if not row:
+        return web.json_response({"message": "bad id"}, status=400)
+
+    patch = row[14]
+    if patch:
+        patch = patch.decode("utf-8")
+        # Reduce size of sent patch
+        if not fullnnue:
+            patch = re.sub(r"(?<=\nGIT binary patch\n).*?(?=\ndiff --git |\Z)", "", patch, flags=re.DOTALL)
+    errorlog = row[15]
+
+    test = {
+        "id": row[0],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "status": row[3],
+        "tc": row[4],
+        "alpha": row[5],
+        "gamma": row[6],
+        "A": row[7],
+        "adjudicate": row[8],
+        "queuetime": row[9],
+        "starttime": row[10],
+        "donetime": row[11],
+        "commit": row[12],
+        "simd": row[13],
+        "patch": patch,
+        "errorlog": errorlog,
+        "spsa": json.loads(row[16]),
+        "N": row[17],
+        "spsahistory": json.loads(row[18]),
+    }
+
+    resp = web.json_response({"message": "ok", "test": test})
+    if not fullnnue:
+        resp.enable_compression()
+
+    return resp
 @web.middleware
 async def enforce_https(request, handler):
     if request.scheme != "https":
-        return web.json_response({"message": "use https"})
+        return web.json_response({"message": "use https"}, status=400)
     return await handler(request)
 
 @web.middleware
@@ -971,6 +1296,8 @@ def create_app():
     app.router.add_get("/test/task", get_task)
     app.router.add_get("/test/{id}", test_fetch_single)
     app.router.add_get("/test", test_fetch_all)
+    app.router.add_get("/spsa/{id}", spsa_fetch_single)
+    app.router.add_get("/spsa", spsa_fetch_all)
     app.router.add_post("/test/backup", backup_database)
 
     return app
@@ -1000,7 +1327,9 @@ def main() -> int:
     create_table()
 
     thread = threading.Thread(target=build_docker_images, daemon=True)
+    thread_cleanup = threading.Thread(target=cleanup_thread, daemon=True)
     thread.start()
+    thread_cleanup.start()
 
     app = create_app()
 
