@@ -11,7 +11,7 @@ supervisor="supervise-daemon"
 retry="SIGINT/5"
 
 depend() {
-	need net docker
+	need net docker dns
 	use testbitd
 }
 

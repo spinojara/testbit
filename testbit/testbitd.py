@@ -194,7 +194,8 @@ def build_docker_images():
             client.images.push("jalagaoi.se:5000/testbit", tag=str(id))
         except:
             log_exception()
-            break
+            # Maybe the registry service is not available yet?
+            continue
 
         with dbcond:
             cursor = con.cursor()

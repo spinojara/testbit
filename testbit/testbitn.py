@@ -170,6 +170,11 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
                 log_exception()
             finally:
                 continue
+        except:
+            # Maybe the registry service is not available yet?
+            log_exception()
+            time.sleep(60)
+            continue
 
         # If this fails it's probably because the container was killed
         # by cleanup_docker, so let's just exit
