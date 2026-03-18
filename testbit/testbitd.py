@@ -262,6 +262,7 @@ def create_table():
             patch       BLOB NOT NULL,
             errorlog    TEXT,
             spsa        TEXT,
+            priority    INTEGER DEFAULT 0,
             UNIQUE (type, queuetime, patch, commithash)
         );
     """)
@@ -278,6 +279,34 @@ def create_table():
         );
     """)
     con.commit()
+    cursor.execute("""
+        UPDATE tests
+            SET
+                starttime = CASE
+                    WHEN status = 'queued' THEN unixepoch()
+                    ELSE starttime
+                END,
+                status = 'running'
+        WHERE id = (
+            SELECT id FROM tests
+            WHERE status IN ('running', 'queued')
+            ORDER BY
+                priority DESC,
+                ifnull(
+                    (
+                        SELECT max(starttime)
+                        FROM games
+                        WHERE games.testid = tests.id
+                    ),
+                    0
+                ) ASC,
+                queuetime ASC
+            LIMIT 1
+        )
+        RETURNING id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2;
+    """)
+    row = cursor.fetchone()
+    print(row)
 
 async def test_new(request):
     try:
@@ -825,7 +854,17 @@ async def get_task(request):
             WHERE id = (
                 SELECT id FROM tests
                 WHERE status IN ('running', 'queued')
-                ORDER BY queuetime ASC
+                ORDER BY
+                    priority DESC,
+                    ifnull(
+                        (
+                            SELECT max(starttime)
+                            FROM games
+                            WHERE games.testid = tests.id
+                        ),
+                        0
+                    ) ASC,
+                    queuetime ASC
                 LIMIT 1
             )
             RETURNING id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2;
