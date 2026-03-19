@@ -655,7 +655,7 @@ function updateTable() {
 				ak.textContent = akval.toFixed(7);
 				ak.style.textAlign = 'right';
 
-				const ckval = (param.c / ((test.N + 1) ** test.gamma))
+				const ckval = (param.c / ((test.A + test.N + 1) ** test.gamma))
 				const ck = row.cells[7];
 				ck.textContent = ckval.toFixed(7);
 				ck.style.textAlign = 'right';
