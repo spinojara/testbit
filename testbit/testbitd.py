@@ -1157,10 +1157,16 @@ async def spsa_fetch_all(request):
             tests.donetime,
             tests.commithash,
             tests.simd,
-            (tests.t0 + tests.t1 + tests.t2) / 2
+            (tests.t0 + tests.t1 + tests.t2) / 2,
+            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
         FROM tests
-        WHERE tests.type = 'spsa';
-    """)
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND (? < 0 OR unixepoch() - ? <= games.donetime)
+        WHERE tests.type = 'spsa'
+        GROUP BY tests.id;
+    """, (delta, delta))
 
     tests = [{
         "id": row[0],
@@ -1179,6 +1185,7 @@ async def spsa_fetch_all(request):
         "commithash": row[13],
         "simd": row[14],
         "N": row[15],
+        "gametimeavg": row[16],
     } for row in cursor.fetchall()]
 
     return web.json_response({"message": "ok", "tests": tests})
@@ -1231,10 +1238,16 @@ async def spsa_fetch_single(request):
                     AND games.donetime IS NOT NULL
                     AND games.spsa IS NOT NULL
                 ORDER BY donetime ASC
-            )
+            ),
+            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
         FROM tests
-        WHERE tests.id = ? AND tests.type = 'spsa';
-    """, (id, ))
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND (? < 0 OR unixepoch() - ? <= games.donetime)
+        WHERE tests.id = ? AND tests.type = 'spsa'
+        GROUP BY tests.id;
+    """, (delta, delta, id))
 
     row = cursor.fetchone()
     if not row:
@@ -1268,6 +1281,7 @@ async def spsa_fetch_single(request):
         "spsa": json.loads(row[16]),
         "N": row[17],
         "spsahistory": json.loads(row[18]),
+        "gametimeavg": row[19],
     }
 
     resp = web.json_response({"message": "ok", "test": test})
