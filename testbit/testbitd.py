@@ -218,8 +218,15 @@ def cleanup_thread():
             cursor = con.cursor()
             cursor.execute("""
                 DELETE FROM games
-                WHERE donetime IS NULL
-                    AND starttime < unixepoch() - 3600;
+                WHERE
+                    (
+                        donetime IS NULL
+                        AND starttime < unixepoch() - 3600
+                    ) OR (
+                        donetime IS NOT NULL
+                        AND donetime < unixepoch() - 604800
+                        AND spsa IS NULL
+                    );
             """)
             con.commit()
         time.sleep(3600)
