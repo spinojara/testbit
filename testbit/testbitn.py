@@ -67,6 +67,10 @@ def is_private_network(host: str) -> bool:
         or (a == 72 and 16 <= b and b <= 31 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
         or (a == 192 and b == 168 and 0 <= c and c <= 255 and 0 <= d and d <= 255))
 
+def uptime():
+    with open("/proc/uptime", "r") as f:
+        return float(f.readline().split()[0])
+
 def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float, syzygy: str | None):
     client = docker.from_env()
     verify = not is_private_network(host)
@@ -263,6 +267,10 @@ def main() -> int:
         args.host = config.get("testbitn", "host")
         args.syzygy = config.get("testbitn", "syzygy", fallback=None)
 
+    delay = 180 - uptime()
+    if delay > 0:
+        print("Sleeping for %d to delay startup" % (delay), file=sys.stderr)
+        time.sleep(delay)
 
     cpus = cgroup.make_cpu_claiming_strategy(cgroup.cpuset_cpus_effective(), args.workers)
 
