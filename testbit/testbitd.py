@@ -1374,12 +1374,14 @@ def main() -> int:
     global con
     con = sqlite3.connect(args.db, check_same_thread=False)
 
-    ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-    try:
-        ctx.load_cert_chain(args.cert_chain, args.cert_key)
-    except FileNotFoundError:
-        log_exception()
-        return 1
+    ctx = None
+    if args.cert_chain and args.cert_key:
+        ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+        try:
+            ctx.load_cert_chain(args.cert_chain, args.cert_key)
+        except FileNotFoundError:
+            log_exception()
+            return 1
 
     create_table()
 
