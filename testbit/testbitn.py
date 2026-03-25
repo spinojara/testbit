@@ -91,7 +91,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
 
     while True:
         try:
-            response = requests.get(host + "/test/task", auth=("", password), verify=verify)
+            response = requests.get(host + "/testbit/test/task", auth=("", password), verify=verify)
             response = response.json()
         except json.JSONDecodeError:
             log_exception()
@@ -169,7 +169,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
 
         except ImageNotFound:
             try:
-                response = requests.put(host + "/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + "/testbit/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
             except:
                 log_exception()
             finally:
@@ -227,10 +227,10 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
                 print(f"{threading.get_ident()}: Docker container had errors")
-                response = requests.put(host + "/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + "/testbit/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
             else:
                 print(f"{threading.get_ident()}: Docker container had no errors")
-                response = requests.put(host + "/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + "/testbit/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
         except:
             log_exception()
 
@@ -246,7 +246,7 @@ def main() -> int:
     parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="localhost")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
     parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
-    parser.add_argument("--port", type=str, default="2718")
+    parser.add_argument("--port", type=str, default="443")
 
     args, _ = parser.parse_known_args()
     if args.workers < 1 and args.workers != -1:

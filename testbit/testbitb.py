@@ -22,7 +22,7 @@ def main() -> int:
         with open(args.stdin, "r") as f:
             password = f.read().split("\n")[0]
 
-    response = requests.post("https://localhost:2718/test/backup", auth=("", password), verify=False)
+    response = requests.post("http://localhost:2718/test/backup", auth=("", password), verify=False)
     response = response.json()
     if response.get("message", "") != "ok":
         return 1
