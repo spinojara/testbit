@@ -1296,11 +1296,6 @@ async def spsa_fetch_single(request):
         resp.enable_compression()
 
     return resp
-@web.middleware
-async def enforce_https(request, handler):
-    if request.scheme != "https":
-        return web.json_response({"message": "use https"}, status=400)
-    return await handler(request)
 
 @web.middleware
 async def authenticate(request, handler):
@@ -1346,7 +1341,7 @@ async def add_headers(request, handler):
     return response
 
 def create_app():
-    app = web.Application(middlewares=[add_headers, enforce_https, authenticate], client_max_size=20 * (1024 ** 2))
+    app = web.Application(middlewares=[add_headers, authenticate], client_max_size=20 * (1024 ** 2))
 
     app.router.add_post("/test", test_new)
     app.router.add_put("/test/{id}", test_data)
