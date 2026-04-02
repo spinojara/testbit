@@ -243,6 +243,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, help="Amount of workers.", default=-1)
     parser.add_argument("--stdin", type=str, help="Read stdin from file.")
+    parser.add_argument("--stdout", type=str, help="Redicret stdout to file.", default=None)
+    parser.add_argument("--stderr", type=str, help="Redicret stderr to file.", default=None)
     parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="localhost")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
     parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
@@ -252,6 +254,12 @@ def main() -> int:
     if args.workers < 1 and args.workers != -1:
         print("--workers must be positive or -1", file=sys.stderr)
         return 1
+
+    if args.stdout:
+        sys.stdout = open(args.stdout, "a", buffering=1)
+
+    if args.stderr:
+        sys.stderr = open(args.stderr, "a", buffering=1)
 
     if not args.stdin:
         password = getpass.getpass("Enter passphrase: ")

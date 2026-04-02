@@ -1366,10 +1366,17 @@ def main() -> int:
     parser.add_argument("--cert-key", type=str, help="SSL certificate key", default="")
     parser.add_argument("--db", type=str, help="sqlite3 db path", default=None)
     parser.add_argument("--db-backup", type=str, help="sqlite3 db backup directory", default=None)
+    parser.add_argument("--stdout", type=str, help="redirect stdout and append to file", default=None)
+    parser.add_argument("--stderr", type=str, help="redirect stderr and append to file", default=None)
 
     args, _ = parser.parse_known_args()
     global backup_directory
     backup_directory = args.db_backup
+
+    if args.stdout:
+        sys.stdout = open(args.stdout, "a", buffering=1)
+    if args.stderr:
+        sys.stderr = open(args.stderr, "a", buffering=1)
 
     global con
     con = sqlite3.connect(args.db, check_same_thread=False)
