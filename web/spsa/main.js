@@ -1,5 +1,5 @@
 async function getData(id) {
-	const response = await fetch(`https://jalagaoi.se:2718/spsa/${id}`);
+	const response = await fetch(`https://jalagaoi.se/testbit/spsa/${id}`);
 	const json = await response.json();
 	return await json;
 }
@@ -567,7 +567,7 @@ function continuerequest() {
 	const credentials = btoa(':' + password);
 
 	const button = document.getElementById('actionbutton');
-	var endpoint = 'https://jalagaoi.se:2718/test/';
+	var endpoint = 'https://jalagaoi.se/testbit/test/';
 	switch (button.textContent) {
 	case 'Resume':
 		endpoint += 'resume/';

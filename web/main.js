@@ -1,5 +1,5 @@
 async function getData() {
-	const response = await fetch('https://jalagaoi.se:2718/test', data={"delta": 1800});
+	const response = await fetch('https://jalagaoi.se/testbit/test', data={"delta": 1800});
 	const json = await response.json();
 	return await json;
 }

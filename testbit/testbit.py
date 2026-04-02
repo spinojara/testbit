@@ -104,8 +104,8 @@ def main() -> int:
 
     verify = not args.host in ["localhost", "127.0.0.1"]
 
-    if not args.host.startswith("https://"):
-        args.host = "https://" + args.host
+    if not args.host.startswith("http://") and not args.host.startswith("https://"):
+        args.host = "http://" + args.host
 
     password = getpass.getpass("Enter passphrase: ")
 

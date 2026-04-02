@@ -1,5 +1,5 @@
 async function getData() {
-	const response = await fetch('https://jalagaoi.se:2718/spsa');
+	const response = await fetch('https://jalagaoi.se/testbit/spsa');
 	const json = await response.json();
 	return await json;
 }
