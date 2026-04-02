@@ -7,7 +7,7 @@ import docker
 import atexit
 import sys
 import threading
-from docker.errors import ImageNotFound
+from docker.errors import ImageNotFound, NotFound
 import argparse
 import getpass
 import configparser
@@ -174,7 +174,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
             with container_lock:
                 containers.append(container)
 
-        except ImageNotFound:
+        except (ImageNotFound, NotFound):
             try:
                 response = requests.put(host + "/testbit/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
             except:
