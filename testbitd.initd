@@ -5,11 +5,10 @@ name="testbitd"
 description="testbitd - A test server for bitbit."
 command="testbitd"
 command_args="--db /var/lib/bitbit/bitbit.sqlite3 \
-	--db-backup /var/lib/bitbit/backup"
-output_log="/var/log/testbitd.log"
-error_log="/var/log/testbitd.err"
-supervisor="supervise-daemon"
-retry="SIGINT/5"
+	--db-backup /var/lib/bitbit/backup \
+	--stdout /var/log/testbitd.log \
+	--stderr /var/log/testbitd.err"
+stopsig="SIGINT"
 
 depend() {
 	need net docker
