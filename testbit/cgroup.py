@@ -4,8 +4,13 @@ from pathlib import Path
 from typing import List, Self, Set
 import time
 import sys
+import select
 
 from .exception import log_exception
+
+def echo(file, message):
+    with open(file, "w") as f:
+        f.write(message)
 
 class CPU:
     cpu: int
@@ -13,6 +18,7 @@ class CPU:
     performance: bool
     thread_siblings: Set[int]
     cpu0: bool
+    cgroup: Path
 
     def __init__(self: Self, cpu: int, claimed: bool, performance: bool, thread_siblings: Set[int]):
         self.cpu = cpu
@@ -20,6 +26,7 @@ class CPU:
         self.performance = performance
         self.thread_siblings = thread_siblings
         self.cpu0 = cpu == 0 or 0 in thread_siblings
+        self.cgroup = Path("/sys/fs/cgroup/testbit-%d" % self.cpu)
 
     def __repr__(self):
         return f"cpu: {self.cpu}\nclaimed: {self.claimed}\nperformance: {self.performance}\nthread_siblings: {self.thread_siblings}\ncpu0: {self.cpu0}\n"
@@ -28,17 +35,13 @@ class CPU:
         if self.claimed:
             return
         self.claimed = True
-        cgroup = Path("/sys/fs/cgroup/testbit-%d" % self.cpu)
-        cgroup.mkdir(exist_ok=True)
+        self.cgroup.mkdir(exist_ok=True)
 
-        with open(cgroup / "cpuset.cpus", "w") as f:
-            f.write("%d\n" % self.cpu)
-        with open(cgroup / "cpuset.cpus.partition", "w") as f:
-            f.write("isolated\n")
+        echo(self.cgroup / "cpuset.cpus", "%d\n" % self.cpu)
+        echo(self.cgroup / "cpuset.cpus.partition", "isolated\n")
 
         for cpu in self.thread_siblings:
-            with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
-                f.write("0\n")
+            echo("/sys/devices/system/cpu/cpu%d/online" % cpu, "0\n")
 
     def release(self: Self) -> bool:
         if not self.claimed:
@@ -47,44 +50,62 @@ class CPU:
         has_critical_exception = False
         for cpu in self.thread_siblings:
             try:
-                with open("/sys/devices/system/cpu/cpu%d/online" % cpu, "w") as f:
-                    f.write("1\n")
+                echo("/sys/devices/system/cpu/cpu%d/online" % cpu, "1\n")
             except:
                 has_critical_exception = True
                 log_exception()
                 print("Failed to turn cpu%d back online" % cpu, file=sys.stderr)
 
         try:
-            with open("/sys/fs/cgroup/testbit-%d/cpuset.cpus" % self.cpu, "w") as f:
-                f.write("\n")
+            echo(self.cgroup / "cpuset.cpus.partition", "member\n")
+        except:
+            has_critical_exception = True
+            log_exception()
+            print("Failed to make cgroup testbit-%d non isolated" % (self.cpu, self.cpu), file=sys.stderr)
+
+        try:
+            echo(self.cgroup / "cpuset.cpus", "\n")
         except:
             has_critical_exception = True
             log_exception()
             print("Failed to release cpu%d from cgroup testbit-%d" % (self.cpu, self.cpu), file=sys.stderr)
 
         try:
-            with open("/sys/fs/cgroup/testbit-%d/cgroup.kill" % self.cpu, "w") as f:
-                f.write("1\n")
+            echo(self.cgroup / "cgroup.kill", "1\n")
         except:
             has_critical_exception = True
             log_exception()
             print("Failed to kill cgroup testbit-%d" % self.cpu, file=sys.stderr)
 
+        self.claimed = False
+
+        return has_critical_exception
+
+    def remove(self: Self):
         # TODO: Improve this
         # time.sleep(0.01)
         try:
-            Path("/sys/fs/cgroup/testbit-%d" % self.cpu).rmdir()
+            with open(self.cgroup / "cgroup.events", "r") as f:
+                p = select.poll()
+                p.register(f, select.POLLPRI | select.POLLERR)
+                while True:
+                    f.seek(0)
+                    if "populated 1" not in f.read():
+                        break
+                    p.poll()
+        except:
+            has_critical_exception = True
+            log_exception()
+            print("Failed to poll cgroup.events for cgroup testbit-%d" % self.cpu, file=sys.stderr)
+
+        try:
+            self.cgroup.rmdir()
         except OSError:
             pass
         except:
             has_critical_exception = True
             log_exception()
             print("Failed to remove cgroup testbit-%d" % self.cpu, file=sys.stderr)
-
-        self.claimed = False
-
-        return has_critical_exception
-
 
 def is_performance(cpu: int) -> bool:
     performance = True

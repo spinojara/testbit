@@ -36,6 +36,7 @@ def handle_sigint(signum, frame):
 
 def cleanup_docker():
     with container_lock:
+        print("Cleaning up docker", file=sys.stdout)
         for container in containers:
             try:
                 container.stop(timeout=0)
@@ -48,7 +49,13 @@ def cleanup_docker():
 
 def cleanup(cpu: CPU):
     with cpu_lock:
+        print("Cleaning up cpu %d" % cpu.cpu, file=sys.stdout)
         cpu.release()
+
+def remove(cpu: CPU):
+    with cpu_lock:
+        print("Removing cgroup testbit-%d" % cpu.cpu, file=sys.stdout)
+        cpu.remove()
 
 def is_private_network(host: str) -> bool:
     if host == "localhost":
@@ -290,9 +297,13 @@ def main() -> int:
 
     signal.signal(signal.SIGINT, handle_sigint)
 
-    atexit.register(cleanup_docker)
+    for cpu in cpus:
+        atexit.register(remove, cpu)
+
     for cpu in cpus:
         atexit.register(cleanup, cpu)
+
+    atexit.register(cleanup_docker)
 
     for thread in threads:
         thread.start()
