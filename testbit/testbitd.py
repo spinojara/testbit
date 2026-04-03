@@ -26,6 +26,7 @@ from .tc import validatetc
 from .elo import loglikelihoodratio, calculate_elo
 from .spwd import authenticate as spwdauthenticate
 from .exception import log_exception, log
+from .git import check_ref_format
 
 dbcond = threading.Condition()
 backuplock = threading.Lock()
@@ -51,7 +52,7 @@ ARG SIMD
 ARG CACHEBUST
 
 RUN { git clone https://github.com/spinojara/bitbit.git && \
-    git -C bitbit checkout -- "$COMMIT" && \
+    git -C bitbit checkout "$COMMIT" && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
@@ -83,7 +84,7 @@ ARG SIMD
 ARG CACHEBUST
 
 RUN { git clone https://github.com/spinojara/bitbit.git && \
-    git -C bitbit checkout -- "$COMMIT" && \
+    git -C bitbit checkout "$COMMIT" && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
@@ -422,8 +423,10 @@ async def test_new(request):
                 "c": c,
             }
 
-    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_./") for c in commit):
+    if not isinstance(commit, str) or not commit:
         return web.json_response({"message": "no commit"}, status=400)
+    if (r := check_ref_format(commit)):
+        return web.json_response({"message": f"bad commit ({r})"}, status=400)
     if adjudicate not in ["none", "draw", "resign", "both"]:
         return web.json_response({"message": "bad adjudicate"}, status=400)
 

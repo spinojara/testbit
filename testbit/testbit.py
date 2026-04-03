@@ -82,8 +82,8 @@ def main() -> int:
     if not isinstance(args.commit, str) or not args.commit:
         print("commit can't be empty")
         return 1
-    if not all(c in (string.ascii_letters + string.digits + "-_./") for c in args.commit):
-        print("illegal char in commit")
+    if (r := check_ref_format(args.commit)):
+        print(f"bad commit ({r})")
         return 1
     if not args.simd or not args.simd.isalnum():
         print("simd must contain only alpha numeric characters")
