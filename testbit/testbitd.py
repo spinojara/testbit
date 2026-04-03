@@ -51,15 +51,15 @@ ARG SIMD
 ARG CACHEBUST
 
 RUN { git clone https://github.com/spinojara/bitbit.git && \
-    git -C bitbit checkout "$COMMIT" && \
+    git -C bitbit checkout -- "$COMMIT" && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
-    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD="$SIMD" bitbit-pgo && \
     mv bitbit/bitbit bitbit-old && \
     git -C bitbit apply --allow-empty ../patch && \
-    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD bitbit-pgo && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD="$SIMD" bitbit-pgo && \
     mv bitbit/bitbit bitbit-new && \
     rm -rf bitbit patch; } 2>&1
 """
@@ -83,13 +83,13 @@ ARG SIMD
 ARG CACHEBUST
 
 RUN { git clone https://github.com/spinojara/bitbit.git && \
-    git -C bitbit checkout "$COMMIT" && \
+    git -C bitbit checkout -- "$COMMIT" && \
     echo "$CACHEBUST" && \
     git -C bitbit rev-parse HEAD && \
     echo "$CACHEBUST" && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     git -C bitbit apply --allow-empty ../patch && \
-    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD=$SIMD tunebit && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD="$SIMD" tunebit && \
     mv bitbit/tunebit bitbit-new && \
     ln bitbit-new bitbit-old && \
     rm -rf bitbit patch; } 2>&1
@@ -421,7 +421,7 @@ async def test_new(request):
                 "c": c,
             }
 
-    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in commit):
+    if not isinstance(commit, str) or not commit or not all(c in (string.ascii_letters + string.digits + "-_./") for c in commit):
         return web.json_response({"message": "no commit"}, status=400)
     if adjudicate not in ["none", "draw", "resign", "both"]:
         return web.json_response({"message": "bad adjudicate"}, status=400)

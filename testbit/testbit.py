@@ -79,8 +79,11 @@ def main() -> int:
     if args.type not in ["sprt", "elo", "spsa"]:
         print("type must be either sprt, elo or spsa")
         return 1
-    if not isinstance(args.commit, str) or not args.commit or not all(c in (string.ascii_letters + string.digits + "-_") for c in args.commit):
+    if not isinstance(args.commit, str) or not args.commit:
         print("commit can't be empty")
+        return 1
+    if not all(c in (string.ascii_letters + string.digits + "-_./") for c in args.commit):
+        print("illegal char in commit")
         return 1
     if not args.simd or not args.simd.isalnum():
         print("simd must contain only alpha numeric characters")
