@@ -722,6 +722,8 @@ async def test_requeue(request):
                 tc,
                 alpha,
                 beta,
+                gamma,
+                A,
                 elo0,
                 elo1,
                 eloe,
@@ -729,7 +731,8 @@ async def test_requeue(request):
                 queuetime,
                 commithash,
                 simd,
-                patch
+                patch,
+                spsa
             )
             SELECT
                 concat(description, ' (requeue)'),
@@ -737,6 +740,8 @@ async def test_requeue(request):
                 tc,
                 alpha,
                 beta,
+                gamma,
+                A,
                 elo0,
                 elo1,
                 eloe,
@@ -744,7 +749,8 @@ async def test_requeue(request):
                 unixepoch(),
                 commithash,
                 simd,
-                patch
+                patch,
+                spsa
             FROM tests
             WHERE id = ?;
         """, (id, ))
