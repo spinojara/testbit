@@ -556,6 +556,7 @@ async def test_data(request):
 
         if not row:
             # It could be that this id was already set to done.
+            con.rollback()
             return web.json_response({"message": "ok"})
 
         type, alpha, beta, t0, t1, t2, p0, p1, p2, p3, p4, eloe, elo0, elo1, spsa = row
@@ -604,6 +605,7 @@ async def test_data(request):
 
             if spsa.keys() != spsaargs.keys():
                 print("error: expected equal spsa keys", file=sys.stderr)
+                con.rollback()
                 return web.json_response({"message": "internal error"}, status=400)
 
             for name, param in spsa.items():
@@ -889,6 +891,7 @@ async def get_task(request):
         row = cursor.fetchone()
 
         if not row:
+            con.rollback()
             return web.json_response({"id": None})
 
         id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2 = row
