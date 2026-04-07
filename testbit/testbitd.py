@@ -853,6 +853,8 @@ async def backup_database(request):
         log(f"Connected to '{backup_path}'")
         with dbcond:
             log("Aquired db lock")
+            con.rollback()
+            log("Rolled back just to be sure")
             con.backup(backupcon)
             log("Back up finished")
 
