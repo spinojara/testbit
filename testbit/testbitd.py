@@ -90,8 +90,8 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     echo "$CACHEBUST" && \
     mv bitbit/etc/book/testbit-50cp5d6m100k.epd book.epd && \
     git -C bitbit apply --allow-empty ../patch && \
-    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD="$SIMD" tunebit && \
-    mv bitbit/tunebit bitbit-new && \
+    make -C bitbit clean && make -C bitbit COLOR=yes ARCH=x86-64-v3 SIMD="$SIMD" TUNE=yes bitbit-pgo && \
+    mv bitbit/bitbit bitbit-new && \
     ln bitbit-new bitbit-old && \
     rm -rf bitbit patch; } 2>&1
 """
