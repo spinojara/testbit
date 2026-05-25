@@ -10,5 +10,6 @@ setup(
     install_requires=[
         "aiohttp",
         "docker",
-    ]
+    ],
+    python_requires=">=3.14",
 )
