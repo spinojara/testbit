@@ -78,11 +78,12 @@ def uptime():
     with open("/proc/uptime", "r") as f:
         return float(f.readline().split()[0])
 
-def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float, syzygy: str | None):
+def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float, syzygy: str | None, root: str):
     client = docker.from_env()
     verify = not is_private_network(host)
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    host = f"https://{host}:{port}"
+    host = f"http{"s" if verify else ""}://{host}:{port}"
+    print(host)
 
     rng = random.Random()
 
@@ -98,7 +99,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
 
     while True:
         try:
-            response = requests.get(host + "/testbit/test/task", auth=("", password), verify=verify)
+            response = requests.get(host + f"{root}/test/task", auth=("", password), verify=verify)
             response = response.json()
         except json.JSONDecodeError:
             log_exception()
@@ -176,7 +177,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
 
         except (ImageNotFound, NotFound):
             try:
-                response = requests.put(host + "/testbit/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
             except:
                 log_exception()
             finally:
@@ -234,10 +235,10 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
                 print(f"{threading.get_ident()}: Docker container had errors")
-                response = requests.put(host + "/testbit/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
             else:
                 print(f"{threading.get_ident()}: Docker container had no errors")
-                response = requests.put(host + "/testbit/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
         except:
             log_exception()
 
@@ -256,8 +257,10 @@ def main() -> int:
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
     parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
     parser.add_argument("--port", type=str, default="443")
+    parser.add_argument("--root-dir", type=str, help="Empty for development version.", default="/testbit")
 
     args, _ = parser.parse_known_args()
+    print(args.root_dir)
     if args.workers < 1 and args.workers != -1:
         print("--workers must be positive or -1", file=sys.stderr)
         return 1
@@ -293,7 +296,7 @@ def main() -> int:
         print("Failed to make cpu claiming strategy.", file=sys.stderr)
         return 1
 
-    threads = [threading.Thread(target=worker, args=(cpu, args.host, args.port, password, tcfactor, args.syzygy), daemon=True) for cpu in cpus]
+    threads = [threading.Thread(target=worker, args=(cpu, args.host, args.port, password, tcfactor, args.syzygy, args.root_dir), daemon=True) for cpu in cpus]
 
     signal.signal(signal.SIGINT, handle_sigint)
 

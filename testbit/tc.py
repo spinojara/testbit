@@ -59,8 +59,8 @@ def validatetc(tc: str) -> bool:
 
 def tcadjust(tc: str, tcfactor: float) -> str:
     moves = 0
-    maintime = 0
-    increment = 0
+    maintime = 0.0
+    increment = 0.0
 
     i = tc.find("/")
     if i != -1:
@@ -71,7 +71,7 @@ def tcadjust(tc: str, tcfactor: float) -> str:
         maintime = float(tc[:i])
         increment = float(tc[i + 1:])
     else:
-        maintime = tc
+        maintime = float(tc)
 
     tc = ""
     if moves > 0:

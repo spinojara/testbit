@@ -9,6 +9,7 @@ import string
 import urllib3
 
 from . import tc
+from .git import check_ref_format
 
 tune_help = """The loss function is evaluated at f(θ+c∙Δ) and f(θ-c∙Δ) where Δ is ±1.
 The gradient is then estimated as f'(θ)≈(f(θ+cΔ)-f(θ-cΔ))/(2cΔ) and a
@@ -17,7 +18,8 @@ step is taken in the direction af'(θ).
 
 def main() -> int:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("patch", type=str, help="patch path")
+    parser.add_argument("--patch", type=str, help="patch path")
+    parser.add_argument("--no-patch", action="store_true")
     parser.add_argument("--type", type=str, help="sprt, elo or spsa", default="sprt")
     parser.add_argument("--alpha", type=float, help="alpha", default=None)
     parser.add_argument("--beta", type=float, help="beta", default=0.025)
@@ -36,20 +38,23 @@ def main() -> int:
     parser.add_argument("--port", type=int, help="port", default=2718)
     parser.add_argument("--description", type=str, help="description", default="")
     parser.add_argument("--cancel", action="store_true", default=False)
-    parser.add_argument("--tune", type=str, nargs=6, help=tune_help, default=[], action="append", metavar=("NAME", "VALUE", "MIN", "MAX", "A", "C"))
+    parser.add_argument("--tune", type=str, nargs="*", help=tune_help, default=[], action="append")
 
     args, _ = parser.parse_known_args()
 
     if not args.alpha:
         args.alpha = 0.025 if args.type == "sprt" else 0.602
 
-    if bool(args.tune) != (args.type == "spsa"):
-        print("needs --tune exactly when --type spsa")
+    if bool(args.tune) != (args.type == "spsa" or args.type == "clop"):
+        print("needs --tune exactly when --type spsa or --type clop")
         return 1
 
     spsa = {}
     if args.type == "spsa":
         for param in args.tune:
+            if len(param) != 6:
+                print("--tune parameter theta min max a c")
+                return 1
             if param[0] in spsa:
                 print(f"--tune {param[0]} ... was given twice")
                 return 1
@@ -61,12 +66,38 @@ def main() -> int:
                 except:
                     print(f"'{f}' is not a float")
                     return 1
+            if floats[1] >= floats[2]:
+                print("need min < max")
+                return 1
             spsa[param[0]] = {
                 "theta": floats[0],
                 "min": floats[1],
                 "max": floats[2],
                 "a": floats[3],
                 "c": floats[4],
+            }
+    elif args.type == "clop":
+        for param in args.tune:
+            if len(param) != 3:
+                print("--tune parameter min max")
+                return 1
+            if param[0] in spsa:
+                print(f"--tune {param[0]} ... was given twice")
+                return 1
+
+            floats = []
+            for f in param[1:]:
+                try:
+                    floats.append(float(f))
+                except:
+                    print(f"'{f}' is not a float")
+                    return 1
+            if floats[0] >= floats[1]:
+                print("need min < max")
+                return 1
+            spsa[param[0]] = {
+                "min": floats[0],
+                "max": floats[1],
             }
 
     if args.type == "sprt":
@@ -76,7 +107,7 @@ def main() -> int:
     if args.elo0 >= args.elo1:
         print("bad elo0 or elo1")
         return 1
-    if args.type not in ["sprt", "elo", "spsa"]:
+    if args.type not in ["sprt", "elo", "spsa", "clop"]:
         print("type must be either sprt, elo or spsa")
         return 1
     if not isinstance(args.commit, str) or not args.commit:
@@ -98,12 +129,18 @@ def main() -> int:
     while not args.description.strip():
         args.description = input("Description: ")
 
-    try:
-        with open(args.patch, "r") as f:
-            patch = f.read()
-    except FileNotFoundError:
-        print("failed to open '%s'" % args.patch)
-        return 1
+    if args.patch:
+        try:
+            with open(args.patch, "r") as f:
+                patch = f.read()
+        except FileNotFoundError:
+            print("failed to open '%s'" % args.patch)
+            return 1
+    else:
+        if not args.no_patch:
+            print("need --patch or --no-patch")
+            return 1
+        patch = ""
 
     verify = not args.host in ["localhost", "127.0.0.1"]
 

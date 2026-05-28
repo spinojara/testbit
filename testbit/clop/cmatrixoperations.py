@@ -20,3 +20,11 @@ class CMatrixOperations:
                 else:
                     vCholesky[j * Size + i] = Sum / vCholesky[i * Size + i]
         return True
+
+    @staticmethod
+    def Solve(vMatrix: list[float], v: list[float], Size: int) -> None:
+        raise ValueError("Not implemented")
+
+    @staticmethod
+    def Inverse(vMatrix: list[float], vInverse: list[float], Size: int) -> None:
+        raise ValueError("Not implemented")

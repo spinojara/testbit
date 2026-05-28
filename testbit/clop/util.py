@@ -1,15 +1,13 @@
-from typing import TypeVar, Generic, Callable
+from typing import TypeVar, Generic, Callable, Any
 
 T = TypeVar("T")
 
 class Vector(Generic[T]):
-    _data: list[T | None]
+    _data: list[T]
     _factory: Callable[[], T]
 
-    def __init__(self, n: int = 0, factory: Callable[[], T] = None) -> None:
+    def __init__(self, n: int = 0, factory: Callable[[], T] = lambda: None) -> None: # type: ignore
         self._factory = factory
-        if self._factory is None:
-            self._factory = lambda: None
         self._data: list[T] = [self._factory() for _ in range(n)]
 
     def push_back(self, value: T) -> None:
@@ -45,8 +43,8 @@ class Vector(Generic[T]):
     def __repr__(self) -> str:
         return f"Vector({", ".join([str(x) for x in self._data])})"
 
-    def __eq__(self, other) -> bool:
-        if isinstance(other, 'Vector') and self._data == other._data:
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Vector) and self._data == other._data:
             return True
         return False
 

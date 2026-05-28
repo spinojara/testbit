@@ -1,5 +1,6 @@
 # Regression
 from enum import IntEnum
+from typing import Callable
 from dataclasses import dataclass, field
 import copy
 import math
@@ -12,8 +13,11 @@ from .coutcome import COutcome
 from .csampledata import CSampleData
 from .clogistic import CLogistic
 from .cdflogp import CDFLogP
+from .cmatrixoperations import CMatrixOperations
+from .cdfconfidence import CDFConfidence
 
 class S_(IntEnum):
+    NoState = 0x0
     LogP = 0x1
     Gradient = 0x2
     Hessian = 0x4
@@ -24,9 +28,9 @@ class S_(IntEnum):
 
 @dataclass
 class CWeighting:
-    vParam: Vector[float] = None
-    Radius: float = None
-    Mean: float = None
+    vParam: Vector[float] = field(default_factory=Vector)
+    Radius: float = 0.0
+    Mean: float = 0.0
 
 class CRegression(CObserver):
     pf: CParametricFunction
@@ -44,16 +48,17 @@ class CRegression(CObserver):
     fCholesky: bool
     fAutoLocalize: bool = True
     fDirty: bool
-    State: S_
+    State: int
     RefreshRate: float
     Refreshcount: int
     NextRefresh: int
     LocalizationHeight: float = 3.0
     LocalizationPower: float = 0.0
-    MaxWeightIterations: float = 7.0
+    MaxWeightIterations: int = 7
     vWeighting: Vector[CWeighting]
     TotalWeight: float
     vTotalWeightedSample: Vector[float]
+    lObs: list[Callable[[CRegression], None]]
 
     def __init__(self, results: CResults, pf: CParametricFunction) -> None:
         super().__init__(results)
@@ -62,14 +67,18 @@ class CRegression(CObserver):
         self.vMonomial = Vector(pf.GetParameters())
         self.vGradient = Vector(pf.GetParameters())
         self.vHessian = Vector(pf.GetParameters() * pf.GetParameters())
-        self.vCholeksy = Vector(pf.GetParameters() * pf.GetParameters())
-        self.vCholeksyInverse = Vector(pf.GetParameters() * pf.GetParameters())
+        self.vCholesky = Vector(pf.GetParameters() * pf.GetParameters())
+        self.vCholeskyInverse = Vector(pf.GetParameters() * pf.GetParameters())
         self.RefreshRate = 0.0
         self.vTotalWeightedSample = Vector(pf.GetDimensions())
         self.vsd = Vector(0, CSampleData)
         self.vWeighting = Vector()
+        self.lObs = []
 
         self.OnReset()
+
+    def AddObserver(self, obs: Callable[[CRegression], None]) -> None:
+        self.lObs.append(obs)
 
     def GetSample(self, i: int) -> list[float]:
         return self.results.GetSample(i)
@@ -84,15 +93,16 @@ class CRegression(CObserver):
 
         self.tCount = [0, 0, 0]
         for i in range(self.Samples):
-            self.tCount[self.results.GetOutcome(i)] += 1
+            if self.results.GetOutcome(i) < 3:
+                self.tCount[self.results.GetOutcome(i)] += 1
 
         self.RefreshCounter = 0
         self.NextRefresh = 0
 
         self.SetUniformWeights()
-        self.pf.GetPriorParam(self.vParamMAP)
+        self.pf.GetPriorParam(self.vParamMAP.data())
 
-        self.State = 0
+        self.State = S_.NoState
         self.fDirty = False
         self.fAutoLocalize = True
 
@@ -117,12 +127,12 @@ class CRegression(CObserver):
     def OnOutcome(self, i: int) -> None:
         self.fDirty = True
         outcome: COutcome = self.results.GetOutcome(i)
-        self.tCount[outcome] += 1
         if outcome < 3:
+            self.tCount[outcome] += 1
             self.vsd[self.vsd[i].Index].tCount[outcome] += 1
 
         if self.RefreshCounter == self.NextRefresh:
-            self.State = 0
+            self.State = S_.NoState
             self.fDirty = False
             self.NextRefresh += 1 + int(self.NextRefresh * self.RefreshRate)
 
@@ -202,7 +212,7 @@ class CRegression(CObserver):
             self.vWeighting.push_back(weighting)
 
             self.UpdateWeights()
-            self.State = 0
+            self.State = S_.NoState
 
     def SetUniformWeights(self) -> None:
         self.vWeighting.resize(0)
@@ -219,7 +229,7 @@ class CRegression(CObserver):
 
         self.vParamMAP.fill(0.0)
 
-        self.State = 0
+        self.State = S_.NoState
 
     def ComputeLocalWeights(self) -> None:
         self.SetUniformWeights()
@@ -237,7 +247,10 @@ class CRegression(CObserver):
 
         if self.MaxWeightIterations == 0 and self.vWeighting.size() > 0:
             self.vWeighting.pop_back()
-            self.updateWeight()
+            self.UpdateWeights()
+
+        for obs in self.lObs:
+            obs(self)
 
     def GetPosteriorInfo(self, vLocation: list[float]) -> tuple[float, float]:
         Rating = self.pf.GetValue(self.vParamMAP.data(), vLocation)
@@ -246,8 +259,8 @@ class CRegression(CObserver):
         Variance = dfconf.GetVariance()
         return Rating, Variance
 
-    def GetParamPositivity(i: int) -> float:
-        self.EnsureState(S_.MAP | S_.HESSIAN)
+    def GetParamPositivity(self, i: int) -> float:
+        self.EnsureState(S_.MAP | S_.Hessian)
         x = self.vParamMAP[i]
         h = self.vHessian[i * (self.pf.GetParameters() + 1)]
         return math.sqrt(h) * x
@@ -256,7 +269,7 @@ class CRegression(CObserver):
         while (Flags & ~self.State):
             if self.fDirty:
                 self.fDirty = False
-                self.State = 0
+                self.State = S_.NoState
 
             if (Flags & ~self.State) & S_.MAP:
                 self.Newton()
@@ -272,14 +285,13 @@ class CRegression(CObserver):
 
             if (Flags & ~self.State) & S_.Cholesky:
                 self.EnsureState(S_.Hessian)
-                self.fCholesky = CMatrixOperations.Choleksy(self.vHessian.data(), self.vCholesky.data(), self.pf.GetParameters())
-                self.State |= S_.Choleksy
+                self.fCholesky = CMatrixOperations.Cholesky(self.vHessian.data(), self.vCholesky.data(), self.pf.GetParameters())
+                self.State |= S_.Cholesky
 
             if (Flags & ~self.State) & S_.CholeskyInverse:
                 self.EnsureState(S_.Cholesky)
-                self.fCholesky = CMatrixOperations.Inverse(self.vCholesky.data(), self.vCholeskyInverse.data(), self.pf.GetParameters())
-                self.State |= S_.CholeksyInverse
-                raise ValueError
+                CMatrixOperations.Inverse(self.vCholesky.data(), self.vCholeskyInverse.data(), self.pf.GetParameters())
+                self.State |= S_.CholeskyInverse
 
     def Newton(self) -> None:
         func: CDFLogP = CDFLogP(self)
@@ -365,3 +377,15 @@ class CRegression(CObserver):
 
     def GetTotalWeightedSample(self) -> list[float]:
         return self.vTotalWeightedSample.data()
+
+    def GetReplications(self, i: int) -> int:
+        return self.vsd[i].Replications
+
+    def SetRefreshRate(self, x: float) -> None:
+        self.RefreshRate = x
+
+    def SetAutoLocalize(self, f: bool) -> None:
+        self.fAutoLocalize = f
+
+    def GetSampleData(self, i: int) -> CSampleData:
+        return self.vsd[i]

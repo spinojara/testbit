@@ -28,7 +28,15 @@ from .spwd import authenticate as spwdauthenticate
 from .exception import log_exception, log
 from .git import check_ref_format
 
+from .clop.clinearparameter import CLinearParameter
+from .clop.cregression import CRegression
+from .clop.cexperiment import CExperiment
+
+clops: dict[int, CExperiment] = {}
+clopseed: dict[tuple[int, str], tuple[int, datetime]] = {}
+
 dbcond = threading.Condition()
+cloplock = threading.Lock()
 backuplock = threading.Lock()
 con = None
 backup_directory = None
@@ -65,7 +73,7 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     rm -rf bitbit patch; } 2>&1
 """
 
-Dockerfile_spsa = """
+Dockerfile_tune = """
 FROM alpine:3.23.3
 
 RUN apk add --no-cache make clang lld compiler-rt llvm git curl 2>&1
@@ -96,6 +104,96 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     rm -rf bitbit patch; } 2>&1
 """
 
+def clop_store_seed(id: int, task_uuid: str, seed: int) -> None:
+    with cloplock:
+        while len(clopseed) >= 10000:
+            min_index = (-1, "")
+            min_dt = None
+            for index, (seed, dt) in clopseed.items():
+                if min_dt is None or dt < min_dt:
+                    min_index = index
+                    min_dt = dt
+
+            clopseed.pop(min_index)
+
+        clopseed[(id, task_uuid)] = (seed, datetime.now())
+
+def clop_get_seed(id: int, task_uuid: str) -> int:
+    with cloplock:
+        return clopseed.pop((id, task_uuid), (-1, None))[0]
+
+def clop_unload(id: int) -> None:
+    with cloplock:
+        if id in clops:
+            del clops[id]
+
+def clop_load(id: int) -> CExperiment:
+    with cloplock:
+        if id not in clops:
+            paramcol: list[CLinearParameter] = []
+            with dbcond:
+                cursor = con.cursor()
+                cursor.execute("""
+                    SELECT spsa
+                    FROM tests
+                    WHERE id = ?;
+                """, (id, ))
+                tune = json.loads(cursor.fetchone()[0])
+                print("Loading")
+                print(tune)
+                print(type(tune["p1"]))
+                for key, value in tune.items():
+                    paramcol.append(CLinearParameter(key, value.get("min"), value.get("max")))
+            cexp = CExperiment(paramcol, id)
+            cexp.reg.SetAutoLocalize(False)
+
+            def obs(reg: CRegression, cexp : CExperiment=cexp, id: int=id):
+                with dbcond:
+                    cursor = con.cursor()
+                    cursor.execute("""
+                        SELECT id, spsa
+                        FROM tests
+                        WHERE
+                            id = ?
+                            AND donetime IS NOT NULL
+                            AND spsa IS NOT NULL;
+                    """, (id, ))
+                    allrows = cursor.fetchall()
+                newrows: list[tuple[float, int]] = [(cexp.reg.GetWeight(cexp.sample_from_dict(json.loads(spsa))), id) for id, spsa in allrows]
+                with dbcond:
+                    cursor = con.cursor()
+                    cursor.executemany("""
+                        UPDATE games
+                        SET weight = ?
+                        WHERE id = ?;
+                    """, newrows)
+                    con.commit()
+
+            cexp.reg.AddObserver(obs)
+
+            clops[id] = cexp
+
+            with dbcond:
+                cursor = con.execute()
+                cursor.execute("""
+                    SELECT spsa, w, d, l
+                    FROM games
+                    WHERE testid = ?
+                        AND donetime IS NOT NULL
+                        AND w + d + l = 2
+                    ORDER BY starttime ASC;
+                """, (id, ))
+
+                allrows = cursor.fetchall()
+
+            for tune, w, d, l in allrows:
+                cexp.add_sample(tune, w, d, l)
+
+            cexp.reg.SetAutoLocalize(True)
+            cexp.reg.ComputeLocalWeights()
+
+    return clops[id]
+
 def get_next_image_to_build():
     cursor = con.cursor()
     cursor.execute("""
@@ -122,7 +220,7 @@ def build_docker_images():
             with open(patch_path, "wb") as f:
                 f.write(patch)
             with open(dockerfile, "w") as f:
-                f.write(Dockerfile_spsa if type == "spsa" else Dockerfile)
+                f.write(Dockerfile_tune if type in ["spsa", "clop"] else Dockerfile)
         except:
             log_exception()
             break
@@ -284,38 +382,10 @@ def create_table():
             l         INTEGER,
             starttime INTEGER NOT NULL,
             donetime  INTEGER,
-            spsa      TEXT
+            spsa      TEXT,
+            weight    REAL
         );
     """)
-    con.commit()
-    cursor.execute("""
-        UPDATE tests
-            SET
-                starttime = CASE
-                    WHEN status = 'queued' THEN unixepoch()
-                    ELSE starttime
-                END,
-                status = 'running'
-        WHERE id = (
-            SELECT id FROM tests
-            WHERE status IN ('running', 'queued')
-            ORDER BY
-                priority DESC,
-                ifnull(
-                    (
-                        SELECT max(starttime)
-                        FROM games
-                        WHERE games.testid = tests.id
-                    ),
-                    0
-                ) ASC,
-                queuetime ASC
-            LIMIT 1
-        )
-        RETURNING id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2;
-    """)
-    row = cursor.fetchone()
-    print(row)
 
 async def test_new(request):
     try:
@@ -333,7 +403,7 @@ async def test_new(request):
         return web.json_response({"message": "bad patch"}, status=400)
 
     type = data.get("type")
-    if type not in ["elo", "sprt", "spsa"]:
+    if type not in ["elo", "sprt", "spsa", "clop"]:
         return web.json_response({"message": "bad type"}, status=400)
     tc = data.get("tc")
     if not isinstance(tc, str) or not validatetc(tc):
@@ -370,6 +440,8 @@ async def test_new(request):
             return web.json_response({"message": "need alpha + beta < 0.5"}, status=400)
         eloe = None
         spsa = None
+        A = None
+        gamma = None
     elif type == "elo":
         if not isinstance(eloe, float) or eloe <= 0.0:
             return web.json_response({"message": "bad eloe"}, status=400)
@@ -378,6 +450,8 @@ async def test_new(request):
         elo0 = None
         elo1 = None
         spsa = None
+        A = None
+        gamma = None
     elif type == "spsa":
         if not isinstance(spsadata, dict) or not spsadata:
             return web.json_response({"message": "bad spsa"}, status=400)
@@ -421,6 +495,37 @@ async def test_new(request):
                 "max": max,
                 "a": a,
                 "c": c,
+            }
+    elif type == "clop":
+        if not isinstance(spsadata, dict) or not spsadata:
+            return web.json_response({"message": "bad clop"}, status=400)
+
+        alpha = None
+        beta = None
+        elo0 = None
+        elo1 = None
+        eloe = None
+        A = None
+        gamma = None
+
+        spsa = {}
+        for name, param in spsadata.items():
+            if name.startswith("_"):
+                return web.json_response({"message": "parameter starts with '_'"}, status=400)
+            min = param.get("min")
+            max = param.get("max")
+            if not isinstance(name, str) or not name:
+                return web.json_response({"message": "bad clop.param.name"}, status=400)
+            if not isinstance(min, float):
+                return web.json_response({"message": "bad clop.param.min"}, status=400)
+            if not isinstance(max, float):
+                return web.json_response({"message": "bad clop.param.max"}, status=400)
+            if min >= max:
+                return web.json_response({"message": "need clop.param.min < clop.param.max"}, status=400)
+
+            spsa[name] = {
+                "min": min,
+                "max": max,
             }
 
     if not isinstance(commit, str) or not commit:
@@ -637,7 +742,24 @@ async def test_data(request):
                 SET spsa = json(?)
                 WHERE id = ? AND testid = ?;
             """, (json.dumps(spsaargs) if dy else None, task_uuid, id))
+        elif type == "clop":
+            spsa = json.loads(spsa)
+            cursor.execute("""
+                UPDATE tests
+                SET t0 = ?,
+                    t1 = ?,
+                    t2 = ?,
+                    p0 = ?,
+                    p1 = ?,
+                    p2 = ?,
+                    p3 = ?,
+                    p4 = ?
+                WHERE id = ?;
+            """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], id))
 
+            seed: int = clop_get_seed(id, task_uuid)
+            if seed >= 0:
+                clop.add_outcome(seed, wins, draws, losses)
         else:
             if pm is not None and pm < eloe:
                 status = "done"
@@ -687,6 +809,8 @@ async def test_cancel(request):
                 AND id = ?;
         """, (id, ))
         con.commit()
+
+        clop_unload(id)
     return web.json_response({"message": "ok"})
 
 async def test_resume(request):
@@ -902,6 +1026,9 @@ async def get_task(request):
         k = (t0 + t1 + t2) // 2
         argsplus = ""
         argsminus = ""
+        task_uuid = str(uuid.uuid4())
+        weight = None
+
         if type == "spsa":
             for name, param in spsa.items():
                 a = param.get("a")
@@ -924,24 +1051,34 @@ async def get_task(request):
                     "ck": ck,
                     "Delta": Delta,
                 }
+        elif type == "clop":
+            cexp = clop_load(id)
+            spsaargs, seed, weight = cexp.next_sample()
 
-        task_uuid = str(uuid.uuid4())
+            clop_store_seed(id, task_uuid, seed)
+
+            for key, value in spsaargs.items():
+                argsplus += f" option.{key}={value}"
+
         cursor = con.cursor()
         cursor.execute("""
             INSERT INTO games (
                 id,
                 testid,
                 starttime,
-                spsa
+                spsa,
+                weight
             )
             VALUES (
                 ?,
                 ?,
                 unixepoch(),
-                json(?)
+                json(?),
+                ?
             );
-        """, (task_uuid, id, json.dumps(spsaargs)))
+        """, (task_uuid, id, json.dumps(spsaargs), weight))
         con.commit()
+
     return web.json_response({
         "id": id,
         "tc": tc,
@@ -1010,7 +1147,7 @@ async def test_fetch_single(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.id = ? AND tests.type != 'spsa'
+        WHERE tests.id = ? AND tests.type IN ('elo', 'sprt')
         GROUP BY tests.id;
     """, (delta, delta, id))
 
@@ -1113,7 +1250,7 @@ async def test_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.type != 'spsa'
+        WHERE tests.type IN ('elo', 'sprt')
         GROUP BY tests.id;
     """, (delta, delta))
 
@@ -1186,7 +1323,7 @@ async def spsa_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.type = 'spsa'
+        WHERE tests.type IN ('spsa', 'clop')
         GROUP BY tests.id;
     """, (delta, delta))
 
@@ -1254,7 +1391,7 @@ async def spsa_fetch_single(request):
             tests.spsa,
             (tests.t0 + tests.t1 + tests.t2) / 2,
             (
-                SELECT json_group_array(json(spsa))
+                SELECT json_group_array(json_patch(json(spsa), '$._weight', weight))
                 FROM games
                 WHERE games.testid = tests.id
                     AND games.donetime IS NOT NULL
@@ -1267,7 +1404,7 @@ async def spsa_fetch_single(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.id = ? AND tests.type = 'spsa'
+        WHERE tests.id = ? AND tests.type IN ('spsa', 'clop')
         GROUP BY tests.id;
     """, (delta, delta, id))
 
@@ -1282,6 +1419,8 @@ async def spsa_fetch_single(request):
         if not fullnnue:
             patch = re.sub(r"(?<=\nGIT binary patch\n).*?(?=\ndiff --git |\Z)", "", patch, flags=re.DOTALL)
     errorlog = row[15]
+
+    spsa = json.loads(row[18])
 
     test = {
         "id": row[0],
@@ -1302,7 +1441,7 @@ async def spsa_fetch_single(request):
         "errorlog": errorlog,
         "spsa": json.loads(row[16]),
         "N": row[17],
-        "spsahistory": json.loads(row[18]),
+        "spsahistory": spsa,
         "gametimeavg": row[19],
     }
 
@@ -1423,4 +1562,5 @@ def main() -> int:
     return 0
 
 if __name__ == "__main__":
+    fjaosidjf = fjoasijdf
     sys.exit(main())

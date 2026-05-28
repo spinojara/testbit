@@ -57,7 +57,8 @@ class CDiffFunction:
 
             vMax = self.vxTemp
             if LNew - L < NewtonThreshold:
-                return vMax
+                break
+        return vMax
 
     def CG(self, vMax: list[float], fTrace: bool = False) -> None:
         vG = self.GetGradient()
@@ -91,12 +92,12 @@ class CDiffFunction:
                     vD[i] = vG[i] + Beta * vD[i]
                     vPrevG[i] = vG[i]
 
-            x: int = Iteration % self.GetDimensions()
-            if vD[x] * vD[x] == 0.0:
-                if vD[x] >= 0:
-                    vD[x] = 1.0
+            x_: int = Iteration % self.GetDimensions()
+            if vD[x_] * vD[x_] == 0.0:
+                if vD[x_] >= 0:
+                    vD[x_] = 1.0
                 else:
-                    vD[x] = -1.0
+                    vD[x_] = -1.0
 
             x: float = self.LineOpt(vMax, vD.data(), fTrace)
 
@@ -121,8 +122,8 @@ class CDiffFunction:
         if Scale == float("inf"):
             return 0.0
 
-        tx: list[float | None] = [None, None, None]
-        tf: list[float | None] = [None, None, None]
+        tx: list[float] = [0.0, 0.0, 0.0]
+        tf: list[float] = [0.0, 0.0, 0.0]
 
         tx[0] = 0.0
         tf[0] = self.SetLineInput(vx0, vDir, tx[0])
@@ -173,3 +174,18 @@ class CDiffFunction:
 
     def Normalize(self, x: float) -> float:
         return x
+
+    def GetOutput(self, vInput: list[float]) -> float:
+        raise ValueError("Not implemented")
+
+    def GetGradient(self) -> Vector[float]:
+        raise ValueError("Not implemented")
+
+    def GetHessian(self) -> Vector[float]:
+        raise ValueError("Not implemented")
+
+    def ComputeGradient(self) -> None:
+        raise ValueError("Not implemented")
+
+    def ComputeHessian(self) -> None:
+        raise ValueError("Not implemented")

@@ -35,3 +35,9 @@ class CParametricFunction:
             vHessian[i] = 0.0
         for i in range(self.Parameters):
             vHessian[i * (self.Parameters + 1)] = self.PriorStrength
+
+    def GetValue(self, vParam: list[float], vx: list[float]) -> float:
+        raise ValueError("Not implemented")
+
+    def GetMonomials(self, vx: list[float], vMonomial: list[float]) -> None:
+        raise ValueError("Not implemented")

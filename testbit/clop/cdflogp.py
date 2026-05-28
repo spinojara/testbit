@@ -1,4 +1,10 @@
 from .cdifffunction import CDiffFunction
+from .util import Vector
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .cregression import CRegression
 
 class CDFLogP(CDiffFunction):
     reg: CRegression

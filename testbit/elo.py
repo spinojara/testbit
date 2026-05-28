@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import math
-from typing import List
 
 eps = 1e-6
 
@@ -18,7 +17,7 @@ def dsigmoiddx(x: float) -> float:
 def sigmoidinv(y: float) -> float:
     return -400.0 * math.log(1.0 / y - 1.0) / math.log(10.0)
 
-def normalize_clamp(p: List[int]) -> List[int]:
+def normalize_clamp(p: list[int]) -> list[float] | None:
     N = sum(p)
 
     if N <= 0:
@@ -37,7 +36,7 @@ def normalize_clamp(p: List[int]) -> List[int]:
 
     return n
 
-def f_calc(mu: float, C: float, n: List[float]) -> float:
+def f_calc(mu: float, C: float, n: list[float]) -> float:
     s = 0.0
 
     for i in range(5):
@@ -45,7 +44,7 @@ def f_calc(mu: float, C: float, n: List[float]) -> float:
 
     return s
 
-def mu_bisect(C: float, n: List[float]) -> float:
+def mu_bisect(C: float, n: list[float]) -> float:
     a = -1.0 / (1.0 - C)
     b = 1.0 / C
 
@@ -59,7 +58,7 @@ def mu_bisect(C: float, n: List[float]) -> float:
         else:
             b = c
 
-def loglikelihood(mu: float, C: float, n: List[float]) -> float:
+def loglikelihood(mu: float, C: float, n: list[float]) -> float:
     s = 0.0
     for i in range(5):
         p = n[i] / (1.0 + (alpha(i) - C) * mu)
@@ -69,7 +68,7 @@ def loglikelihood(mu: float, C: float, n: List[float]) -> float:
     return s
 
 
-def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
+def loglikelihoodratio(p: list[int], elo0: float, elo1: float) -> float | None:
     N = sum(p)
 
     n = normalize_clamp(p)
@@ -96,7 +95,7 @@ def loglikelihoodratio(p: List[int], elo0: float, elo1: float) -> float:
 
     return N * (loglikelihood(mu1, C1, n) - loglikelihood(mu0, C0, n))
 
-def calculate_elo(p: List[int]) -> tuple[float | None, float | None]:
+def calculate_elo(p: list[int]) -> tuple[float | None, float | None]:
     N = sum(p)
     if N <= 0:
         return None, None

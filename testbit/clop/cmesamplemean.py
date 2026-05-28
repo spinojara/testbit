@@ -17,3 +17,5 @@ class CMESampleMean(CMaxEstimator):
         if TotalWeight > 0.0:
             for i in range(self.reg.GetPF().GetDimensions()):
                 vMax[i] = vTotalWeightedSample[i] / TotalWeight
+
+        return True

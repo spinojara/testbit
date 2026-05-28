@@ -1,13 +1,16 @@
-from enum import IntEnum
-
 from .util import Vector
 from .coutcome import COutcome
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .cobserver import CObserver
 
 class CResults:
     Dimensions: int
     vSample: Vector[float]
-    vOutcome: Vector[float]
-    lObs: Vector[cobserver.CObserver] = Vector(0)
+    vOutcome: Vector[COutcome]
+    lObs: Vector[CObserver] = Vector(0)
     Samples: int
 
     def __init__(self, Dimensions: int) -> None:
@@ -19,7 +22,7 @@ class CResults:
     def AddOutcome(self, i: int, outcome: COutcome) -> None:
         self.vOutcome[i] = outcome
 
-        for obs in self.lObs:
+        for obs in self.lObs.data():
             obs.OnOutcome(i)
 
     def GetOutcome(self, i: int) -> COutcome:
@@ -37,11 +40,11 @@ class CResults:
 
         self.vOutcome[self.Samples - 1] = COutcome.InProgress
 
-        for obs in self.lObs:
+        for obs in self.lObs.data():
             obs.OnSample()
 
         if outcome is not None:
-            AddOutcome(self.Samples - 1, outcome)
+            self.AddOutcome(self.Samples - 1, outcome)
 
         return self.Samples - 1
 
