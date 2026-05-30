@@ -1317,18 +1317,18 @@ async def spsa_fetch_all(request):
         "id": row[0],
         "legacy": bool(row[1]),
         "description": row[2],
-        "status": row[4],
-        "tc": row[5],
-        "alpha": row[6],
-        "gamma": row[7],
-        "A": row[8],
-        "adjudicate": row[9],
-        "queuetime": row[10],
-        "starttime": row[11],
-        "donetime": row[12],
-        "commithash": row[13],
-        "simd": row[14],
-        "N": row[15]
+        "status": row[3],
+        "tc": row[4],
+        "alpha": row[5],
+        "gamma": row[6],
+        "A": row[7],
+        "adjudicate": row[8],
+        "queuetime": row[9],
+        "starttime": row[10],
+        "donetime": row[11],
+        "commithash": row[12],
+        "simd": row[13],
+        "N": row[14]
     } for row in cursor.fetchall()]
 
     return web.json_response({"message": "ok", "tests": tests})
