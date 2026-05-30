@@ -1112,18 +1112,8 @@ async def test_fetch_single(request):
         log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
-    delta = -1
-    fullnnue = False
-    try:
-        data = await request.json()
-        delta_temp = data.get("delta")
-        if isinstance(delta_temp, int):
-            delta = delta_temp
-        fullnnue_temp = data.get("fullnnue")
-        if isinstance(fullnnue_temp, bool):
-            fullnnue = fullnnue_temp
-    except:
-        pass
+    delta = request.rel_url.query.get("delta", -1)
+    fullnnue = request.rel_url.query.get("fullnnue", "false").lower() == "true"
 
     cursor = con.cursor()
     cursor.execute("""
@@ -1221,14 +1211,7 @@ async def test_fetch_single(request):
     return resp
 
 async def test_fetch_all(request):
-    delta = -1
-    try:
-        data = await request.json()
-        delta_temp = data.get("delta")
-        if isinstance(delta_temp, int):
-            delta = delta_temp
-    except:
-        pass
+    delta = request.rel_url.query.get("delta", -1)
 
     cursor = con.cursor()
     cursor.execute("""
@@ -1306,15 +1289,6 @@ async def test_fetch_all(request):
     return web.json_response({"message": "ok", "tests": tests})
 
 async def spsa_fetch_all(request):
-    delta = -1
-    try:
-        data = await request.json()
-        delta_temp = data.get("delta")
-        if isinstance(delta_temp, int):
-            delta = delta_temp
-    except:
-        pass
-
     cursor = con.cursor()
     cursor.execute("""
         SELECT
@@ -1332,16 +1306,10 @@ async def spsa_fetch_all(request):
             tests.donetime,
             tests.commithash,
             tests.simd,
-            (tests.t0 + tests.t1 + tests.t2) / 2,
-            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
+            (tests.t0 + tests.t1 + tests.t2) / 2
         FROM tests
-        LEFT OUTER JOIN games
-            ON tests.id = games.testid
-            AND games.donetime IS NOT NULL
-            AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.type = 'spsa'
-        GROUP BY tests.id;
-    """, (delta, delta))
+        WHERE tests.type = 'spsa';
+    """)
 
     tests = [{
         "id": row[0],
@@ -1358,8 +1326,7 @@ async def spsa_fetch_all(request):
         "donetime": row[12],
         "commithash": row[13],
         "simd": row[14],
-        "N": row[15],
-        "gametimeavg": row[16],
+        "N": row[15]
     } for row in cursor.fetchall()]
 
     return web.json_response({"message": "ok", "tests": tests})
@@ -1438,14 +1405,7 @@ async def spsa_fetch_single(request):
         log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
-    fullnnue = False
-    try:
-        data = await request.json()
-        fullnnue_temp = data.get("fullnnue")
-        if isinstance(fullnnue_temp, bool):
-            fullnnue = fullnnue_temp
-    except:
-        pass
+    fullnnue = request.rel_url.query.get("fullnnue", "false").lower() == "true"
 
     cursor = con.cursor()
     cursor.execute("""
@@ -1475,8 +1435,8 @@ async def spsa_fetch_single(request):
             AND games.donetime IS NOT NULL
             AND games.spsa IS NOT NULL
         WHERE tests.id = ? AND tests.type = 'spsa'
-        ORDER BY games.starttime ASC
-        GROUP BY tests.id;
+        GROUP BY tests.id
+        ORDER BY games.starttime ASC;
     """, (id, ))
 
     row = cursor.fetchone()
@@ -1528,18 +1488,7 @@ async def clop_fetch_single(request):
         log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
-    delta = -1
-    fullnnue = False
-    try:
-        data = await request.json()
-        delta_temp = data.get("delta")
-        if isinstance(delta_temp, int):
-            delta = delta_temp
-        fullnnue_temp = data.get("fullnnue")
-        if isinstance(fullnnue_temp, bool):
-            fullnnue = fullnnue_temp
-    except:
-        pass
+    fullnnue = request.rel_url.query.get("fullnnue", "false").lower() == "true"
 
     cursor = con.cursor()
     cursor.execute("""
@@ -1581,8 +1530,8 @@ async def clop_fetch_single(request):
             AND games.w + games.d + games.l = 2
             AND games.spsa IS NOT NULL
         WHERE tests.id = ? AND tests.type = 'clop'
-        ORDER BY games.starttime ASC
-        GROUP BY tests.id;
+        GROUP BY tests.id
+        ORDER BY games.starttime ASC;
     """, (id, ))
 
     row = cursor.fetchone()
