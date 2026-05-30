@@ -95,7 +95,7 @@ def loglikelihoodratio(p: list[int], elo0: float, elo1: float) -> float | None:
 
     return N * (loglikelihood(mu1, C1, n) - loglikelihood(mu0, C0, n))
 
-def calculate_elo(p: list[int]) -> tuple[float | None, float | None]:
+def calculate_elo(p: list[float]) -> tuple[float | None, float | None]:
     N = sum(p)
     if N <= 0:
         return None, None
