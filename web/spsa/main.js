@@ -442,6 +442,8 @@ getData(id).then(data => {
 	}
 
 	prepatch.innerHTML = formatPatch(test.patch);
+	if (!test.patch)
+		prepatch.style.display = 'none';
 	preerrorlog.innerHTML = parseEscapeCodes(test.errorlog);
 	if (!test.errorlog)
 		preerrorlog.style.display = 'none';
