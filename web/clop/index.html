@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Testbit</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="margindiv">
+      <table id="testtable"></table>
+    </div>
+    <div class="margindiv">
+      <table id="paramtable"></table>
+    </div>
+    <div id="passwordprompt" class="hidden">
+      <div class="password">
+        <div class="passwordbox">
+          <div>
+            <span class="noselect">Password:</span>
+            <input id="passwordinput" type="password"></input>
+          </div>
+          <div class="buttondiv">
+            <button onclick="continuerequest()" class="buttons">Continue</button>
+            <button onclick="cancelrequest()" class="button"> Cancel </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="wrongpassword" class="hidden">
+      <div class="password">
+        <div class="passwordbox">
+          <div>
+            <span class="noselect">Wrong password!</span>
+          </div>
+          <div class="buttondiv">
+            <button onclick="wrongpasswordok()" class="button">Ok</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="buttondiv" class="margindiv">
+      <button id="actionbutton" class="button"></button>
+      <select id="selectx"></select>
+      <select id="selecty"></select>
+    </div>
+    <div class="margindiv">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="margindiv">
+      <pre id="errorlog"></pre>
+    </div>
+    <div class="margindiv">
+      <pre id="patch"></pre>
+    </div>
+    <script src="main.js"></script>
+  </body>
+</html>
