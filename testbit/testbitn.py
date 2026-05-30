@@ -252,7 +252,7 @@ def main() -> int:
     parser.add_argument("--stdin", type=str, help="Read stdin from file.")
     parser.add_argument("--stdout", type=str, help="Redicret stdout to file.", default=None)
     parser.add_argument("--stderr", type=str, help="Redicret stderr to file.", default=None)
-    parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="localhost")
+    parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="jalagaoi.se")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
     parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
     parser.add_argument("--port", type=str, default="443")
