@@ -139,9 +139,6 @@ def clop_load(id: int) -> CExperiment:
                     WHERE id = ?;
                 """, (id, ))
                 tune = json.loads(cursor.fetchone()[0])
-                print("Loading")
-                print(tune)
-                print(type(tune["p1"]))
                 for key, value in tune.items():
                     paramcol.append(CLinearParameter(key, value.get("min"), value.get("max")))
             cexp = CExperiment(paramcol, id)
@@ -152,9 +149,9 @@ def clop_load(id: int) -> CExperiment:
                     cursor = con.cursor()
                     cursor.execute("""
                         SELECT id, spsa
-                        FROM tests
+                        FROM games
                         WHERE
-                            id = ?
+                            testid = ?
                             AND donetime IS NOT NULL
                             AND spsa IS NOT NULL;
                     """, (id, ))
@@ -169,12 +166,10 @@ def clop_load(id: int) -> CExperiment:
                     """, newrows)
                     con.commit()
 
-            cexp.reg.AddObserver(obs)
-
             clops[id] = cexp
 
             with dbcond:
-                cursor = con.execute()
+                cursor = con.cursor()
                 cursor.execute("""
                     SELECT spsa, w, d, l
                     FROM games
@@ -187,10 +182,14 @@ def clop_load(id: int) -> CExperiment:
                 allrows = cursor.fetchall()
 
             for tune, w, d, l in allrows:
-                cexp.add_sample(tune, w, d, l)
+                cexp.add_sample(json.loads(tune), w, d, l)
 
             cexp.reg.SetAutoLocalize(True)
             cexp.reg.ComputeLocalWeights()
+            # We can add the observer last since we don't have to store
+            # the weights at this point
+            cexp.reg.AddObserver(obs)
+
 
     return clops[id]
 
@@ -526,6 +525,8 @@ async def test_new(request):
             spsa[name] = {
                 "min": min,
                 "max": max,
+                "mean": None,
+                "maximum": None,
             }
 
     if not isinstance(commit, str) or not commit:
@@ -709,7 +710,7 @@ async def test_data(request):
             dy = wins - losses
 
             if spsa.keys() != spsaargs.keys():
-                print("error: expected equal spsa keys", file=sys.stderr)
+                log("error: expected equal spsa keys")
                 con.rollback()
                 return web.json_response({"message": "internal error"}, status=400)
 
@@ -744,6 +745,25 @@ async def test_data(request):
             """, (json.dumps(spsaargs) if dy else None, task_uuid, id))
         elif type == "clop":
             spsa = json.loads(spsa)
+            seed: int = clop_get_seed(id, task_uuid)
+            clop = clop_load(id)
+            if seed >= 0:
+                clop.add_outcome(seed, wins, draws, losses)
+
+                dim: int = clop.reg.GetPF().GetDimensions()
+                mean: list[float] = [0.0 for _ in range(dim)]
+                maximum: list[float] = [0.0 for _ in range(dim)]
+
+                clop.me.MaxParameter(mean)
+                for key, value in clop.dict_from_sample(mean).items():
+                    spsa[key]["mean"] = value
+                has_max: bool = clop.reg.GetPF().GetMax(clop.reg.MAP(), maximum)
+                for key, value in clop.dict_from_sample(maximum).items():
+                    if has_max:
+                        spsa[key]["maximum"] = value
+                    else:
+                        spsa[key]["maximum"] = None
+
             cursor.execute("""
                 UPDATE tests
                 SET t0 = ?,
@@ -753,13 +773,10 @@ async def test_data(request):
                     p1 = ?,
                     p2 = ?,
                     p3 = ?,
-                    p4 = ?
+                    p4 = ?,
+                    spsa = json(?)
                 WHERE id = ?;
-            """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], id))
-
-            seed: int = clop_get_seed(id, task_uuid)
-            if seed >= 0:
-                clop.add_outcome(seed, wins, draws, losses)
+            """, (t0, t1, t2, p[0], p[1], p[2], p[3], p[4], json.dumps(spsa), id))
         else:
             if pm is not None and pm < eloe:
                 status = "done"
@@ -1304,7 +1321,6 @@ async def spsa_fetch_all(request):
             tests.id,
             tests.legacy,
             tests.description,
-            tests.type,
             tests.status,
             tests.tc,
             tests.alpha,
@@ -1323,7 +1339,7 @@ async def spsa_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.type IN ('spsa', 'clop')
+        WHERE tests.type = 'spsa'
         GROUP BY tests.id;
     """, (delta, delta))
 
@@ -1331,7 +1347,6 @@ async def spsa_fetch_all(request):
         "id": row[0],
         "legacy": bool(row[1]),
         "description": row[2],
-        "type": row[3],
         "status": row[4],
         "tc": row[5],
         "alpha": row[6],
@@ -1349,6 +1364,73 @@ async def spsa_fetch_all(request):
 
     return web.json_response({"message": "ok", "tests": tests})
 
+async def clop_fetch_all(request):
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.status,
+            tests.tc,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.commithash,
+            tests.simd,
+            (tests.t0 + tests.t1 + tests.t2) / 2,
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 0 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 0 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 0 THEN 1 ELSE 0 END)
+        FROM tests
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND games.w + games.d + games.l = 2
+        WHERE tests.type = 'clop'
+        GROUP BY tests.id;
+    """)
+
+    tests = [{
+        "id": row[0],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "status": row[3],
+        "tc": row[4],
+        "adjudicate": row[5],
+        "queuetime": row[6],
+        "starttime": row[7],
+        "donetime": row[8],
+        "commithash": row[9],
+        "simd": row[10],
+        "N": row[11],
+        "eloall": eloall,
+        "pmall": pmall,
+        "eloweighted": eloweighted,
+        "pmweighted": pmweighted,
+        "elocentral": elocentral,
+        "pmcentral": pmcentral,
+        } for row in cursor.fetchall()
+        for eloall, pmall in (calculate_elo(row[12:17]), )
+        for eloweighted, pmweighted in (calculate_elo(row[17:22]), )
+        for elocentral, pmcentral in (calculate_elo(row[22:27]), )
+    ]
+
+    return web.json_response({"message": "ok", "tests": tests})
+
 async def spsa_fetch_single(request):
     try:
         id = int(request.match_info.get("id"))
@@ -1356,13 +1438,9 @@ async def spsa_fetch_single(request):
         log_exception()
         return web.json_response({"message": "bad id"}, status=400)
 
-    delta = -1
     fullnnue = False
     try:
         data = await request.json()
-        delta_temp = data.get("delta")
-        if isinstance(delta_temp, int):
-            delta = delta_temp
         fullnnue_temp = data.get("fullnnue")
         if isinstance(fullnnue_temp, bool):
             fullnnue = fullnnue_temp
@@ -1390,30 +1468,23 @@ async def spsa_fetch_single(request):
             tests.errorlog,
             tests.spsa,
             (tests.t0 + tests.t1 + tests.t2) / 2,
-            (
-                SELECT json_group_array(json_patch(json(spsa), '$._weight', weight))
-                FROM games
-                WHERE games.testid = tests.id
-                    AND games.donetime IS NOT NULL
-                    AND games.spsa IS NOT NULL
-                ORDER BY donetime ASC
-            ),
-            (unixepoch() - min(games.donetime + games.starttime) / 2.0) / count(games.id)
+            json_group_array(json(spsa))
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
-            AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.id = ? AND tests.type IN ('spsa', 'clop')
+            AND games.spsa IS NOT NULL
+        WHERE tests.id = ? AND tests.type = 'spsa'
+        ORDER BY games.starttime ASC
         GROUP BY tests.id;
-    """, (delta, delta, id))
+    """, (id, ))
 
     row = cursor.fetchone()
     if not row:
         return web.json_response({"message": "bad id"}, status=400)
 
     patch = row[14]
-    if patch:
+    if patch is not None:
         patch = patch.decode("utf-8")
         # Reduce size of sent patch
         if not fullnnue:
@@ -1442,7 +1513,119 @@ async def spsa_fetch_single(request):
         "spsa": json.loads(row[16]),
         "N": row[17],
         "spsahistory": spsa,
-        "gametimeavg": row[19],
+    }
+
+    resp = web.json_response({"message": "ok", "test": test})
+    if not fullnnue:
+        resp.enable_compression()
+
+    return resp
+
+async def clop_fetch_single(request):
+    try:
+        id = int(request.match_info.get("id"))
+    except:
+        log_exception()
+        return web.json_response({"message": "bad id"}, status=400)
+
+    delta = -1
+    fullnnue = False
+    try:
+        data = await request.json()
+        delta_temp = data.get("delta")
+        if isinstance(delta_temp, int):
+            delta = delta_temp
+        fullnnue_temp = data.get("fullnnue")
+        if isinstance(fullnnue_temp, bool):
+            fullnnue = fullnnue_temp
+    except:
+        pass
+
+    cursor = con.cursor()
+    cursor.execute("""
+        SELECT
+            tests.id,
+            tests.legacy,
+            tests.description,
+            tests.status,
+            tests.tc,
+            tests.adjudicate,
+            tests.queuetime,
+            tests.starttime,
+            tests.donetime,
+            tests.commithash,
+            tests.simd,
+            tests.patch,
+            tests.spsa,
+            (tests.t0 + tests.t1 + tests.t2) / 2,
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 0 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 0 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 0 THEN 1 ELSE 0 END),
+            json_group_array(json_set(json(games.spsa), '$._weight', games.weight, '$._score', 0.5 * games.w + 0.25 * games.d))
+        FROM tests
+        LEFT OUTER JOIN games
+            ON tests.id = games.testid
+            AND games.donetime IS NOT NULL
+            AND games.w + games.d + games.l = 2
+            AND games.spsa IS NOT NULL
+        WHERE tests.id = ? AND tests.type = 'clop'
+        ORDER BY games.starttime ASC
+        GROUP BY tests.id;
+    """, (id, ))
+
+    row = cursor.fetchone()
+    if not row:
+        return web.json_response({"message": "bad id"}, status=400)
+
+    patch = row[11]
+    if patch is not None:
+        patch = patch.decode("utf-8")
+        # Reduce size of sent patch
+        if not fullnnue:
+            patch = re.sub(r"(?<=\nGIT binary patch\n).*?(?=\ndiff --git |\Z)", "", patch, flags=re.DOTALL)
+    errorlog = row[15]
+
+    spsa = json.loads(row[12])
+    spsahistory = json.loads(row[29])
+
+    eloall, pmall = calculate_elo(row[14:19])
+    eloweighted, pmweighted = calculate_elo(row[19:24])
+    elocentral, pmcentral = calculate_elo(row[24:29])
+
+    test = {
+        "id": row[0],
+        "legacy": bool(row[1]),
+        "description": row[2],
+        "status": row[3],
+        "tc": row[4],
+        "adjudicate": row[5],
+        "queuetime": row[6],
+        "starttime": row[7],
+        "donetime": row[8],
+        "commithash": row[9],
+        "simd": row[10],
+        "patch": patch,
+        "N": row[13],
+        "spsa": spsa,
+        "eloall": eloall,
+        "pmall": pmall,
+        "eloweighted": eloweighted,
+        "pmweighted": pmweighted,
+        "elocentral": elocentral,
+        "pmcentral": pmcentral,
+        "spsahistory": spsahistory,
     }
 
     resp = web.json_response({"message": "ok", "test": test})
@@ -1509,6 +1692,8 @@ def create_app():
     app.router.add_get("/test", test_fetch_all)
     app.router.add_get("/spsa/{id}", spsa_fetch_single)
     app.router.add_get("/spsa", spsa_fetch_all)
+    app.router.add_get("/clop/{id}", clop_fetch_single)
+    app.router.add_get("/clop", clop_fetch_all)
     app.router.add_post("/test/backup", backup_database)
 
     return app
