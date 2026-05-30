@@ -1,21 +1,9 @@
+import { formatDate } from '/util.js';
+
 async function getData() {
 	const response = await fetch('https://jalagaoi.se/testbit/spsa');
 	const json = await response.json();
 	return await json;
-}
-
-function formatDate(unixepoch) {
-	if (!unixepoch) {
-		return '';
-	}
-	const date = new Date(unixepoch * 1000);
-	const year = String(date.getFullYear());
-	const month = String(date.getMonth() + 1);
-	const day = String(date.getDate());
-	const hour = String(date.getHours());
-	const minute = String(date.getMinutes());
-	const second = String(date.getSeconds());
-	return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
 }
 
 function truncate(text, n) {
@@ -24,9 +12,12 @@ function truncate(text, n) {
 	return text;
 }
 
-function totests() {
+document.getElementById('testbutton').addEventListener('click', () => {
 	window.location.href = '/';
-}
+});
+document.getElementById('clopbutton').addEventListener('click', () => {
+	window.location.href = '/clops';
+});
 
 const table = document.getElementById('testtable');
 table.addEventListener('click', function(event) {
@@ -87,7 +78,7 @@ function drawTable() {
 	getData().then(data => {
 		if (data.message != 'ok')
 			throw new Error('Bad request.');
-		tests = data.tests;
+		const tests = data.tests;
 		tests.sort((a, b) => {
 			if (a.donetime && !b.donetime)
 				return true;
@@ -109,46 +100,46 @@ function drawTable() {
 
 			row.classList.add('clickable-row');
 			row.dataset.id = test.id;
-			desc = row.cells[0];
+			const desc = row.cells[0];
 			desc.textContent = truncate(test.description, 33);
-			stat = row.cells[1];
+			const stat = row.cells[1];
 			stat.textContent = test.status;
 
-			N = row.cells[2];
+			const N = row.cells[2];
 			N.textContent = test.N;
 			N.style.textAlign = 'right';
 
-			alpha = row.cells[3];
+			const alpha = row.cells[3];
 			alpha.textContent = test.alpha;
 			alpha.style.textAlign = 'right';
 
-			gamma = row.cells[4];
+			const gamma = row.cells[4];
 			gamma.textContent = test.gamma;
 			gamma.style.textAlign = 'right';
 
-			A = row.cells[5];
+			const A = row.cells[5];
 			A.textContent = test.A;
 			A.style.textAlign = 'right';
 
-			tc = row.cells[6];
+			const tc = row.cells[6];
 			tc.textContent = test.tc;
 			tc.style.textAlign = 'center';
 
-			queue = row.cells[7];
+			const queue = row.cells[7];
 			if (test.queuetime) {
 				queue.textContent = formatDate(test.queuetime);
 				queue.style.textAlign = 'center';
 			}
 			else
 				queue.textContent = '';
-			start = row.cells[8];
+			const start = row.cells[8];
 			if (test.starttime) {
 				start.textContent = formatDate(test.starttime);
 				start.style.textAlign = 'center';
 			}
 			else
 				start.textContent = '';
-			done = row.cells[9];
+			const done = row.cells[9];
 			if (test.donetime) {
 				done.textContent = formatDate(test.donetime);
 				done.style.textAlign = 'center';

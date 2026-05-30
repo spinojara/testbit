@@ -1,21 +1,9 @@
+import { formatDate, formatElo } from '/util.js';
+
 async function getData() {
-	const response = await fetch('https://jalagaoi.se/testbit/test', data={"delta": 1800});
+	const response = await fetch('https://jalagaoi.se/testbit/test?delta=1800');
 	const json = await response.json();
 	return await json;
-}
-
-function formatDate(unixepoch) {
-	if (!unixepoch) {
-		return '';
-	}
-	const date = new Date(unixepoch * 1000);
-	const year = String(date.getFullYear());
-	const month = String(date.getMonth() + 1);
-	const day = String(date.getDate());
-	const hour = String(date.getHours());
-	const minute = String(date.getMinutes());
-	const second = String(date.getSeconds());
-	return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
 }
 
 function truncate(text, n) {
@@ -39,9 +27,12 @@ function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
 	return Date.now() / 1000 + N_needed * gametimeavg;
 }
 
-function tospsas() {
+document.getElementById('spsabutton').addEventListener('click', () => {
 	window.location.href = '/spsas';
-}
+});
+document.getElementById('clopbutton').addEventListener('click', () => {
+	window.location.href = '/clops';
+});
 
 const table = document.getElementById('testtable');
 table.addEventListener('click', function(event) {
@@ -100,9 +91,11 @@ startUpdating();
 function drawTable() {
 	console.log('redrawing');
 	getData().then(data => {
-		if (data.message != 'ok')
+		if (data.message != 'ok') {
+			console.log(data.message);
 			throw new Error('Bad request.');
-		tests = data.tests;
+		}
+		const tests = data.tests;
 		tests.sort((a, b) => {
 			if (a.donetime && !b.donetime)
 				return true;
@@ -124,39 +117,18 @@ function drawTable() {
 
 			row.classList.add('clickable-row');
 			row.dataset.id = test.id;
-			desc = row.cells[0];
+			const desc = row.cells[0];
 			desc.textContent = truncate(test.description, 33);
-			type = row.cells[1];
+			const type = row.cells[1];
 			type.textContent = test.type;
 			type.style.textAlign = 'center';
-			stat = row.cells[2];
+			const stat = row.cells[2];
 			stat.textContent = test.status;
-			elo = row.cells[3];
-			if (test.elo != null) {
-				var elotext = test.elo.toFixed(3).toString();
-				if (test.pm != null) {
-					var pmtext = test.pm.toFixed(3).toString();
-					if (elotext.length < pmtext.length)
-						elotext = ' '.repeat(pmtext.length - elotext.length) + elotext + '\u00B1' + pmtext;
-					else
-						elotext += '\u00B1' + pmtext + ' '.repeat(elotext.length - pmtext.length);
-				}
-				else {
-					var split = elotext.split('.');
-					var beforedot = split[0].length;
-					var afterdot = split[1].length;
-					if (beforedot < afterdot)
-						elotext = ' '.repeat(afterdot - beforedot) + elotext;
-					else
-						elotext += ' '.repeat(beforedot - afterdot);
-				}
-				elo.textContent = elotext;
-			}
-			else
-				elo.textContent = '';
+			const elo = row.cells[3];
+			elo.textContent = formatElo(test.elo, test.pm)
 			elo.style.textAlign = 'center';
 			elo.style.whiteSpace = 'pre';
-			trinomial = row.cells[4];
+			const trinomial = row.cells[4];
 			trinomial.textContent = test.t0 + '-' + test.t1 + '-' + test.t2;
 			var righttext = test.t0.toString().length;
 			var lefttext = test.t2.toString().length;
@@ -166,7 +138,7 @@ function drawTable() {
 				trinomial.textContent += ' '.repeat(righttext - lefttext);
 			trinomial.style.textAlign = 'center';
 			trinomial.style.whiteSpace = 'pre';
-			pentanomial = row.cells[5];
+			const pentanomial = row.cells[5];
 			pentanomial.textContent = test.p0 + '-' + test.p1 + '-' + test.p2 + '-' + test.p3 + '-' + test.p4;
 			var righttext = test.p0.toString().length + test.p1.toString().length;
 			var lefttext = test.p3.toString().length + test.p4.toString().length;
@@ -176,34 +148,30 @@ function drawTable() {
 				pentanomial.textContent += ' '.repeat(righttext - lefttext);
 			pentanomial.style.textAlign = 'center';
 			pentanomial.style.whiteSpace = 'pre';
-			llr = row.cells[6];
+			const llr = row.cells[6];
 			llr.style.textAlign = 'right';
 			if (test.llr != null)
 				llr.textContent = test.llr.toFixed(3);
 			else
 				llr.textContent = '';
-			queue = row.cells[7];
+			const queue = row.cells[7];
 			if (test.queuetime) {
 				queue.textContent = formatDate(test.queuetime);
 				queue.style.textAlign = 'center';
 			}
 			else
 				queue.textContent = '';
-			start = row.cells[8];
+			const start = row.cells[8];
 			if (test.starttime) {
 				start.textContent = formatDate(test.starttime);
 				start.style.textAlign = 'center';
 			}
 			else
 				start.textContent = '';
-			done = row.cells[9];
+			const done = row.cells[9];
 			done.style.textAlign = 'center';
 			done.style.whiteSpace = 'pre';
 			const N = (test.t0 + test.t1 + test.t2) / 2;
-			if (index == 0) {
-				console.log('N: ' + N);
-				console.log('llr: ' + test.llr);
-			}
 			if (test.donetime) {
 				done.textContent = formatDate(test.donetime);
 			}

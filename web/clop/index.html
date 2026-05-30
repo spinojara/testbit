@@ -19,8 +19,8 @@
             <input id="passwordinput" type="password"></input>
           </div>
           <div class="buttondiv">
-            <button onclick="continuerequest()" class="buttons">Continue</button>
-            <button onclick="cancelrequest()" class="button"> Cancel </button>
+            <button id="buttoncontinue" class="buttons">Continue</button>
+            <button id="buttoncancel" class="button"> Cancel </button>
           </div>
         </div>
       </div>
@@ -32,7 +32,7 @@
             <span class="noselect">Wrong password!</span>
           </div>
           <div class="buttondiv">
-            <button onclick="wrongpasswordok()" class="button">Ok</button>
+            <button id="buttonwrongpasswordok" class="button">Ok</button>
           </div>
         </div>
       </div>
@@ -51,6 +51,6 @@
     <div class="margindiv">
       <pre id="patch"></pre>
     </div>
-    <script src="main.js"></script>
+    <script type="module" src="main.js"></script>
   </body>
 </html>
