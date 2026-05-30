@@ -335,16 +335,16 @@ function drawImage() {
 		maxY = spsa[axisY].max;
 	}
 
-	var i = length === 1 ? 1 : 0;
 	const lastElement = {};
 	for (const [key, param] of Object.entries(spsa)) {
 		lastElement[key] = param.theta;
 	}
 
 	const merged = [...spsahistory, lastElement];
-	length = Math.max(merged.length - 1, 1);
+	length = merged.length + 1;
+	var i = 1;
 	for (const point of merged) {
-		const phase = (i / length);
+		const phase = i / length;
 
 		if (axisX !== '')
 			x = Math.round((canvas.width - 1) * (point[axisX] - minX) / (maxX - minX));
