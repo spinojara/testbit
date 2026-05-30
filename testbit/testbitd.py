@@ -1154,7 +1154,8 @@ async def test_fetch_single(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.id = ? AND tests.type IN ('elo', 'sprt')
+        -- sqlite3 query planner is very stupid, let's trick it to get better performance
+        WHERE NOT (tests.id != ?) AND NOT (tests.type NOT IN ('elo', 'sprt'))
         GROUP BY tests.id;
     """, (delta, delta, id))
 
@@ -1250,7 +1251,8 @@ async def test_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND (? < 0 OR unixepoch() - ? <= games.donetime)
-        WHERE tests.type IN ('elo', 'sprt')
+        -- sqlite3 query planner is very stupid, let's trick it to get better performance
+        WHERE NOT (tests.type NOT IN ('elo', 'sprt'))
         GROUP BY tests.id;
     """, (delta, delta))
 
@@ -1367,7 +1369,8 @@ async def clop_fetch_all(request):
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND games.w + games.d + games.l = 2
-        WHERE tests.type = 'clop'
+        -- sqlite3 query planner is very stupid, let's trick it to get better performance
+        WHERE NOT (tests.type != 'clop')
         GROUP BY tests.id;
     """)
 
@@ -1428,13 +1431,14 @@ async def spsa_fetch_single(request):
             tests.errorlog,
             tests.spsa,
             (tests.t0 + tests.t1 + tests.t2) / 2,
-            json_group_array(json(spsa))
+            json_group_array(json(games.spsa))
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
             AND games.donetime IS NOT NULL
             AND games.spsa IS NOT NULL
-        WHERE tests.id = ? AND tests.type = 'spsa'
+        -- sqlite3 query planner is very stupid, let's trick it to get better performance
+        WHERE NOT (tests.id != ?) AND NOT (tests.type != 'spsa')
         GROUP BY tests.id
         ORDER BY games.starttime ASC;
     """, (id, ))
@@ -1529,7 +1533,8 @@ async def clop_fetch_single(request):
             AND games.donetime IS NOT NULL
             AND games.w + games.d + games.l = 2
             AND games.spsa IS NOT NULL
-        WHERE tests.id = ? AND tests.type = 'clop'
+        -- sqlite3 query planner is very stupid, let's trick it to get better performance
+        WHERE NOT (tests.id != ?) AND NOT (tests.type != 'clop')
         GROUP BY tests.id
         ORDER BY games.starttime ASC;
     """, (id, ))
