@@ -83,7 +83,6 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
     verify = not is_private_network(host)
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     host = f"http{"s" if verify else ""}://{host}:{port}"
-    print(host)
 
     rng = random.Random()
 
@@ -260,7 +259,6 @@ def main() -> int:
     parser.add_argument("--root-dir", type=str, help="Empty for development version.", default="/testbit")
 
     args, _ = parser.parse_known_args()
-    print(args.root_dir)
     if args.workers < 1 and args.workers != -1:
         print("--workers must be positive or -1", file=sys.stderr)
         return 1
