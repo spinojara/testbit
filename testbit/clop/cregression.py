@@ -389,3 +389,7 @@ class CRegression(CObserver):
 
     def GetSampleData(self, i: int) -> CSampleData:
         return self.vsd[i]
+
+    def MAP(self) -> list[float]:
+        self.EnsureState(S_.MAP)
+        return self.vParamMAP.data()

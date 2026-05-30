@@ -23,7 +23,28 @@ class CMatrixOperations:
 
     @staticmethod
     def Solve(vMatrix: list[float], v: list[float], Size: int) -> None:
-        raise ValueError("Not implemented")
+        for i in range(Size):
+            j: int = i
+            while True:
+                j -= 1
+                if j < 0:
+                    break
+                v[i] -= v[j] * vMatrix[i * Size + j]
+            v[i] /= vMatrix[i * Size + i]
+
+        i = Size
+        while True:
+            i -= 1
+            if i < 0:
+                break
+
+            j = i + 1
+            while True:
+                if j >= Size:
+                    break
+                v[i] -= vMatrix[j * Size + i]
+                j += 1
+            v[i] /= vMatrix[i * Size + i]
 
     @staticmethod
     def Inverse(vMatrix: list[float], vInverse: list[float], Size: int) -> None:
