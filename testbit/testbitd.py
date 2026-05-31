@@ -1435,7 +1435,7 @@ async def spsa_fetch_single(request):
             tests.errorlog,
             tests.spsa,
             (tests.t0 + tests.t1 + tests.t2) / 2,
-            json_group_array(json(games.spsa))
+            json_group_array(json(games.spsa) ORDER BY games.starttime ASC)
                 FILTER (WHERE games.spsa IS NOT NULL)
         FROM tests
         LEFT OUTER JOIN games
@@ -1444,8 +1444,7 @@ async def spsa_fetch_single(request):
             AND games.spsa IS NOT NULL
         -- sqlite3 query planner is very stupid, let's trick it to get better performance
         WHERE NOT (tests.id != ?) AND NOT (tests.type != 'spsa')
-        GROUP BY tests.id
-        ORDER BY games.starttime ASC;
+        GROUP BY tests.id;
     """, (id, ))
 
     row = cursor.fetchone()
@@ -1531,8 +1530,10 @@ async def clop_fetch_single(request):
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
-            json_group_array(json_set(json(games.spsa), '$._weight', games.weight, '$._score', 0.5 * games.w + 0.25 * games.d))
-                FILTER (WHERE games.spsa IS NOT NULL)
+            json_group_array(
+                json_set(json(games.spsa), '$._weight', games.weight, '$._score', 0.5 * games.w + 0.25 * games.d)
+                ORDER BY games.starttime ASC
+            ) FILTER (WHERE games.spsa IS NOT NULL)
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
@@ -1541,8 +1542,7 @@ async def clop_fetch_single(request):
             AND games.spsa IS NOT NULL
         -- sqlite3 query planner is very stupid, let's trick it to get better performance
         WHERE NOT (tests.id != ?) AND NOT (tests.type != 'clop')
-        GROUP BY tests.id
-        ORDER BY games.starttime ASC;
+        GROUP BY tests.id;
     """, (id, ))
 
     row = cursor.fetchone()
