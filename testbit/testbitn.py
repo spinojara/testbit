@@ -114,7 +114,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
         id = response.get("id")
         tc = response.get("tc")
         adjudicate = response.get("adjudicate")
-        task_uuid = response.get("uuid")
+        task_id = response.get("taskid")
         argsplus = response.get("argsplus")
         argsminus = response.get("argsminus")
 
@@ -124,7 +124,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
         if adjudicate == "resign" or adjudicate == "both":
             adjudicatestring += " -resign twosided=true movecount=3 score=800"
 
-        if None in [id, tc, adjudicate, task_uuid, argsplus, argsminus]:
+        if None in [id, tc, adjudicate, task_id, argsplus, argsminus]:
             has_critical_exception = cpu.release()
             print(f"{threading.get_ident()}: No task, sleeping for 10 seconds")
             if has_critical_exception:
@@ -176,11 +176,10 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
 
         except (ImageNotFound, NotFound):
             try:
-                response = requests.put(host + f"{root}/test/docker/%d" % id, json={"uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/docker/%d" % id, json={"taskid": task_id}, auth=("", password), verify=verify)
             except:
                 log_exception()
-            finally:
-                continue
+            continue
         except:
             # Maybe the registry service is not available yet?
             log_exception()
@@ -234,10 +233,10 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
         try:
             if result["StatusCode"] or losses + draws + wins != 2:
                 print(f"{threading.get_ident()}: Docker container had errors")
-                response = requests.put(host + f"{root}/test/error/%d" % id, json={"errorlog": logs, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/error/%d" % id, json={"errorlog": logs, "taskid": task_id}, auth=("", password), verify=verify)
             else:
                 print(f"{threading.get_ident()}: Docker container had no errors")
-                response = requests.put(host + f"{root}/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "uuid": task_uuid}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "taskid": task_id}, auth=("", password), verify=verify)
         except:
             log_exception()
 

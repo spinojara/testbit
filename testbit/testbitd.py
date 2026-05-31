@@ -104,7 +104,7 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
     rm -rf bitbit patch; } 2>&1
 """
 
-def clop_store_seed(id: int, task_uuid: str, seed: int) -> None:
+def clop_store_seed(id: int, task_id: int, seed: int) -> None:
     with cloplock:
         while len(clopseed) >= 10000:
             min_index = (-1, "")
@@ -116,11 +116,11 @@ def clop_store_seed(id: int, task_uuid: str, seed: int) -> None:
 
             clopseed.pop(min_index)
 
-        clopseed[(id, task_uuid)] = (seed, datetime.now())
+        clopseed[(id, task_id)] = (seed, datetime.now())
 
-def clop_get_seed(id: int, task_uuid: str) -> int:
+def clop_get_seed(id: int, task_id: int) -> int:
     with cloplock:
-        return clopseed.pop((id, task_uuid), (-1, None))[0]
+        return clopseed.pop((id, task_id), (-1, None))[0]
 
 def clop_unload(id: int) -> None:
     with cloplock:
@@ -156,7 +156,7 @@ def clop_load(id: int) -> CExperiment:
                             AND spsa IS NOT NULL;
                     """, (id, ))
                     allrows = cursor.fetchall()
-                newrows: list[tuple[float, int]] = [(cexp.reg.GetWeight(cexp.sample_from_dict(json.loads(spsa))), id) for id, spsa in allrows]
+                newrows: list[tuple[float, int]] = [(cexp.reg.GetWeight(cexp.sample_from_dict(json.loads(spsa))), gameid) for gameid, spsa in allrows]
                 with dbcond:
                     cursor = con.cursor()
                     cursor.executemany("""
@@ -317,14 +317,17 @@ def cleanup_thread():
             cursor = con.cursor()
             cursor.execute("""
                 DELETE FROM games
-                WHERE
-                    (
+                WHERE (
                         donetime IS NULL
                         AND starttime < unixepoch() - 3600
                     ) OR (
                         donetime IS NOT NULL
                         AND donetime < unixepoch() - 604800
-                        AND spsa IS NULL
+                        AND (
+                            spsa IS NULL
+                            OR spsa = ''
+                            OR spsa = '{}'
+                        )
                     );
             """)
             con.commit()
@@ -374,7 +377,7 @@ def create_table():
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS games (
-            id        TEXT PRIMARY KEY,
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
             testid    INTEGER,
             w         INTEGER,
             d         INTEGER,
@@ -619,9 +622,9 @@ async def test_data(request):
     wins = data.get("wins")
     draws = data.get("draws")
     losses = data.get("losses")
-    task_uuid = data.get("uuid")
-    if not isinstance(task_uuid, str):
-        return web.json_response({"message": "bad uuid"}, status=400)
+    task_id = data.get("taskid")
+    if not isinstance(task_id, int):
+        return web.json_response({"message": "bad id"}, status=400)
     if not isinstance(wins, int) or wins < 0:
         return web.json_response({"message": "bad wins"}, status=400)
     if not isinstance(losses, int) or losses < 0:
@@ -641,12 +644,12 @@ async def test_data(request):
                 donetime = unixepoch()
             WHERE id = ? AND testid = ? AND donetime IS NULL
             RETURNING spsa;
-        """, (wins, draws, losses, task_uuid, id))
+        """, (wins, draws, losses, task_id, id))
 
         row = cursor.fetchone()
         if not row:
             con.rollback()
-            return web.json_response({"message": "bad uuid"}, status=400)
+            return web.json_response({"message": "bad id"}, status=400)
 
         spsaargs = row[0]
 
@@ -742,10 +745,10 @@ async def test_data(request):
                 UPDATE games
                 SET spsa = json(?)
                 WHERE id = ? AND testid = ?;
-            """, (json.dumps(spsaargs) if dy else None, task_uuid, id))
+            """, (json.dumps(spsaargs) if dy else None, task_id, id))
         elif type == "clop":
             spsa = json.loads(spsa)
-            seed: int = clop_get_seed(id, task_uuid)
+            seed: int = clop_get_seed(id, task_id)
             clop = clop_load(id)
             if seed >= 0:
                 clop.add_outcome(seed, wins, draws, losses)
@@ -919,21 +922,21 @@ async def test_error(request):
         return web.json_response({"message": "no json"}, status=400)
 
     errorlog = data.get("errorlog")
-    task_uuid = data.get("uuid")
+    task_id = data.get("id")
     if not isinstance(errorlog, str):
         return web.json_response({"message": "bad errorlog"}, status=400)
-    if not isinstance(task_uuid, str):
-        return web.json_response({"message": "bad uuid"}, status=400)
+    if not isinstance(task_id, int):
+        return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
             DELETE FROM games
             WHERE id = ? AND testid = ? AND donetime IS NULL;
-        """, (task_uuid, id))
+        """, (task_id, id))
         if cursor.rowcount != 1:
             con.rollback()
-            return web.json_response({"message": "bad uuid"}, status=400)
+            return web.json_response({"message": "bad id"}, status=400)
         cursor.execute("""
             UPDATE tests
             SET status = 'error', errorlog = ?
@@ -957,19 +960,19 @@ async def test_docker(request):
         log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
-    task_uuid = data.get("uuid")
-    if not isinstance(task_uuid, str):
-        return web.json_response({"message": "bad uuid"}, status=400)
+    task_id = data.get("id")
+    if not isinstance(task_id, int):
+        return web.json_response({"message": "bad id"}, status=400)
 
     with dbcond:
         cursor = con.cursor()
         cursor.execute("""
             DELETE FROM games
             WHERE id = ? AND testid = ? AND donetime IS NULL;
-        """, (task_uuid, id))
+        """, (task_id, id))
         if cursor.rowcount != 1:
             con.rollback()
-            return web.json_response({"message": "bad uuid"}, status=400)
+            return web.json_response({"message": "bad id"}, status=400)
         cursor.execute("""
             UPDATE tests
             SET status = 'building'
@@ -1039,14 +1042,14 @@ async def get_task(request):
 
         id, type, tc, adjudicate, spsa, alpha, gamma, A, t0, t1, t2 = row
         spsa = json.loads(spsa)
-        spsaargs = {}
+        spsaargs = None
         k = (t0 + t1 + t2) // 2
         argsplus = ""
         argsminus = ""
-        task_uuid = str(uuid.uuid4())
         weight = None
 
         if type == "spsa":
+            spsaargs = {}
             for name, param in spsa.items():
                 a = param.get("a")
                 c = param.get("c")
@@ -1072,15 +1075,12 @@ async def get_task(request):
             cexp = clop_load(id)
             spsaargs, seed, weight = cexp.next_sample()
 
-            clop_store_seed(id, task_uuid, seed)
-
             for key, value in spsaargs.items():
                 argsplus += f" option.{key}={value}"
 
         cursor = con.cursor()
         cursor.execute("""
             INSERT INTO games (
-                id,
                 testid,
                 starttime,
                 spsa,
@@ -1088,19 +1088,23 @@ async def get_task(request):
             )
             VALUES (
                 ?,
-                ?,
                 unixepoch(),
                 json(?),
                 ?
-            );
-        """, (task_uuid, id, json.dumps(spsaargs), weight))
+            )
+            RETURNING id;
+        """, (id, json.dumps(spsaargs), weight))
+        task_id = cursor.fetchone()[0]
         con.commit()
+
+        if type == "clop":
+            clop_store_seed(id, task_id, seed)
 
     return web.json_response({
         "id": id,
         "tc": tc,
         "adjudicate": adjudicate,
-        "uuid": task_uuid,
+        "taskid": task_id,
         "argsplus": argsplus,
         "argsminus": argsminus
     })
@@ -1283,7 +1287,7 @@ async def test_fetch_all(request):
         "p2": row[23],
         "p3": row[24],
         "p4": row[25],
-        "commithash": row[26],
+        "commit": row[26],
         "simd": row[27],
         "gametimeavg": row[28]
     } for row in cursor.fetchall()]
@@ -1326,7 +1330,7 @@ async def spsa_fetch_all(request):
         "queuetime": row[9],
         "starttime": row[10],
         "donetime": row[11],
-        "commithash": row[12],
+        "commit": row[12],
         "simd": row[13],
         "N": row[14]
     } for row in cursor.fetchall()]
@@ -1384,7 +1388,7 @@ async def clop_fetch_all(request):
         "queuetime": row[6],
         "starttime": row[7],
         "donetime": row[8],
-        "commithash": row[9],
+        "commit": row[9],
         "simd": row[10],
         "N": row[11],
         "eloall": eloall,
@@ -1432,6 +1436,7 @@ async def spsa_fetch_single(request):
             tests.spsa,
             (tests.t0 + tests.t1 + tests.t2) / 2,
             json_group_array(json(games.spsa))
+                FILTER (WHERE games.spsa IS NOT NULL)
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
@@ -1527,6 +1532,7 @@ async def clop_fetch_single(request):
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
             json_group_array(json_set(json(games.spsa), '$._weight', games.weight, '$._score', 0.5 * games.w + 0.25 * games.d))
+                FILTER (WHERE games.spsa IS NOT NULL)
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
@@ -1568,7 +1574,7 @@ async def clop_fetch_single(request):
         "queuetime": row[6],
         "starttime": row[7],
         "donetime": row[8],
-        "commithash": row[9],
+        "commit": row[9],
         "simd": row[10],
         "patch": patch,
         "N": row[13],
