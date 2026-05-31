@@ -1349,21 +1349,21 @@ async def clop_fetch_all(request):
             tests.commithash,
             tests.simd,
             (tests.t0 + tests.t1 + tests.t2) / 2,
-            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
             SUM(CASE WHEN 2 * games.w + games.d = 0 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN games.weight ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN games.weight ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN games.weight ELSE 0 END),
-            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
             SUM(CASE WHEN 2 * games.w + games.d = 0 THEN games.weight ELSE 0 END),
-            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 1 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 2 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 3 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN 2 * games.w + games.d = 4 THEN games.weight ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 0 THEN 1 ELSE 0 END),
             SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 1 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 0 THEN 1 ELSE 0 END)
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN games.weight = 1.0 AND 2 * games.w + games.d = 4 THEN 1 ELSE 0 END)
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
