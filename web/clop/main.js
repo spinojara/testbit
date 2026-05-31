@@ -182,7 +182,7 @@ getData(id).then(data => {
 	tc.style.textAlign = 'center';
 
 	const commit = row.insertCell();
-	commit.textContent = truncate(test.commithash, 12);
+	commit.textContent = truncate(test.commit, 12);
 	commit.style.textAlign = 'center';
 
 	const time = row.insertCell();
@@ -366,7 +366,7 @@ function updateTable() {
 		NCell.textContent = test.N;
 
 		const commit = table.rows[1].cells[7];
-		commit.textContent = truncate(test.commithash, 12);
+		commit.textContent = truncate(test.commit, 12);
 
 		const eloall = table.rows[1].cells[3];
 		eloall.textContent = formatElo(test.eloall, test.pmall);
