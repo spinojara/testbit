@@ -319,8 +319,16 @@ class CRegression(CObserver):
             self.vsd[k].tProba[1] = CLogistic.f(+r - self.DrawRating)
 
             tLogP: list[float] = [0.0, 0.0, 0.0]
-            tLogP[COutcome.Loss] = math.log(self.vsd[k].tProba[0])
-            tLogP[COutcome.Win] = math.log(self.vsd[k].tProba[1])
+            if self.vsd[k].tProba[0] > 0.0:
+                tLogP[COutcome.Loss] = math.log(self.vsd[k].tProba[0])
+            else:
+                tLogP[COutcome.Loss] = -r - self.DrawRating
+
+            if self.vsd[k].tProba[1] > 0.0:
+                tLogP[COutcome.Win] = math.log(self.vsd[k].tProba[1])
+            else:
+                tLogP[COutcome.Win] = +r - self.DrawRating
+
             tLogP[COutcome.Draw] = tLogP[COutcome.Loss] + tLogP[COutcome.Win]
 
             self.L += self.vsd[k].Weight * (tLogP[0] * self.vsd[k].tCount[0] + tLogP[1] * self.vsd[k].tCount[1] + tLogP[2] * self.vsd[k].tCount[2])
