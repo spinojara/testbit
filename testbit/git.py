@@ -16,7 +16,7 @@ def check_ref_format(branch: str) -> int:
     if ".." in branch:
         return 3
     # 4, Not entierly correct, but this is better
-    if any(ord(c) < 0o40 or ord(c) >= 177 or c in "~^:" for c in branch):
+    if any(ord(c) < 0o40 or ord(c) >= 0o177 or c in " ~^:" for c in branch):
         return 4
     # 5
     if any(c in "?*[" for c in branch):

@@ -33,7 +33,7 @@ from .clop.cregression import CRegression
 from .clop.cexperiment import CExperiment
 
 clops: dict[int, CExperiment] = {}
-clopseed: dict[tuple[int, str], tuple[int, datetime]] = {}
+clopseed: dict[tuple[int, int], tuple[int, datetime]] = {}
 
 dbcond = threading.Condition()
 cloplock = threading.Lock()
@@ -107,9 +107,9 @@ RUN { git clone https://github.com/spinojara/bitbit.git && \
 def clop_store_seed(id: int, task_id: int, seed: int) -> None:
     with cloplock:
         while len(clopseed) >= 10000:
-            min_index = (-1, "")
+            min_index = (-1, -1)
             min_dt = None
-            for index, (seed, dt) in clopseed.items():
+            for index, (_, dt) in clopseed.items():
                 if min_dt is None or dt < min_dt:
                     min_index = index
                     min_dt = dt
@@ -702,7 +702,7 @@ async def test_data(request):
                     elo = ?,
                     pm = ?,
                     donetime = CASE
-                        WHEN ? IN ("H0 accepted", "H1 accepted")
+                        WHEN ? IN ('H0 accepted', 'H1 accepted')
                             THEN unixepoch()
                         ELSE NULL
                     END
@@ -924,7 +924,7 @@ async def test_error(request):
         return web.json_response({"message": "no json"}, status=400)
 
     errorlog = data.get("errorlog")
-    task_id = data.get("id")
+    task_id = data.get("taskid")
     if not isinstance(errorlog, str):
         return web.json_response({"message": "bad errorlog"}, status=400)
     if not isinstance(task_id, int):
@@ -962,7 +962,7 @@ async def test_docker(request):
         log_exception()
         return web.json_response({"message": "no json"}, status=400)
 
-    task_id = data.get("id")
+    task_id = data.get("taskid")
     if not isinstance(task_id, int):
         return web.json_response({"message": "bad id"}, status=400)
 
@@ -980,7 +980,10 @@ async def test_docker(request):
             SET status = 'building'
             WHERE status = 'running'
                 AND id = ?
-                AND unixepoch() - buildtime > 300;
+                AND (
+                    buildtime IS NULL OR
+                    unixepoch() - buildtime > 300
+                );
         """, (id, ))
         if cursor.rowcount > 0:
             dbcond.notify()
@@ -1558,7 +1561,6 @@ async def clop_fetch_single(request):
         # Reduce size of sent patch
         if not fullnnue:
             patch = re.sub(r"(?<=\nGIT binary patch\n).*?(?=\ndiff --git |\Z)", "", patch, flags=re.DOTALL)
-    errorlog = row[15]
 
     spsa = json.loads(row[12])
     spsahistory = json.loads(row[29])
@@ -1710,5 +1712,4 @@ def main() -> int:
     return 0
 
 if __name__ == "__main__":
-    fjaosidjf = fjoasijdf
     sys.exit(main())

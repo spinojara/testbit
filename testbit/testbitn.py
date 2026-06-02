@@ -60,7 +60,7 @@ def remove(cpu: CPU):
 def is_private_network(host: str) -> bool:
     if host == "localhost":
         return True
-    match = re.search("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)", host)
+    match = re.fullmatch("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)", host)
 
     if not match:
         return False
@@ -71,7 +71,7 @@ def is_private_network(host: str) -> bool:
     d = int(match.group(4))
 
     return ((a == 10 and 0 <= b and b <= 255 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
-        or (a == 72 and 16 <= b and b <= 31 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
+        or (a == 172 and 16 <= b and b <= 31 and 0 <= c and c <= 255 and 0 <= d and d <= 255)
         or (a == 192 and b == 168 and 0 <= c and c <= 255 and 0 <= d and d <= 255))
 
 def uptime():
@@ -102,7 +102,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
             response = response.json()
         except json.JSONDecodeError:
             log_exception()
-            sys.exit(1)
+            break
         except:
             has_critical_exception = cpu.release()
             log_exception()
@@ -249,8 +249,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, help="Amount of workers.", default=-1)
     parser.add_argument("--stdin", type=str, help="Read stdin from file.")
-    parser.add_argument("--stdout", type=str, help="Redicret stdout to file.", default=None)
-    parser.add_argument("--stderr", type=str, help="Redicret stderr to file.", default=None)
+    parser.add_argument("--stdout", type=str, help="Redirect stdout to file.", default=None)
+    parser.add_argument("--stderr", type=str, help="Redirect stderr to file.", default=None)
     parser.add_argument("--host", type=str, help="Hostname of testbitd.", default="jalagaoi.se")
     parser.add_argument("--daemon", help="daemon mode.", action="store_true", default=False)
     parser.add_argument("--syzygy", type=str, help="Colon separated list of syzygy tablebases directories.", default=None)
