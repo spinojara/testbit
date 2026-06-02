@@ -10,7 +10,7 @@ class CResults:
     Dimensions: int
     vSample: Vector[float]
     vOutcome: Vector[COutcome]
-    lObs: Vector[CObserver] = Vector(0)
+    lObs: Vector[CObserver]
     Samples: int
 
     def __init__(self, Dimensions: int) -> None:
@@ -18,6 +18,7 @@ class CResults:
         self.Samples = 0
         self.vOutcome = Vector()
         self.vSample = Vector()
+        self.lObs = Vector()
 
     def AddOutcome(self, i: int, outcome: COutcome) -> None:
         self.vOutcome[i] = outcome

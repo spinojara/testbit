@@ -40,11 +40,12 @@ class CDiffFunction:
             self.ComputeGradient()
             self.ComputeHessian()
 
-            self.vStep = vG
+            self.vStep = copy.deepcopy(vG)
             if CMatrixOperations.Cholesky(vH.data(), self.vCholesky.data(), n):
                 CMatrixOperations.Solve(self.vCholesky.data(), self.vStep.data(), n)
             else:
                 self.CG(vMax.data(), fTrace)
+                break
 
             for i in range(n):
                 self.vxTemp[i] = self.Normalize(vMax[i] + self.vStep[i])
@@ -54,6 +55,7 @@ class CDiffFunction:
 
             if (LNew != LNew or LNew < L) and NewtonStep > MinNewtonStep:
                 self.CG(vMax.data(), fTrace)
+                break
 
             vMax = self.vxTemp
             if LNew - L < NewtonThreshold:
@@ -83,10 +85,10 @@ class CDiffFunction:
                     Num += vG[i] * (vG[i] - vPrevG[i])
                     Den += vPrevG[i] * vPrevG[i]
 
-                Beta: float = Num / Den
-
-                if Den == 0.0 or Beta > MaxBeta:
-                    Beta = MaxBeta
+                if Den == 0.0 or Num / Den > MaxBeta:
+                    Beta: float = MaxBeta
+                else:
+                    Beta: float = Num / Den
 
                 for i in range(self.GetDimensions()):
                     vD[i] = vG[i] + Beta * vD[i]

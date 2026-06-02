@@ -1,9 +1,16 @@
 class CSampleData:
-    Weight: float = 0.0
-    Replications: int = 0
-    Index: int = 0
-    tProba: list[float] = [0.0, 0.0]
-    tCount: list[int] = [0, 0, 0]
+    Weight: float
+    Replications: int
+    Index: int
+    tProba: list[float]
+    tCount: list[int]
+
+    def __init__(self) -> None:
+        self.Weight = 0.0
+        self.Replications = 0
+        self.Index = 0
+        self.tProba = [0.0, 0.0]
+        self.tCount = [0, 0, 0]
 
     def GetCount(self) -> int:
         return self.tCount[0] + self.tCount[1] + self.tCount[2]

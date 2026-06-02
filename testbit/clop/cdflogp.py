@@ -24,8 +24,8 @@ class CDFLogP(CDiffFunction):
             if vInput[i] != self.reg.vParamMAP[i]:
                 self.reg.vParamMAP[i] = vInput[i]
                 self.reg.State = 0
-            from .cregression import S_
-            self.reg.EnsureState(S_.LogP)
+        from .cregression import S_
+        self.reg.EnsureState(S_.LogP)
         return self.reg.L
 
     def ComputeGradient(self) -> None:

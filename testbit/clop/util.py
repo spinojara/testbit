@@ -35,7 +35,7 @@ class Vector(Generic[T]):
     def pop_back(self) -> None:
         if len(self._data) == 0:
             raise ValueError("Cannot pop_back when vector is empty")
-        del self._data[:1]
+        del self._data[-1:]
 
     def __len__(self) -> int:
         return self.size()

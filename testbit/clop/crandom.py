@@ -2,7 +2,7 @@ from typing import TypeVar, Generic
 
 T = TypeVar("T")
 
-UINT64_MAX = 0xFFFFFFFFFFFFFFF
+UINT64_MAX = 0xFFFF_FFFF_FFFF_FFFF
 
 class CRandom:
     _Seed: int

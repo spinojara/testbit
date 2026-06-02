@@ -41,3 +41,6 @@ class CParametricFunction:
 
     def GetMonomials(self, vx: list[float], vMonomial: list[float]) -> None:
         raise ValueError("Not implemented")
+
+    def GetGradient(self, vParam: list[float], vx: list[float], vG: list[float]) -> None:
+        raise ValueError("Not implemented")

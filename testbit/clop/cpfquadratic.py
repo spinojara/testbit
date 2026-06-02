@@ -57,7 +57,7 @@ class CPFQuadratic(CParametricFunction):
 
     def GetMax(self, vParam: list[float], vx: list[float]) -> bool:
         vMatrix: Vector[float] = Vector(self.Dimensions * self.Dimensions)
-        p: int = self.Dimensions - 1
+        p: int = self.Dimensions + 1
         i: int = self.Dimensions
         while True:
             i -= 1
@@ -118,4 +118,30 @@ class CPFQuadratic(CParametricFunction):
                 if j < 0:
                     break
                 vMonomial[p] = vx[i] * vx[j]
+                p += 1
+
+    def GetGradient(self, vParam: list[float], vx: list[float], vG: list[float]) -> None:
+        p: int = 1
+
+        i: int = self.Dimensions
+        while True:
+            i -= 1
+            if i < 0:
+                break
+            vG[i] = vParam[p]
+            p += 1
+
+        i = self.Dimensions
+        while True:
+            i -= 1
+            if i < 0:
+                break
+
+            j: int = i + 1
+            while True:
+                j -= 1
+                if j < 0:
+                    break
+                vG[i] += vParam[p] * vx[j]
+                vG[j] += vParam[p] * vx[i]
                 p += 1

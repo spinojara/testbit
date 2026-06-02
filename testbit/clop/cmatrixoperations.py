@@ -42,7 +42,7 @@ class CMatrixOperations:
             while True:
                 if j >= Size:
                     break
-                v[i] -= vMatrix[j * Size + i]
+                v[i] -= v[j] * vMatrix[j * Size + i]
                 j += 1
             v[i] /= vMatrix[i * Size + i]
 

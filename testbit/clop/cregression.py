@@ -36,7 +36,6 @@ class CRegression(CObserver):
     pf: CParametricFunction
     Samples: int
     vsd: Vector[CSampleData]
-    tCount: list[int] = [0, 0, 0]
     DrawRating: float = 100 * math.log(10.0) / 400.0
     vParamMAP: Vector[float]
     vMonomial: Vector[float]
@@ -74,6 +73,7 @@ class CRegression(CObserver):
         self.vsd = Vector(0, CSampleData)
         self.vWeighting = Vector()
         self.lObs = []
+        self.tCount = [0, 0, 0]
 
         self.OnReset()
 
@@ -206,7 +206,7 @@ class CRegression(CObserver):
 
             self.EnsureState(S_.MAP)
             weighting: CWeighting = CWeighting()
-            weighting.vParam = self.vParamMAP
+            weighting.vParam = copy.deepcopy(self.vParamMAP)
             weighting.Radius = Deviation * self.LocalizationHeight * self.Samples ** self.LocalizationPower
             weighting.Mean = Mean
             self.vWeighting.push_back(weighting)
@@ -242,7 +242,7 @@ class CRegression(CObserver):
             Iterations += 1
             if self.MaxWeightIterations and Iterations >= self.MaxWeightIterations:
                 break
-            if self.TotalWeight < PreviousTotalWeight * 0.99:
+            if self.TotalWeight >= PreviousTotalWeight * 0.99:
                 break
 
         if self.MaxWeightIterations == 0 and self.vWeighting.size() > 0:
@@ -298,7 +298,7 @@ class CRegression(CObserver):
         v: Vector[float] = copy.deepcopy(self.vParamMAP)
 
         v = func.Newton(v)
-        self.vParamMap = copy.deepcopy(v)
+        self.vParamMAP = copy.deepcopy(v)
         func.GetOutput(v.data())
 
         self.State = S_.MAP | S_.LogP
@@ -374,10 +374,11 @@ class CRegression(CObserver):
                     break
 
                 p2: int = self.pf.GetParameters()
-                p2 -= 1
-                if p2 < p1:
-                    break
-                self.vHessian[p1 * self.pf.GetParameters() + p2] += TotalMul * self.vMonomial[p1] * self.vMonomial[p2]
+                while True:
+                    p2 -= 1
+                    if p2 < p1:
+                        break
+                    self.vHessian[p1 * self.pf.GetParameters() + p2] += TotalMul * self.vMonomial[p1] * self.vMonomial[p2]
         self.State |= S_.Hessian
 
     def GetTotalWeight(self) -> float:

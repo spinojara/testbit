@@ -20,7 +20,7 @@ class CSPWeight(CSamplingPolicy):
         self.rnd = CRandom()
 
     def NextSample(self, i: int) -> list[float]:
-        if self.ReplicationThreshold and i > 0 and self.reg.GetReplications(i - 1) < (1 + i / self.ReplicationThreshold):
+        if self.ReplicationThreshold and i > 0 and self.reg.GetReplications(i - 1) < (1 + i // self.ReplicationThreshold):
             return self.reg.GetSample(i - 1)
 
         for j in range(self.vResult.size()):
