@@ -755,7 +755,7 @@ async def test_data(request):
                 with cloplock:
                     cexp.add_outcome(seed, wins, draws, losses)
 
-                    dim: int = clop.reg.GetPF().GetDimensions()
+                    dim: int = cexp.reg.GetPF().GetDimensions()
                     mean: list[float] = [0.0 for _ in range(dim)]
                     maximum: list[float] = [0.0 for _ in range(dim)]
 
