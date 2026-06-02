@@ -31,8 +31,8 @@ class CDiffFunction:
         return self.Dimensions
 
     def Newton(self, vMax: Vector[float], fTrace: bool = False) -> Vector[float]:
-        vG = self.GetGradient()
-        vH = self.GetHessian()
+        vG: Vector[float] = self.GetGradient()
+        vH: Vector[float] = self.GetHessian()
         n: int = self.GetDimensions()
 
         for Iterations in range(MaxNewtonIterations):
