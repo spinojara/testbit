@@ -88,7 +88,7 @@ class CDiffFunction:
                 if Den == 0.0 or Num / Den > MaxBeta:
                     Beta: float = MaxBeta
                 else:
-                    Beta: float = Num / Den
+                    Beta = Num / Den
 
                 for i in range(self.GetDimensions()):
                     vD[i] = vG[i] + Beta * vD[i]

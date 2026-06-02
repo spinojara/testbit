@@ -186,8 +186,9 @@ def clop_load(id: int) -> CExperiment:
 
             cexp.reg.SetAutoLocalize(True)
             cexp.reg.ComputeLocalWeights()
-            # We can add the observer last since we don't have to store
-            # the weights at this point
+            # We can add the observer last since we don't have to store the
+            # weights at this point. In addition the weights cannot even be
+            # re-stored before, because they have not been computed yet.
             cexp.reg.AddObserver(obs)
 
 
