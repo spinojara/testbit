@@ -120,9 +120,9 @@ class CDiffFunction:
         N2: float = 0.0
         for i in range(self.Dimensions):
             N2 += vDir[i] * vDir[i]
-        Scale: float = 1.0 / math.sqrt(N2)
-        if Scale == float("inf"):
+        if N2 == 0.0:
             return 0.0
+        Scale: float = 1.0 / math.sqrt(N2)
 
         tx: list[float] = [0.0, 0.0, 0.0]
         tf: list[float] = [0.0, 0.0, 0.0]

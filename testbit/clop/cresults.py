@@ -36,7 +36,7 @@ class CResults:
             self.vOutcome.resize(self.Samples)
             self.vSample.resize(self.Samples * self.Dimensions)
 
-        for i in range(len(v)):
+        for i in range(self.Dimensions):
             self.vSample[(self.Samples - 1) * self.Dimensions + i] = v[i]
 
         self.vOutcome[self.Samples - 1] = COutcome.InProgress

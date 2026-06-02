@@ -1,6 +1,6 @@
 import math
 
-CholeksyThreshold = 1e-10
+CholeskyThreshold = 1e-10
 
 class CMatrixOperations:
     @staticmethod
@@ -13,7 +13,7 @@ class CMatrixOperations:
                     Sum -= vCholesky[i * Size + k] * vCholesky[j * Size + k]
 
                 if i == j:
-                    if Sum < CholeksyThreshold:
+                    if Sum < CholeskyThreshold:
                         return False
                     else:
                         vCholesky[i * Size + i] = math.sqrt(Sum)
