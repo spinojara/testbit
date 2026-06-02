@@ -156,6 +156,7 @@ def clop_load(id: int) -> CExperiment:
                             AND spsa IS NOT NULL;
                     """, (id, ))
                     allrows = cursor.fetchall()
+
                 newrows: list[tuple[float, int]] = [(cexp.reg.GetWeight(cexp.sample_from_dict(json.loads(spsa))), gameid) for gameid, spsa in allrows]
                 with dbcond:
                     cursor = con.cursor()
@@ -190,7 +191,6 @@ def clop_load(id: int) -> CExperiment:
             # weights at this point. In addition the weights cannot even be
             # re-stored before, because they have not been computed yet.
             cexp.reg.AddObserver(obs)
-
 
     return clops[id]
 
@@ -750,23 +750,24 @@ async def test_data(request):
         elif type == "clop":
             spsa = json.loads(spsa)
             seed: int = clop_get_seed(id, task_id)
-            clop = clop_load(id)
+            cexp = clop_load(id)
             if seed >= 0:
-                clop.add_outcome(seed, wins, draws, losses)
+                with cloplock:
+                    cexp.add_outcome(seed, wins, draws, losses)
 
-                dim: int = clop.reg.GetPF().GetDimensions()
-                mean: list[float] = [0.0 for _ in range(dim)]
-                maximum: list[float] = [0.0 for _ in range(dim)]
+                    dim: int = clop.reg.GetPF().GetDimensions()
+                    mean: list[float] = [0.0 for _ in range(dim)]
+                    maximum: list[float] = [0.0 for _ in range(dim)]
 
-                clop.me.MaxParameter(mean)
-                for key, value in clop.dict_from_sample(mean).items():
-                    spsa[key]["mean"] = value
-                has_max: bool = clop.reg.GetPF().GetMax(clop.reg.MAP(), maximum)
-                for key, value in clop.dict_from_sample(maximum).items():
-                    if has_max:
-                        spsa[key]["maximum"] = value
-                    else:
-                        spsa[key]["maximum"] = None
+                    cexp.me.MaxParameter(mean)
+                    for key, value in cexp.dict_from_sample(mean).items():
+                        spsa[key]["mean"] = value
+                    has_max: bool = cexp.reg.GetPF().GetMax(cexp.reg.MAP(), maximum)
+                    for key, value in cexp.dict_from_sample(maximum).items():
+                        if has_max:
+                            spsa[key]["maximum"] = value
+                        else:
+                            spsa[key]["maximum"] = None
 
             cursor.execute("""
                 UPDATE tests
@@ -1074,7 +1075,8 @@ async def get_task(request):
                 }
         elif type == "clop":
             cexp = clop_load(id)
-            spsaargs, seed, weight = cexp.next_sample()
+            with cloplock:
+                spsaargs, seed, weight = cexp.next_sample()
 
             for key, value in spsaargs.items():
                 argsplus += f" option.{key}={value}"

@@ -57,7 +57,7 @@ class CDiffFunction:
                 self.CG(vMax.data(), fTrace)
                 break
 
-            vMax = self.vxTemp
+            vMax = copy.deepcopy(self.vxTemp)
             if LNew - L < NewtonThreshold:
                 break
         return vMax

@@ -253,6 +253,7 @@ class CRegression(CObserver):
             obs(self)
 
     def GetPosteriorInfo(self, vLocation: list[float]) -> tuple[float, float]:
+        raise ValueError("Not implemented")
         Rating = self.pf.GetValue(self.vParamMAP.data(), vLocation)
         dfconf: CDFConfidence = CDFConfidence(self)
         dfconf.ComputeVariance(vLocation)
