@@ -239,10 +239,9 @@ getData(id).then(data => {
 		}
 
 		const maximum = row2.insertCell();
-		if (param.maximum != null) {
+		if (param.maximum != null)
 			maximum.textContent = param.maximum.toFixed(3);
-			maximum.style.textAlign = 'right';
-		}
+		maximum.style.textAlign = 'right';
 
 		const min = row2.insertCell();
 		min.textContent = param.min.toFixed(3);
