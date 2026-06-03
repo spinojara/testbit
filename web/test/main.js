@@ -279,7 +279,7 @@ function updateTable() {
 	getData(id).then(data => {
 		if (data.message != 'ok')
 			redirectHome();
-		test = data.test;
+		const test = data.test;
 		shouldUpdate = test.donetime == null;
 		const statusCell = table.rows[1].cells[2];
 		statusCell.textContent = test.status;
