@@ -1,16 +1,9 @@
-import { formatDate, formatElo } from '/util.js';
+import { truncate, formatDate, formatElo } from '/util.js';
 
 async function getData() {
 	const response = await fetch('https://jalagaoi.se/testbit/clop');
-	console.log(response)
 	const json = await response.json();
 	return await json;
-}
-
-function truncate(text, n) {
-	if (text.length > n)
-		return text.substring(0, n - 3) + '...';
-	return text;
 }
 
 document.getElementById('spsabutton').addEventListener('click', () => {
@@ -82,12 +75,12 @@ function drawTable() {
 		const tests = data.tests;
 		tests.sort((a, b) => {
 			if (a.donetime && !b.donetime)
-				return true;
+				return 1;
 			if (b.donetime && !a.donetime)
-				return false;
+				return -1;
 			if (a.donetime && b.donetime)
-				return a.donetime < b.donetime;
-			return a.queuetime < b.queuetime;
+				return b.donetime - a.donetime;
+			return b.queuetime - a.queuetime;
 		});
 		tests.forEach((test, index) => {
 			var row;

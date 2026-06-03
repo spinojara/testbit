@@ -282,3 +282,10 @@ export function formatElo(elo, pm) {
 	return elotext;
 }
 
+export function truncate(text, n) {
+	if (!text)
+		return ''
+	if (text.length > n)
+		return text.substring(0, n - 3) + '...';
+	return text;
+}

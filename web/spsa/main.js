@@ -84,7 +84,7 @@ function drawImage() {
 	}
 
 	const merged = [...spsahistory, lastElement];
-	length = merged.length + 1;
+	const length = merged.length + 1;
 	var i = 1;
 	for (const point of merged) {
 		const phase = i / length;
@@ -101,7 +101,7 @@ function drawImage() {
 		var r = 255;
 		var g = 0;
 		var b = 255;
-		if (i !== merged.length - 1) {
+		if (i !== merged.length) {
 			r = 255 * (1.0 - phase);
 			g = 255 * phase;
 			b = 0;
@@ -252,8 +252,8 @@ getData(id).then(data => {
 		selecty.appendChild(new Option(key));
 	}
 
-	selectx.selectedIndex = 1 - (test.spsa.length == 1);
-	selecty.selectedIndex = 2 - (test.spsa.length == 1);
+	selectx.selectedIndex = 1 - (Object.keys(test.spsa).length == 1);
+	selecty.selectedIndex = 2 - (Object.keys(test.spsa).length == 1);
 
 	ctx.imageSmoothingEnabled = false;
 	ctx.mozImageSmoothingEnabled = false;
@@ -352,7 +352,7 @@ function updateTable() {
 	getData(id).then(data => {
 		if (data.message != 'ok')
 			redirectHome();
-		test = data.test;
+		const test = data.test;
 		shouldUpdate = test.donetime == null;
 
 		const statusCell = table.rows[1].cells[1];

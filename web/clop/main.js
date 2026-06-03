@@ -255,8 +255,8 @@ getData(id).then(data => {
 		selecty.appendChild(new Option(key));
 	}
 
-	selectx.selectedIndex = 1 - (test.spsa.length == 1);
-	selecty.selectedIndex = 2 - (test.spsa.length == 1);
+	selectx.selectedIndex = 1 - (Object.keys(test.spsa).length == 1);
+	selecty.selectedIndex = 2 - (Object.keys(test.spsa).length == 1);
 
 	ctx.imageSmoothingEnabled = false;
 	ctx.mozImageSmoothingEnabled = false;
@@ -356,7 +356,7 @@ function updateTable() {
 		if (data.message != 'ok')
 			redirectHome();
 		var test = data.test;
-		var shouldUpdate = test.donetime == null;
+		shouldUpdate = test.donetime == null;
 
 		const statusCell = table.rows[1].cells[1];
 		statusCell.textContent = test.status;

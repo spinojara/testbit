@@ -1,15 +1,9 @@
-import { formatDate, formatElo } from '/util.js';
+import { truncate, formatDate, formatElo } from '/util.js';
 
 async function getData() {
 	const response = await fetch('https://jalagaoi.se/testbit/test?delta=1800');
 	const json = await response.json();
 	return await json;
-}
-
-function truncate(text, n) {
-	if (text.length > n)
-		return text.substring(0, n - 3) + '...';
-	return text;
 }
 
 function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
@@ -18,7 +12,6 @@ function eta(type, N, alpha, beta, llr, eloe, pm, gametimeavg) {
 		const A = Math.log(beta / (1.0 - alpha));
 		const B = Math.log((1.0 - beta) / alpha);
 		const target = llr < 0.0 ? A : B;
-		console.log(target);
 		N_needed = N * (target / llr - 1.0);
 	}
 	else {
@@ -98,12 +91,12 @@ function drawTable() {
 		const tests = data.tests;
 		tests.sort((a, b) => {
 			if (a.donetime && !b.donetime)
-				return true;
+				return 1;
 			if (b.donetime && !a.donetime)
-				return false;
+				return -1;
 			if (a.donetime && b.donetime)
-				return a.donetime < b.donetime;
-			return a.queuetime < b.queuetime;
+				return b.donetime - a.donetime;
+			return b.queuetime - a.queuetime;
 		});
 		tests.forEach((test, index) => {
 			var row;
