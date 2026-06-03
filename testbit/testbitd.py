@@ -1539,7 +1539,8 @@ async def clop_fetch_single(request):
             json_group_array(
                 json_set(json(games.spsa), '$._weight', games.weight, '$._score', 0.5 * games.w + 0.25 * games.d)
                 ORDER BY games.starttime ASC
-            ) FILTER (WHERE games.spsa IS NOT NULL)
+            ) FILTER (WHERE games.spsa IS NOT NULL),
+            tests.errorlog
         FROM tests
         LEFT OUTER JOIN games
             ON tests.id = games.testid
@@ -1591,6 +1592,7 @@ async def clop_fetch_single(request):
         "elocentral": elocentral,
         "pmcentral": pmcentral,
         "spsahistory": spsahistory,
+        "errorlog": row[30],
     }
 
     resp = web.json_response({"message": "ok", "test": test})
