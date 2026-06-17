@@ -16,6 +16,9 @@ import os
 import signal
 import random
 import re
+import tempfile
+from pathlib import Path
+import socket
 
 from .tc import tcadjust
 from .cgroup import CPU
@@ -141,6 +144,8 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
                       -games 2
                       -openings format=epd file=./book.epd order=random
                       -repeat
+                      -event testbit
+                      -site {socket.gethostname()}
         """
 
         command += adjudicatestring
@@ -162,38 +167,45 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
                 break
         print(f"{threading.get_ident()}: Running docker container")
         print(f"{threading.get_ident()}: {" ".join(command.split())}")
-        try:
-            container = client.containers.run(
-                image="jalagaoi.se:5000/testbit:%d" % id,
-                command=command,
-                detach=True,
-                cgroup_parent="testbit-%d" % cpu.cpu,
-                volumes={path: {"bind": path, "mode": "ro"} for path in syzygy_paths},
-            )
-
-            with container_lock:
-                containers.append(container)
-
-        except (ImageNotFound, NotFound):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pgnfile = Path(tmpdir) / "out.pgn"
             try:
-                response = requests.put(host + f"{root}/test/docker/%d" % id, json={"taskid": task_id}, auth=("", password), verify=verify)
+                container = client.containers.run(
+                    image="jalagaoi.se:5000/testbit:%d" % id,
+                    command=command + f" -pgnout file={pgnfile} min=true nodes=true",
+                    detach=True,
+                    cgroup_parent="testbit-%d" % cpu.cpu,
+                    volumes={path: {"bind": path, "mode": "ro"} for path in syzygy_paths} | {tmpdir: {"bind": tmpdir, "mode": "rw"}},
+                )
+                with container_lock:
+                    containers.append(container)
+
+            except (ImageNotFound, NotFound):
+                try:
+                    response = requests.put(host + f"{root}/test/docker/%d" % id, json={"taskid": task_id}, auth=("", password), verify=verify)
+                except:
+                    log_exception()
+                continue
+            except:
+                # Maybe the registry service is not available yet?
+                log_exception()
+                time.sleep(60)
+                continue
+
+            # If this fails it's probably because the container was killed
+            # by cleanup_docker, so let's just exit
+            try:
+                result = container.wait()
+                try:
+                    with open(pgnfile) as f:
+                        pgn = f.read()
+                except:
+                    pgn = ""
+
+                logs: str = container.logs().decode("utf-8")
             except:
                 log_exception()
-            continue
-        except:
-            # Maybe the registry service is not available yet?
-            log_exception()
-            time.sleep(60)
-            continue
-
-        # If this fails it's probably because the container was killed
-        # by cleanup_docker, so let's just exit
-        try:
-            result = container.wait()
-            logs: str = container.logs().decode("utf-8")
-        except:
-            log_exception()
-            break
+                break
 
         try:
             container.remove(force=True)
@@ -236,7 +248,7 @@ def worker(cpu: cgroup.CPU, host: str, port: str, password: str, tcfactor: float
                 response = requests.put(host + f"{root}/test/error/%d" % id, json={"errorlog": logs, "taskid": task_id}, auth=("", password), verify=verify)
             else:
                 print(f"{threading.get_ident()}: Docker container had no errors")
-                response = requests.put(host + f"{root}/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "taskid": task_id}, auth=("", password), verify=verify)
+                response = requests.put(host + f"{root}/test/%d" % id, json={"losses": losses, "draws": draws, "wins": wins, "taskid": task_id, "pgn": pgn}, auth=("", password), verify=verify)
         except:
             log_exception()
 

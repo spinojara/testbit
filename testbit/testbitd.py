@@ -386,7 +386,8 @@ def create_table():
             starttime INTEGER NOT NULL,
             donetime  INTEGER,
             spsa      TEXT,
-            weight    REAL
+            weight    REAL,
+            pgn       BLOB
         );
     """)
 
@@ -624,6 +625,7 @@ async def test_data(request):
     draws = data.get("draws")
     losses = data.get("losses")
     task_id = data.get("taskid")
+    pgn = data.get("pgn")
     if not isinstance(task_id, int):
         return web.json_response({"message": "bad id"}, status=400)
     if not isinstance(wins, int) or wins < 0:
@@ -634,6 +636,8 @@ async def test_data(request):
         return web.json_response({"message": "bad draws"}, status=400)
     if wins + draws + losses != 2:
         return web.json_response({"message": "need losses + draws + wins = 2"}, status=400)
+    if not isinstance(pgn, str):
+        return web.json_response({"message": "need pgn"}, status=400)
     with dbcond:
         cursor = con.cursor()
 
@@ -642,10 +646,11 @@ async def test_data(request):
             SET w = ?,
                 d = ?,
                 l = ?,
-                donetime = unixepoch()
+                donetime = unixepoch(),
+                pgn = ?
             WHERE id = ? AND testid = ? AND donetime IS NULL
             RETURNING spsa;
-        """, (wins, draws, losses, task_id, id))
+        """, (wins, draws, losses, pgn.encode("utf-8"), task_id, id))
 
         row = cursor.fetchone()
         if not row:
@@ -1174,7 +1179,7 @@ async def test_fetch_single(request):
         return web.json_response({"message": "bad id"}, status=400)
 
     patch = row[28]
-    if patch:
+    if patch is not None:
         patch = patch.decode("utf-8")
         # Reduce size of sent patch
         if not fullnnue:
