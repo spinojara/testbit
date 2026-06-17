@@ -329,6 +329,7 @@ def cleanup_thread():
                             OR spsa = ''
                             OR spsa = '{}'
                         )
+                        AND pgn IS NULL
                     );
             """)
             con.commit()
