@@ -73,6 +73,7 @@ static int config_handler(void *user, const char *section, const char *name, con
 	}
 	else if (!strcmp(section, "timecontrol")) {
 		if (!strcmp(name, "tcfactor")) {
+			errno = 0;
 			cfg->tcfactor = strtod(value, &endptr);
 			if (errno || *endptr || cfg->tcfactor <= 0.0) {
 				fprintf(stderr, "error: bad tcfactor '%s'\n", value);
@@ -99,6 +100,7 @@ static void *worker(void *arg) {
 		chunk.data = NULL;
 		chunk.size = 0;
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+#warning set hostname and port
 		curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:3333/test/task");
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
 		json = NULL;
@@ -176,10 +178,10 @@ static void *worker(void *arg) {
 		}
 
 		int id = idobject->valueint;
-		cJSON *argplusobject = cJSON_GetObjectItemCaseSensitive(json, "argplus");
-		cJSON *argminusobject = cJSON_GetObjectItemCaseSensitive(json, "argminus");
+		cJSON *argplusobject = cJSON_GetObjectItemCaseSensitive(json, "argsplus");
+		cJSON *argminusobject = cJSON_GetObjectItemCaseSensitive(json, "argsminus");
 
-		if (!cJSON_IsNull(argplusobject)) {
+		if (cJSON_IsNull(argplusobject)) {
 			argplusobject = NULL;
 		}
 		else if (!cJSON_IsArray(argplusobject)) {
@@ -189,7 +191,7 @@ static void *worker(void *arg) {
 			goto end;
 		}
 
-		if (!cJSON_IsNull(argminusobject)) {
+		if (cJSON_IsNull(argminusobject)) {
 			argminusobject = NULL;
 		}
 		else if (!cJSON_IsArray(argminusobject)) {

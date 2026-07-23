@@ -115,6 +115,8 @@ void test_fetch_single(int fd, const struct http *http, int id) {
 	json_sql_add(test, TYPE_STRING, "simd", stmt, 26);
 	cJSON_AddStringOrNullToObject(test, "patch", smallpatch ? smallpatch : patch);
 	json_sql_add(test, TYPE_STRING, "errorlog", stmt, 28);
+
+	/* status will never bu NULL */
 	if (!strcmp(status, "running"))
 		json_sql_add(test, TYPE_REAL, "gametimeavg", stmt, 29);
 	else
@@ -598,9 +600,9 @@ void spsa_fetch_all(int fd, const struct http *http, int id) {
 		json_sql_add(test, TYPE_STRING, "description", stmt, 2);
 		json_sql_add(test, TYPE_STRING, "status", stmt, 3);
 		json_sql_add(test, TYPE_STRING, "tc", stmt, 4);
-		json_sql_add(test, TYPE_STRING, "alpha", stmt, 5);
-		json_sql_add(test, TYPE_STRING, "gamma", stmt, 6);
-		json_sql_add(test, TYPE_STRING, "A", stmt, 7);
+		json_sql_add(test, TYPE_REAL, "alpha", stmt, 5);
+		json_sql_add(test, TYPE_REAL, "gamma", stmt, 6);
+		json_sql_add(test, TYPE_REAL, "A", stmt, 7);
 		json_sql_add(test, TYPE_STRING, "adjudicate", stmt, 8);
 		json_sql_add(test, TYPE_INTEGER, "queuetime", stmt, 9);
 		json_sql_add(test, TYPE_INTEGER, "starttime", stmt, 10);

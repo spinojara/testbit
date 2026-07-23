@@ -109,7 +109,10 @@ void create_table(struct column *columns, size_t ncol, const char *table, const 
 			s = append_string(s, " ");
 			s = append_string(s, column->extra);
 		}
-		s = append_string(s, ",\n");
+		if (i < ncol - 1 || extra)
+			s = append_string(s, ",\n");
+		else
+			s = append_string(s, "\n");
 		/* Just try adding the columns in case the table already exists. */
 		char *t = strdup("ALTER TABLE ");
 		t = append_string(t, table);
@@ -129,7 +132,7 @@ void create_table(struct column *columns, size_t ncol, const char *table, const 
 	if (extra) {
 		s = append_string(s, "\t");
 		s = append_string(s, extra);
-		s = append_string(s, ",\n");
+		s = append_string(s, "\n");
 	}
 	s = append_string(s, ");");
 	sqlite3_exec(db, s, NULL, NULL, NULL);

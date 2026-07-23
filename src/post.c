@@ -31,7 +31,7 @@ void test_new(int fd, const struct http *http, int id) {
 	cJSON *tc = cJSON_GetObjectItemCaseSensitive(http->content, "tc");
 	const char *tcstr;
 	struct tc tcobj;
-	if (!tc || !cJSON_IsString(tc) || !parsetc((tcstr = tc->valuestring), &tcobj)) {
+	if (!tc || !cJSON_IsString(tc) || parsetc((tcstr = tc->valuestring), &tcobj)) {
 		bad_request(fd, "bad tc");
 		return;
 	}
@@ -362,7 +362,7 @@ void backup_database(int fd, const struct http *http, int id) {
 		return;
 	}
 	cJSON *prefix = cJSON_GetObjectItemCaseSensitive(http->content, "prefix");
-	if (!prefix || !cJSON_IsString(prefix) || strlen(prefix->valuestring) >= 64) {
+	if (!prefix || !cJSON_IsString(prefix) || strlen(prefix->valuestring) >= 64 || strchr(prefix->valuestring, '/')) {
 		bad_request(fd, "bad prefix");
 		return;
 	}
@@ -393,14 +393,16 @@ void backup_database(int fd, const struct http *http, int id) {
 		rc = sqlite3_errcode(backupdb);
 	}
 
-	if (rc == SQLITE_OK)
+	if (rc == SQLITE_OK && backup) {
+		last_backup = time(NULL);
 		send_response(fd, "200 Ok", "{\"message\": \"ok\"}");
-	else
+	}
+	else {
 		send_response(fd, "500 Internal Server Error", "{\"message\": \"failed to open database\"}");
+	}
 
 	sqlite3_close(backupdb);
 
-	last_backup = time(NULL);
 	pthread_mutex_unlock(&db_lock);
 	pthread_mutex_unlock(&insert_lock);
 }

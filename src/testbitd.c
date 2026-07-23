@@ -58,6 +58,10 @@ void stop(void) {
 void *worker(void *arg) {
 	struct worker *w = arg;
 	while (1) {
+		pthread_mutex_lock(&w->mutex);
+		w->sleep = 1;
+		pthread_mutex_unlock(&w->mutex);
+
 		increase_available_workers();
 
 		pthread_mutex_lock(&w->mutex);
@@ -70,7 +74,6 @@ void *worker(void *arg) {
 			pthread_mutex_unlock(&w->mutex);
 			break;
 		}
-		w->sleep = 1;
 		int fd = w->fd;
 		pthread_mutex_unlock(&w->mutex);
 
@@ -174,7 +177,7 @@ int main(int argc, char **argv) {
 			port = optarg;
 			errno = 0;
 			int portnum = strtol(port, &endptr, 10);
-			if (errno || *endptr || portnum <= 0 || portnum >= 65535) {
+			if (errno || *endptr || portnum <= 0 || portnum > 65535) {
 				error = 1;
 				fprintf(stderr, "error: bad --port\n");
 			}
@@ -204,6 +207,13 @@ int main(int argc, char **argv) {
 	srand(time(NULL));
 	clop_init();
 
+	signal(SIGPIPE, SIG_IGN);
+	int listener = get_listener_socket(port);
+	if (listener < 0) {
+		fprintf(stderr, "error: failed to bind\n");
+		exit(1);
+	}
+
 	if (db_open(db_path)) {
 		fprintf(stderr, "error: failed to open '%s'\n", db_path);
 		exit(1);
@@ -222,8 +232,6 @@ int main(int argc, char **argv) {
 		pthread_create(&w->thread, NULL, &worker, w);
 	}
 
-	signal(SIGPIPE, SIG_IGN);
-	int listener = get_listener_socket(port);
 	struct pollfd fds[2] = {
 		{ .fd = STDIN_FILENO, .events = POLLIN },
 		{ .fd = listener, .events = POLLIN },

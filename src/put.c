@@ -291,6 +291,8 @@ void test_data(int fd, const struct http *http, int id) {
 
 			cJSON *param = NULL;
 			cJSON_ArrayForEach(param, spsa) {
+				cJSON_DeleteItemFromObject(param, "mean");
+				cJSON_DeleteItemFromObject(param, "maximum");
 				cJSON_AddNumberToObject(param, "mean", cJSON_GetObjectItemCaseSensitive(mean, param->string)->valuedouble);
 				if (max)
 					cJSON_AddNumberToObject(param, "maximum", cJSON_GetObjectItemCaseSensitive(max, param->string)->valuedouble);
@@ -464,8 +466,8 @@ void test_error(int fd, const struct http *http, int id) {
 		"DELETE FROM games\n"
 		"WHERE id = ? AND testid = ? AND donetime IS NULL;",
 		-1, &stmt, NULL);
-	sqlite3_bind_int(stmt, 1, id);
-	sqlite3_bind_int(stmt, 2, task_id->valueint);
+	sqlite3_bind_int(stmt, 1, task_id->valueint);
+	sqlite3_bind_int(stmt, 2, id);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
 
@@ -505,7 +507,7 @@ void task_new(int fd, const struct http *http, int unused) {
 					"(\n"
 						"SELECT max(starttime)\n"
 						"FROM games\n"
-						"WHERE games.testid = testid\n"
+						"WHERE games.testid = tests.id\n"
 					"),\n"
 					"0\n"
 				") ASC,\n"

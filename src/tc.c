@@ -7,7 +7,7 @@
 
 int parsetc(const char *tc, struct tc *dst) {
 	if (!tc || !*tc)
-		return 0;
+		return 1;
 	memset(dst, 0, sizeof(*dst));
 
 	char *copy = strdup(tc);

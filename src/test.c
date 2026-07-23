@@ -54,13 +54,16 @@ void clear_old_tests(void) {
 
 		for (size_t i = 0; i < n_tests; i++) {
 			struct test *test = tests[i];
-			if (test->error || (!test->active && test->unused > 16)) {
+			pthread_mutex_lock(&test->lock);
+			if (!test->active && (test->error || test->unused > 16)) {
 				cleared = 1;
 				n_tests--;
-				memmove(&tests[i], &tests[i + 1], n_tests - i);
+				memmove(&tests[i], &tests[i + 1], (n_tests - i) * sizeof(*tests));
+				pthread_mutex_unlock(&test->lock);
 				delete_test(test);
 				break;
 			}
+			pthread_mutex_unlock(&test->lock);
 		}
 	}
 	pthread_mutex_unlock(&lock);

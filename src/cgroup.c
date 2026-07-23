@@ -254,7 +254,7 @@ int release_cpu(struct cpu *cpu) {
 	}
 
 	sprintf(file, "/sys/fs/cgroup/testbit-%d/cpuset.cpus.partition", cpu->cpu);
-	if (echo(file, "isolated"))
+	if (echo(file, "member"))
 		fprintf(stderr, "error: failed to make cgroup testbit-%d non-isolated\n", cpu->cpu);
 
 	sprintf(file, "/sys/fs/cgroup/testbit-%d/cpuset.cpus", cpu->cpu);
@@ -295,6 +295,6 @@ int release_cpu(struct cpu *cpu) {
 	if (rmdir(file))
 		fprintf(stderr, "error: failed to remove cgroup testbit-%d\n", cpu->cpu);
 
-	cpu->claimed = 1;
+	cpu->claimed = 0;
 	return 0;
 }

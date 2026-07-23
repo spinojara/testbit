@@ -191,7 +191,7 @@ int get_headers(int fd, struct http *http) {
 			http->method = HTTP_POST;
 		else if (startswith(buf, "PUT "))
 			http->method = HTTP_PUT;
-		else if (startswith(buf, "OPTION "))
+		else if (startswith(buf, "OPTIONS "))
 			http->method = HTTP_OPTION;
 		else {
 			bad_request(fd, "bad method");
@@ -224,6 +224,7 @@ int get_headers(int fd, struct http *http) {
 		}
 	}
 	else {
+		close(fd);
 		return 1;
 	}
 	long long content_length = 0;

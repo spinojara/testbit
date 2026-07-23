@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <errno.h>
 
 int startswith(const char *str, const char *s) {
 	return !strncmp(str, s, strlen(s));
@@ -122,8 +123,12 @@ char *read_fd(int fd) {
 	char chunk[4096];
 	ssize_t n;
 	while ((n = read(fd, chunk, sizeof(chunk))) != 0) {
-		if (n < 0)
-			continue;
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			else
+				break;
+		}
 
 		buf = realloc(buf, size + n + 1);
 		if (!buf)

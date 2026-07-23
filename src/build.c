@@ -58,11 +58,7 @@ int execvp_wrapper(CURL *curl, char *const argv[]) {
 		if (errno != EINTR)
 			exit(104);
 
-	if (!WIFEXITED(wstatus)) {
-		free(out);
-		return 1;
-	}
-	if (WEXITSTATUS(wstatus)) {
+	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus)) {
 		send_error(curl, out);
 		free(out);
 		return 1;
@@ -119,7 +115,7 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 	if (execlp_wrapper(curl, "make", "-C", test->dir, "clean", (char *)NULL))
 		return 1;
 
-	char *realsimd = malloc(strlen(simd) + 6);
+	char *realsimd = malloc((simd ? strlen(simd) : 0) + 6);
 	if (!realsimd)
 		exit(112);
 
@@ -152,11 +148,13 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 
 	if (execlp_wrapper(curl, "make", "-C", test->dir, "clean", (char *)NULL)) {
 		free(realsimd);
+		unlink(patchfile);
 		return 1;
 	}
 
 	if (execlp_wrapper(curl, "git", "-C", test->dir, "apply", "--allow-empty", patchfile, (char *)NULL)) {
 		free(realsimd);
+		unlink(patchfile);
 		return 1;
 	}
 
@@ -180,7 +178,12 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *adjudicate, char *syzygy, char *tc) {
 	int argc = 0;
 	char *argv[128];
-	char pgnfile[256];
+#warning fix args
+	char pgnfile[] = "/tmp/testbit-pgn-XXXXXX";
+	int fd;
+	if ((fd = mkstemp(pgnfile)) == -1)
+		exit(150);
+	close(fd);
 
 	int new_first = rand() % 2;
 
@@ -312,8 +315,10 @@ int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *ad
 		if (errno != EINTR)
 			exit(104);
 
-	if (!WIFEXITED(wstatus))
+	if (!WIFEXITED(wstatus)) {
+		unlink(pgnfile);
 		return 1;
+	}
 
 	int w = stats[2];
 	int d = stats[1];
@@ -322,10 +327,12 @@ int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *ad
 	if (WEXITSTATUS(wstatus) || error || w + d + l != 2) {
 		send_error(curl, out);
 		free(out);
+		unlink(pgnfile);
 		return 1;
 	}
 	printf("finished games!\n");
 	free(out);
 
+	unlink(pgnfile);
 	return 0;
 }
