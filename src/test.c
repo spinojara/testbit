@@ -69,7 +69,7 @@ void clear_old_tests(void) {
 	pthread_mutex_unlock(&lock);
 }
 
-int load_test(int id, const char *url, CURL *curl, const char **dir) {
+int load_test(int id, int task_id, const char *url, CURL *curl, const char **dir) {
 	clear_old_tests();
 	*dir = NULL;
 	pthread_mutex_lock(&lock);
@@ -131,6 +131,7 @@ int load_test(int id, const char *url, CURL *curl, const char **dir) {
 	cJSON *json;
 	long code = 0;
 	if ((res = curl_easy_perform(curl)) != CURLE_OK || (curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code), code != 200) || !(json = cJSON_Parse(chunk.data))) {
+		printf("what\n");
 		free(chunk.data);
 		free(fullurl);
 		pthread_mutex_lock(&test->lock);
@@ -147,9 +148,8 @@ int load_test(int id, const char *url, CURL *curl, const char **dir) {
 	cJSON *patch = cJSON_GetObjectItemCaseSensitive(json, "patch");
 	cJSON *simd = cJSON_GetObjectItemCaseSensitive(json, "simd");
 	cJSON *commit = cJSON_GetObjectItemCaseSensitive(json, "commit");
-	cJSON *adjudicate = cJSON_GetObjectItemCaseSensitive(json, "adjudicate");
-	if (!simd || !(cJSON_IsString(simd) || cJSON_IsNull(simd)) || !commit || !cJSON_IsString(commit) || check_ref_format(commit->valuestring) || !patch || !cJSON_IsString(patch) || !adjudicate || !cJSON_IsString(adjudicate)
- || build_test(test, patch->valuestring, cJSON_IsNull(simd) ? NULL : simd->valuestring, commit->valuestring, curl)) {
+	if (!simd || !(cJSON_IsString(simd) || cJSON_IsNull(simd)) || !commit || !cJSON_IsString(commit) || check_ref_format(commit->valuestring) || !patch || !cJSON_IsString(patch)
+ || build_test(test, task_id, patch->valuestring, cJSON_IsNull(simd) ? NULL : simd->valuestring, commit->valuestring, curl, url)) {
 		cJSON_Delete(json);
 		pthread_mutex_lock(&test->lock);
 		test->error = 1;

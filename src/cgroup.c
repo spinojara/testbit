@@ -246,6 +246,8 @@ int release_cpu(struct cpu *cpu) {
 	if (!cpu->claimed)
 		return 0;
 
+	printf("releasing %d\n", cpu->cpu);
+
 	char file[4096];
 	for (int i = 0; i < cpu->n_thread_siblings; i++) {
 		sprintf(file, "/sys/devices/system/cpu/cpu%d/online", cpu->thread_siblings[i]);

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
 
@@ -16,12 +17,41 @@ void kill_parent(void) {
 	while (waitpid(pid, NULL, 0) < 0 && errno == EINTR);
 }
 
-void send_error(CURL *curl, const char *message) {
+void send_error(CURL *curl, const char *url, int id, int task_id, const char *message) {
 	printf("sending error: '%s'\n", message);
+	char *errorurl = calloc(strlen(url) + 1000, 1);
+	if (!errorurl)
+		exit(160);
+	sprintf(errorurl, "%s/test/error/%d", url, id);
+
+	cJSON *json = cJSON_CreateObject();
+	cJSON_AddNumberToObject(json, "taskid", task_id);
+	cJSON_AddStringToObject(json, "errorlog", message);
+	char *body = cJSON_PrintUnformatted(json);
+
+	struct curl_slist *headers = NULL;
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+
+	curl_easy_setopt(curl, CURLOPT_URL, errorurl);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
+
+	curl_easy_perform(curl);
+
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+
+	curl_slist_free_all(headers);
+	cJSON_free(body);
+	cJSON_Delete(json);
+	free(errorurl);
 }
 
 /* TODO: Add protection for long running commands and cancel them after a timeout. */
-int execvp_wrapper(CURL *curl, char *const argv[]) {
+int execvp_wrapper(CURL *curl, const char *url, int id, int task_id, char *const argv[]) {
 	int fd[2];
 	if (pipe(fd) < 0)
 		exit(105);
@@ -59,7 +89,7 @@ int execvp_wrapper(CURL *curl, char *const argv[]) {
 			exit(104);
 
 	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus)) {
-		send_error(curl, out);
+		send_error(curl, url, id, task_id, out);
 		free(out);
 		return 1;
 	}
@@ -68,9 +98,9 @@ int execvp_wrapper(CURL *curl, char *const argv[]) {
 	return 0;
 }
 
-int execlp_wrapper(CURL *curl, ...) {
+int execlp_wrapper(CURL *curl, const char *url, int id, int task_id, ...) {
 	va_list ap;
-	va_start(ap, curl);
+	va_start(ap, task_id);
 
 	size_t argc = 0;
 	char **argv = NULL;
@@ -86,13 +116,14 @@ int execlp_wrapper(CURL *curl, ...) {
 	va_end(ap);
 
 
-	int ret = execvp_wrapper(curl, argv);
+	int ret = execvp_wrapper(curl, url, id, task_id, argv);
 	printf("returning %d\n", ret);
 	free(argv);
 	return ret;
 }
 
-int build_test(struct test *test, const char *patch, const char *simd, const char *commit, CURL *curl) {
+int build_test(struct test *test, int task_id, const char *patch, const char *simd, const char *commit, CURL *curl, const char *url) {
+	int id = test->id;
 	printf("building test\n");
 	char template[] = "/tmp/testbit-XXXXXX";
 	if (!mkdtemp(template))
@@ -106,13 +137,13 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 	sprintf(bitbit, "%s/bitbit", template);
 
 	test->dir = strdup(template);
-	if (execlp_wrapper(curl, "git", "clone", "https://github.com/spinojara/bitbit.git", test->dir, (char *)NULL))
+	if (execlp_wrapper(curl, url, id, task_id, "git", "clone", "https://github.com/spinojara/bitbit.git", test->dir, (char *)NULL))
 		return 1;
 
-	if (execlp_wrapper(curl, "git", "-C", test->dir, "checkout", commit, (char *)NULL))
+	if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "checkout", commit, (char *)NULL))
 		return 1;
 
-	if (execlp_wrapper(curl, "make", "-C", test->dir, "clean", (char *)NULL))
+	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL))
 		return 1;
 
 	char *realsimd = malloc((simd ? strlen(simd) : 0) + 6);
@@ -121,7 +152,7 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 
 	sprintf(realsimd, "SIMD=%s", simd ? simd : "");
 
-	if (execlp_wrapper(curl, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
+	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
 		free(realsimd);
 		return 1;
 	}
@@ -146,13 +177,14 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 	}
 	close(fd);
 
-	if (execlp_wrapper(curl, "make", "-C", test->dir, "clean", (char *)NULL)) {
+	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL)) {
 		free(realsimd);
 		unlink(patchfile);
 		return 1;
 	}
 
-	if (execlp_wrapper(curl, "git", "-C", test->dir, "apply", "--allow-empty", patchfile, (char *)NULL)) {
+	//if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "apply", "--allow-empty", patchfile, (char *)NULL)) {
+	if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "apply", patchfile, (char *)NULL)) {
 		free(realsimd);
 		unlink(patchfile);
 		return 1;
@@ -160,7 +192,7 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 
 	unlink(patchfile);
 
-	if (execlp_wrapper(curl, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
+	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
 		free(realsimd);
 		return 1;
 	}
@@ -175,15 +207,25 @@ int build_test(struct test *test, const char *patch, const char *simd, const cha
 }
 
 #define ARG(str) (argv[argc++] = (str))
-int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *adjudicate, char *syzygy, char *tc) {
+int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu *cpu, const char *dir, const char *adjudicate, char *syzygy, char *tc, cJSON *argsplus, cJSON *argsminus) {
 	int argc = 0;
-	char *argv[128];
-#warning fix args
+	char *argv[8192];
+	if (argsplus && cJSON_GetArraySize(argsplus) > 2048) {
+		send_error(curl, url, id, task_id, "error: too many args\n");
+		return 1;
+	}
+	if (argsminus && cJSON_GetArraySize(argsminus) > 2048) {
+		send_error(curl, url, id, task_id, "error: too many args\n");
+		return 1;
+	}
 	char pgnfile[] = "/tmp/testbit-pgn-XXXXXX";
-	int fd;
-	if ((fd = mkstemp(pgnfile)) == -1)
+	int pgnfilefd;
+	if ((pgnfilefd = mkstemp(pgnfile)) == -1)
 		exit(150);
-	close(fd);
+	close(pgnfilefd);
+
+	char pgnfilearg[256];
+	sprintf(pgnfilearg, "file=%s", pgnfile);
 
 	int new_first = rand() % 2;
 
@@ -204,17 +246,34 @@ int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *ad
 	ARG("option.Debug=true");
 	ARG("-rounds"); ARG("1");
 	ARG("-games"); ARG("2");
-	ARG("-pgnout"); ARG(pgnfile); ARG("nodes=true"); ARG("min=true");
+	ARG("-pgnout"); ARG(pgnfilearg); ARG("nodes=true"); ARG("min=true");
 	ARG("-openings"); ARG("format=epd"); ARG(openingfile); ARG("order=random");
 	ARG("-repeat");
 
-	if (new_first) {
-		ARG("-engine"); ARG(new); ARG("name=bitbit-new");
-		ARG("-engine"); ARG(old); ARG("name=bitbit-old");
-	}
-	else {
-		ARG("-engine"); ARG(old); ARG("name=bitbit-old");
-		ARG("-engine"); ARG(new); ARG("name=bitbit-new");
+	cJSON *json;
+	for (int i = 0; i < 2; i++) {
+		if (i != new_first) {
+			ARG("-engine"); ARG(new); ARG("name=bitbit-new");
+			if (argsplus) {
+				json = NULL;
+				cJSON_ArrayForEach(json, argsplus) {
+					if (!cJSON_IsString(json))
+						exit(124);
+					ARG(json->valuestring);
+				}
+			}
+		}
+		else {
+			ARG("-engine"); ARG(old); ARG("name=bitbit-old");
+			if (argsminus) {
+				json = NULL;
+				cJSON_ArrayForEach(json, argsminus) {
+					if (!cJSON_IsString(json))
+						exit(125);
+					ARG(json->valuestring);
+				}
+			}
+		}
 	}
 
 	if (!strcmp(adjudicate, "draw") || !strcmp(adjudicate, "both")) {
@@ -325,7 +384,7 @@ int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *ad
 	int l = stats[0];
 
 	if (WEXITSTATUS(wstatus) || error || w + d + l != 2) {
-		send_error(curl, out);
+		send_error(curl, url, id, task_id, out);
 		free(out);
 		unlink(pgnfile);
 		return 1;
@@ -333,6 +392,59 @@ int fastchess(CURL *curl, const struct cpu *cpu, const char *dir, const char *ad
 	printf("finished games!\n");
 	free(out);
 
+	f = fopen(pgnfile, "r");
+	if (!f)
+		exit(175);
+
+	struct stat st;
+	if (fstat(fileno(f), &st))
+		exit(185);
+
+	/* A pgnfile of two games should never be this large. */
+	if (st.st_size > 128 * 1024 * 1024)
+		exit(195);
+
+	char *pgn = calloc(st.st_size + 1, 1);
+	if (!pgn)
+		exit(196);
+
+	fread(pgn, 1, st.st_size, f);
+	fclose(f);
 	unlink(pgnfile);
+
+
+	char *responseurl = calloc(strlen(url) + 1000, 1);
+	if (!responseurl)
+		exit(160);
+	sprintf(responseurl, "%s/test/%d", url, id);
+
+	json = cJSON_CreateObject();
+	cJSON_AddNumberToObject(json, "taskid", task_id);
+	cJSON_AddNumberToObject(json, "wins", w);
+	cJSON_AddNumberToObject(json, "draws", d);
+	cJSON_AddNumberToObject(json, "losses", l);
+	cJSON_AddStringToObject(json, "pgn", pgn);
+	char *body = cJSON_PrintUnformatted(json);
+
+	struct curl_slist *headers = NULL;
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+
+	curl_easy_setopt(curl, CURLOPT_URL, responseurl);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
+
+	curl_easy_perform(curl);
+
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+
+	curl_slist_free_all(headers);
+	cJSON_free(body);
+	cJSON_Delete(json);
+	free(responseurl);
+	free(pgn);
 	return 0;
 }

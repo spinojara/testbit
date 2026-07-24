@@ -117,7 +117,7 @@ void test_new(int fd, const struct http *http, int id) {
 	}
 	else if (!strcmp(type->valuestring, "spsa")) {
 		/* spsadata cannot be empty map. */
-		if (!spsadata || !cJSON_IsObject(spsadata) || !spsadata->child) {
+		if (!spsadata || !cJSON_IsObject(spsadata) || !spsadata->child || cJSON_GetArraySize(spsadata) > 2048) {
 			bad_request(fd, "bad spsa");
 			return;
 		}
@@ -206,7 +206,7 @@ void test_new(int fd, const struct http *http, int id) {
 		A = NULL;
 		gamma = NULL;
 
-		if (!spsadata || !cJSON_IsObject(spsadata) || !spsadata->child) {
+		if (!spsadata || !cJSON_IsObject(spsadata) || !spsadata->child || cJSON_GetArraySize(spsadata) > 2048) {
 			bad_request(fd, "bad clop");
 			return;
 		}

@@ -24,6 +24,8 @@ struct threadinfo {
 static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
 	size_t realsize = size * nmemb;
 	struct memory *mem = userdata;
+	if (!mem)
+		return realsize;
 	char *p = realloc(mem->data, mem->size + realsize + 1);
 	if (!p)
 		return 0;
@@ -36,7 +38,6 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
 
 struct config {
 	char *hostname;
-	char *port;
 	long long workers;
 	char *syzygy;
 
@@ -45,7 +46,6 @@ struct config {
 
 void free_config(struct config *cfg) {
 	free(cfg->hostname);
-	free(cfg->port);
 	free(cfg->syzygy);
 }
 
@@ -62,10 +62,9 @@ static int config_handler(void *user, const char *section, const char *name, con
 			}
 		}
 		else if (!strcmp(name, "host")) {
-			cfg->hostname = strdup(value);
-		}
-		else if (!strcmp(name, "port")) {
-			cfg->port = strdup(value);
+#warning
+			cfg->hostname = strdup("http://localhost:3333");
+			//cfg->hostname = strdup(value);
 		}
 		else if (!strcmp(name, "syzygy")) {
 			cfg->syzygy = strdup(value);
@@ -96,12 +95,14 @@ static void *worker(void *arg) {
 	cJSON *json;
 	CURLcode res;
 
+	char *taskurl = calloc(strlen(cfg->hostname) + 1000, 1);
+	sprintf(taskurl, "%s/test/task", cfg->hostname);
+
 	while (1) {
 		chunk.data = NULL;
 		chunk.size = 0;
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-#warning set hostname and port
-		curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:3333/test/task");
+		curl_easy_setopt(curl, CURLOPT_URL, taskurl);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
 		json = NULL;
 		res = curl_easy_perform(curl);
@@ -159,6 +160,14 @@ static void *worker(void *arg) {
 			goto end;
 		}
 
+		cJSON *taskidobject = cJSON_GetObjectItemCaseSensitive(json, "taskid");
+		if (!taskidobject || !cJSON_IsNumber(taskidobject)) {
+			fprintf(stderr, "error: taskid is not a number\n");
+			release_cpu(cpu);
+			sleep(300);
+			goto end;
+		}
+
 		cJSON *tcobject = cJSON_GetObjectItemCaseSensitive(json, "tc");
 
 		struct tc tc;
@@ -202,7 +211,7 @@ static void *worker(void *arg) {
 		}
 
 		const char *dir;
-		if (load_test(id, "http://localhost:3333", curl, &dir) || !dir) {
+		if (load_test(id, taskidobject->valueint, cfg->hostname, curl, &dir) || !dir) {
 			fprintf(stderr, "error: failed to load test\n");
 			release_cpu(cpu);
 			goto end;
@@ -215,7 +224,7 @@ static void *worker(void *arg) {
 		tctostr(tcstr, &tc);
 		/* Ok if cpu is already claimed. */
 		claim_cpu(cpu);
-		fastchess(curl, cpu, dir, adjudicate->valuestring, cfg->syzygy, tcstr);
+		fastchess(curl, cfg->hostname, id, taskidobject->valueint, cpu, dir, adjudicate->valuestring, cfg->syzygy, tcstr, argplusobject, argminusobject);
 
 		return_test(id);
 end:
@@ -225,6 +234,7 @@ end:
 		break;
 	}
 	curl_easy_cleanup(curl);
+	free(taskurl);
 	return NULL;
 }
 
@@ -240,6 +250,7 @@ static void cleanup_cpus(void) {
 	printf("cleaning up\n");
 	for (int i = 0; i < cpus.n; i++)
 		release_cpu(&cpus.cpus[i]);
+	free_cpus(&cpus);
 }
 
 int main(int argc, char **argv) {
@@ -274,7 +285,6 @@ int main(int argc, char **argv) {
 	free(ti);
 	free(thread);
 error:
-	free_cpus(&cpus);
 	curl_global_cleanup();
 	free_config(&cfg);
 	test_term();

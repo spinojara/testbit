@@ -48,6 +48,7 @@ void test_data(int fd, const struct http *http, int id) {
 		bad_request(fd, "bad taskid");
 		return;
 	}
+	printf("got stats: %d-%d-%d\n", losses, draws, wins);
 	int task_id = task_iditem->valueint;
 
 	pthread_mutex_lock(&insert_lock);
@@ -658,6 +659,7 @@ void task_new(int fd, const struct http *http, int unused) {
 	cJSON_AddStringToObject(response, "tc", tc);
 	cJSON_AddStringToObject(response, "adjudicate", adjudicate);
 	cJSON_AddNumberToObject(response, "taskid", task_id);
+
 
 	send_json_response(fd, "200 OK", response);
 	cJSON_Delete(response);
