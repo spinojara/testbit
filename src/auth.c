@@ -35,8 +35,6 @@ int authorize(const char *user_password) {
 }
 
 int su(const char *user) {
-#warning
-	return 0;
 	struct passwd pwd = { 0 };
 	char buf[16384] = { 0 };
 	struct passwd *result;
@@ -50,5 +48,18 @@ int su(const char *user) {
 		return 1;
 	}
 
+	return 0;
+}
+
+int user_info(const char *user, uid_t *uid, gid_t *gid) {
+	struct passwd pwd = { 0 };
+	char buf[16384] = { 0 };
+	struct passwd *result;
+	if (getpwnam_r(user, &pwd, buf, sizeof(buf), &result) || !result) {
+		fprintf(stderr, "error: no user '%s'\n", user);
+		return 1;
+	}
+	*uid = pwd.pw_uid;
+	*gid = pwd.pw_gid;
 	return 0;
 }

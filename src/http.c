@@ -228,6 +228,7 @@ int get_headers(int fd, struct http *http) {
 			errno = 0;
 			content_length = strtoll(buf + strlen("Content-Length: "), &endptr, 10);
 			if (errno || *endptr != '\r' || content_length > 512 * 1024 * 1024 || content_length <= 0) {
+				/* There is a specific http code for content length. */
 				bad_request(fd, "bad content length");
 				return 1;
 			}
@@ -245,7 +246,7 @@ int get_headers(int fd, struct http *http) {
 	}
 	if (content_length > 0) {
 		char *content = malloc(content_length + 1);
-		if (recvfixed(content, content_length + 1, &fdr, maxtime)) {
+		if (!content || recvfixed(content, content_length + 1, &fdr, maxtime)) {
 			free(content);
 			bad_request(fd, "bad content");
 			return 1;

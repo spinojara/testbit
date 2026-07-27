@@ -116,7 +116,7 @@ void test_fetch_single(int fd, const struct http *http, int id) {
 	cJSON_AddStringOrNullToObject(test, "patch", smallpatch ? smallpatch : patch);
 	json_sql_add(test, TYPE_STRING, "errorlog", stmt, 28);
 
-	/* status will never bu NULL */
+	/* status will never be NULL */
 	if (!strcmp(status, "running"))
 		json_sql_add(test, TYPE_REAL, "gametimeavg", stmt, 29);
 	else
@@ -242,7 +242,6 @@ void test_fetch_all(int fd, const struct http *http, int id) {
 }
 
 void clop_fetch_single(int fd, const struct http *http, int id) {
-	(void)http;
 	int fullnnue = !strcasecmp(map_get(&http->query, "fullnnue", "false"), "true");
 
 	clock_t c = clock();

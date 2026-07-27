@@ -91,6 +91,7 @@ class CWeightUpdater : CObserver {
 public:
 	CWeightUpdater(CExperiment &cexp_, int id_) : CObserver(cexp_.results), cexp(cexp_), id(id_) {}
 
+	/* TODO: Don't have to update unless weights are actually updated. */
 	void OnOutcome(int i) override {
 		printf("Updating all database weights!\n");
 		pthread_mutex_lock(&db_lock);
@@ -309,10 +310,6 @@ cJSON *clop_next_sample(void *e, int *seed, double *weight) {
 
 	*seed = Seed - 1;
 	*weight = cexp->reg.GetWeight(cexp->results.GetSample(Seed - 1));
-
-	for (int i = 0; i < 2; i++) {
-		std::cout << cexp->results.GetSample(Seed - 1)[i] << std::endl;
-	}
 
 	return cexp->point_to_json(cexp->results.GetSample(Seed - 1));
 }

@@ -13,6 +13,45 @@
 #include "util.h"
 #include "auth.h"
 
+static char *mkdtemp_testbit(char *template) {
+	uid_t uid;
+	gid_t gid;
+	if (user_info("testbit", &uid, &gid)) {
+		printf("no user?\n");
+		return NULL;
+	}
+
+	if (!mkdtemp(template)) {
+		printf("Cannot make %s?\n", template);
+		return NULL;
+	}
+
+	if (chown(template, uid, gid)) {
+		printf("chown?\n");
+		return NULL;
+	}
+
+	return template;
+}
+
+static int mkstemp_testbit(char *template) {
+	uid_t uid;
+	gid_t gid;
+	if (user_info("testbit", &uid, &gid))
+		return -1;
+
+	int fd;
+	if ((fd = mkstemp(template)) == -1)
+		return -1;
+
+	if (fchown(fd, uid, gid)) {
+		unlink(template);
+		return -1;
+	}
+
+	return fd;
+}
+
 int interruptable_fgets(char *buf, size_t size, struct fdreader *fdr, int stop_fd) {
 	if (size == 0)
 		return 1;
@@ -20,8 +59,11 @@ int interruptable_fgets(char *buf, size_t size, struct fdreader *fdr, int stop_f
 	size_t received = 0;
 	while (received < real_size) {
 		ssize_t size_to_copy = fdlen(fdr, stop_fd);
-		if (size_to_copy <= 0)
+		if (size_to_copy <= 0) {
+			if (received > 0)
+				break;
 			return 1;
+		}
 
 		char *newline = strchr(fdr->buf, '\n');
 
@@ -57,7 +99,7 @@ int interruptable_waitpid(pid_t pid, int *wstatus, int stop_fd) {
 		}
 
 		if (pfd[0].revents & POLLIN) {
-			kill(pid, SIGKILL);
+			kill(-pid, SIGKILL);
 			ret = 1;
 			break;
 		}
@@ -77,7 +119,6 @@ int interruptable_waitpid(pid_t pid, int *wstatus, int stop_fd) {
 void kill_parent(void) {
 	pid_t pid = getppid();
 	kill(pid, SIGKILL);
-	while (waitpid(pid, NULL, 0) < 0 && errno == EINTR);
 }
 
 void send_error(CURL *curl, const char *url, int id, int task_id, const char *message) {
@@ -129,6 +170,7 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		exit(106);
 
 	if (pid == 0) {
+		setpgid(0, 0);
 		if (su("testbit")) {
 			kill_parent();
 			exit(109);
@@ -141,17 +183,14 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		kill_parent();
 		exit(103);
 	}
+	setpgid(pid, pid);
 
 	close(fd[1]);
 	char *out = read_fd(fd[0], stop_fd);
 	close(fd[0]);
 
 	/* out is only NULL if we are stopping. */
-	int exiting = 0;
-	if (!out) {
-		kill(pid, SIGKILL);
-		exiting = 1;
-	}
+	int exiting = out == NULL;
 
 	int wstatus;
 	if (interruptable_waitpid(pid, &wstatus, stop_fd) || exiting) {
@@ -198,7 +237,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	int id = test->id;
 	printf("building test\n");
 	char template[] = "/tmp/testbit-XXXXXX";
-	if (!mkdtemp(template))
+	if (!mkdtemp_testbit(template))
 		exit(109);
 
 	char oldfile[64];
@@ -236,7 +275,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 
 	char patchfile[] = "/tmp/testbit-patch-XXXXXX";
 	int fd;
-	if ((fd = mkstemp(patchfile)) == -1)
+	if ((fd = mkstemp_testbit(patchfile)) == -1)
 		exit(110);
 
 	size_t size = strlen(patch);
@@ -293,7 +332,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	}
 	char pgnfile[] = "/tmp/testbit-pgn-XXXXXX";
 	int pgnfilefd;
-	if ((pgnfilefd = mkstemp(pgnfile)) == -1)
+	if ((pgnfilefd = mkstemp_testbit(pgnfile)) == -1)
 		exit(150);
 	close(pgnfilefd);
 
@@ -331,8 +370,10 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			if (argsplus) {
 				json = NULL;
 				cJSON_ArrayForEach(json, argsplus) {
-					if (!cJSON_IsString(json))
-						exit(124);
+					if (!cJSON_IsString(json)) {
+						unlink(pgnfile);
+						return 1;
+					}
 					ARG(json->valuestring);
 				}
 			}
@@ -342,8 +383,10 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			if (argsminus) {
 				json = NULL;
 				cJSON_ArrayForEach(json, argsminus) {
-					if (!cJSON_IsString(json))
-						exit(125);
+					if (!cJSON_IsString(json)) {
+						unlink(pgnfile);
+						return 1;
+					}
 					ARG(json->valuestring);
 				}
 			}
@@ -372,6 +415,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		exit(106);
 
 	if (pid == 0) {
+		setpgid(0, 0);
 		char file[4096];
 		sprintf(file, "/sys/fs/cgroup/testbit-%d/cgroup.procs", cpu->cpu);
 		FILE *f = fopen(file, "w");
@@ -393,6 +437,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		kill_parent();
 		exit(103);
 	}
+	setpgid(pid, pid);
 
 	close(fd[1]);
 
@@ -402,8 +447,6 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	size_t size = 0;
 	char *out = calloc(size + 1, 1);
 	int error = 0;
-
-	int exiting = 0;
 
 	struct fdreader fdr = { .fd = fd[0] };
 	while (!interruptable_fgets(buf, sizeof(buf), &fdr, stop_fd)) {
@@ -453,7 +496,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		return 1;
 	}
 
-	if (exiting || !WIFEXITED(wstatus)) {
+	if (!WIFEXITED(wstatus)) {
 		free(out);
 		unlink(pgnfile);
 		return 1;

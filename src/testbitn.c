@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <stdatomic.h>
 #include <fcntl.h>
+#include <poll.h>
 
 #include "test.h"
 #include "util.h"
@@ -18,8 +19,6 @@
 #include "tc.h"
 #include "cgroup.h"
 
-pthread_cond_t stop_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t stop_mutex = PTHREAD_MUTEX_INITIALIZER;
 atomic_int stop;
 int stop_write;
 int stop_read;
@@ -92,15 +91,12 @@ static int config_handler(void *user, const char *section, const char *name, con
 }
 
 void interruptable_sleep(int seconds) {
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	ts.tv_sec += seconds;
+	struct pollfd pfd = { .fd = stop_read, .events = POLLIN };
+	time_t now, done = time(NULL) + seconds;
 
-	pthread_mutex_lock(&stop_mutex);
-	if (!atomic_load_explicit(&stop, memory_order_relaxed))
-		pthread_cond_timedwait(&stop_cond, &stop_mutex, &ts);
-
-	pthread_mutex_unlock(&stop_mutex);
+	while (done - (now = time(NULL)) > 0 && poll(&pfd, 1, 1000 * (done - now)) < 0)
+		if (errno != EINTR)
+			break;
 }
 
 static void *worker(void *arg) {
@@ -242,7 +238,7 @@ static void *worker(void *arg) {
 		printf("got: %s\n", dir);
 
 		adjusttc(&tc, cfg->tcfactor);
-		char tcstr[128];
+		char tcstr[512];
 		tctostr(tcstr, &tc);
 		/* Ok if cpu is already claimed. */
 		claim_cpu(cpu);
@@ -257,6 +253,7 @@ end:
 		printf("break\n");
 		break;
 	}
+	release_cpu(cpu);
 	curl_easy_cleanup(curl);
 	free(taskurl);
 	return NULL;
@@ -264,12 +261,9 @@ end:
 
 static void sigint_handler(int signum) {
 	(void)signum;
-	pthread_mutex_lock(&stop_mutex);
 	atomic_store_explicit(&stop, 1, memory_order_release);
 	char c = 1;
 	write(stop_write, &c, 1);
-	pthread_cond_broadcast(&stop_cond);
-	pthread_mutex_unlock(&stop_mutex);
 }
 
 struct cpus cpus = { 0 };

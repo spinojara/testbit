@@ -81,11 +81,11 @@ void test_new(int fd, const struct http *http, int id) {
 			bad_request(fd, "bad beta");
 			return;
 		}
-		if (!elo0 || !cJSON_IsNumber(elo0)) {
+		if (!elo0 || !cJSON_IsNumber(elo0) || elo0->valuedouble < -1000.0) {
 			bad_request(fd, "bad elo0");
 			return;
 		}
-		if (!elo1 || !cJSON_IsNumber(elo1)) {
+		if (!elo1 || !cJSON_IsNumber(elo1) || elo1->valuedouble > 1000.0) {
 			bad_request(fd, "bad elo1");
 			return;
 		}
