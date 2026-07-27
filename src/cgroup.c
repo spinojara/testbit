@@ -10,7 +10,8 @@
 #include <poll.h>
 
 int echo(const char *file, const char *str) {
-	FILE *f = fopen(file, "w");
+	/* e = O_CLOEXEC */
+	FILE *f = fopen(file, "we");
 	if (!f) {
 		fprintf(stderr, "cannot open %s\n", file);
 		return 1;
@@ -26,7 +27,7 @@ int echo(const char *file, const char *str) {
 }
 
 int cat(const char *file, char *buf, size_t size) {
-	int fd = open(file, O_RDONLY);
+	int fd = open(file, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
 		return 1;
 

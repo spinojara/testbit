@@ -412,7 +412,8 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		setpgid(0, 0);
 		char file[4096];
 		sprintf(file, "/sys/fs/cgroup/testbit-%d/cgroup.procs", cpu->cpu);
-		FILE *f = fopen(file, "w");
+		/* e = O_CLOEXEC */
+		FILE *f = fopen(file, "we");
 		if (!f) {
 			kill_parent();
 			exit(135);
@@ -510,7 +511,8 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	printf("finished games!\n");
 	free(out);
 
-	FILE *f = fopen(pgnfile, "r");
+	/* e = O_CLOEXEC */
+	FILE *f = fopen(pgnfile, "re");
 	if (!f)
 		exit(175);
 
