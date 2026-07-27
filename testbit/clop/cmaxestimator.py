@@ -1,2 +1,0 @@
-class CMaxEstimator:
-    pass
