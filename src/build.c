@@ -16,20 +16,14 @@
 static char *mkdtemp_testbit(char *template) {
 	uid_t uid;
 	gid_t gid;
-	if (user_info("testbit", &uid, &gid)) {
-		printf("no user?\n");
+	if (user_info("testbit", &uid, &gid))
 		return NULL;
-	}
 
-	if (!mkdtemp(template)) {
+	if (!mkdtemp(template))
 		printf("Cannot make %s?\n", template);
-		return NULL;
-	}
 
-	if (chown(template, uid, gid)) {
-		printf("chown?\n");
+	if (chown(template, uid, gid))
 		return NULL;
-	}
 
 	return template;
 }
@@ -41,7 +35,7 @@ static int mkstemp_testbit(char *template) {
 		return -1;
 
 	int fd;
-	if ((fd = mkstemp(template)) == -1)
+	if ((fd = mkostemp(template, O_CLOEXEC)) == -1)
 		return -1;
 
 	if (fchown(fd, uid, gid)) {
