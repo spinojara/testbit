@@ -134,7 +134,7 @@ char *read_fd(int fd, int stop_fd) {
 		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
 				continue;
-			exit(172);
+			exit(10);
 		}
 		if (pfd[0].revents & POLLIN) {
 			free(buf);
@@ -152,7 +152,7 @@ char *read_fd(int fd, int stop_fd) {
 
 			buf = realloc(buf, size + n + 1);
 			if (!buf)
-				exit(150);
+				exit(11);
 			memcpy(buf + size, chunk, n);
 			buf[size + n] = 0;
 			size += n;
@@ -183,7 +183,7 @@ ssize_t fdlen(struct fdreader *fdr, int stop_fd) {
 		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
 				continue;
-			exit(172);
+			exit(12);
 		}
 		if (pfd[0].revents & POLLIN) {
 			return -1;

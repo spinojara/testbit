@@ -103,10 +103,10 @@ int load_test(int id, int task_id, const char *url, CURL *curl, const char **dir
 	n_tests++;
 	tests = realloc(tests, n_tests * sizeof(*tests));
 	if (!tests)
-		exit(101);
+		exit(21);
 	struct test *test = calloc(1, sizeof(*test));
 	if (!test)
-		exit(102);
+		exit(22);
 	test->id = id;
 	test->ready = 0;
 	test->active = 1;
@@ -118,7 +118,7 @@ int load_test(int id, int task_id, const char *url, CURL *curl, const char **dir
 
 	char *fullurl = calloc(strlen(url) + 1000, 1);
 	if (!fullurl)
-		exit(100);
+		exit(20);
 	sprintf(fullurl, "%s/build/%d", url, id);
 	struct memory chunk = { 0 };
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1);

@@ -89,7 +89,7 @@ int interruptable_waitpid(pid_t pid, int *wstatus, int stop_fd) {
 		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
 				continue;
-			exit(171);
+			exit(40);
 		}
 
 		if (pfd[0].revents & POLLIN) {
@@ -104,7 +104,7 @@ int interruptable_waitpid(pid_t pid, int *wstatus, int stop_fd) {
 
 	while (waitpid(pid, wstatus, 0) < 0)
 		if (errno != EINTR)
-			exit(104);
+			exit(41);
 
 	close(pidfd);
 	return ret;
@@ -119,7 +119,7 @@ void send_error(CURL *curl, const char *url, int id, int task_id, const char *me
 	printf("sending error: '%s'\n", message);
 	char *errorurl = calloc(strlen(url) + 1000, 1);
 	if (!errorurl)
-		exit(160);
+		exit(42);
 	sprintf(errorurl, "%s/test/error/%d", url, id);
 
 	cJSON *json = cJSON_CreateObject();
@@ -152,7 +152,7 @@ void send_error(CURL *curl, const char *url, int id, int task_id, const char *me
 int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id, char *const argv[]) {
 	int fd[2];
 	if (pipe2(fd, O_CLOEXEC) < 0)
-		exit(105);
+		exit(43);
 
 	printf("executing:");
 	for (size_t i = 0; argv[i]; i++)
@@ -161,13 +161,13 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 
 	pid_t pid = fork();
 	if (pid < 0)
-		exit(106);
+		exit(44);
 
 	if (pid == 0) {
 		setpgid(0, 0);
 		if (su("testbit")) {
 			kill_parent();
-			exit(109);
+			exit(45);
 		}
 		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
@@ -175,7 +175,7 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		close(fd[1]);
 		execvp(argv[0], argv);
 		kill_parent();
-		exit(103);
+		exit(46);
 	}
 	setpgid(pid, pid);
 
@@ -232,7 +232,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	printf("building test\n");
 	char template[] = "/tmp/testbit-XXXXXX";
 	if (!mkdtemp_testbit(template))
-		exit(109);
+		exit(47);
 
 	char oldfile[64];
 	char newfile[64];
@@ -253,7 +253,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 
 	char *realsimd = malloc((simd ? strlen(simd) : 0) + 6);
 	if (!realsimd)
-		exit(112);
+		exit(48);
 
 	char realtune[16];
 	sprintf(realtune, "TUNE=%s", tune ? "yes" : "");
@@ -265,12 +265,12 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	}
 
 	if (rename(bitbit, oldfile))
-		exit(116);
+		exit(49);
 
 	char patchfile[] = "/tmp/testbit-patch-XXXXXX";
 	int fd;
 	if ((fd = mkstemp_testbit(patchfile)) == -1)
-		exit(110);
+		exit(50);
 
 	size_t size = strlen(patch);
 	size_t written = 0;
@@ -278,7 +278,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	while (written < size) {
 		n = write(fd, patch + written, size - written);
 		if (n <= 0)
-			exit(111);
+			exit(51);
 		written += n;
 
 	}
@@ -305,7 +305,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	free(realsimd);
 
 	if (rename(bitbit, newfile))
-		exit(116);
+		exit(52);
 
 	printf("built test\n");
 
@@ -327,7 +327,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	char pgnfile[] = "/tmp/testbit-pgn-XXXXXX";
 	int pgnfilefd;
 	if ((pgnfilefd = mkstemp_testbit(pgnfile)) == -1)
-		exit(150);
+		exit(53);
 	close(pgnfilefd);
 
 	char pgnfilearg[256];
@@ -402,11 +402,11 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 
 	int fd[2];
 	if (pipe2(fd, O_CLOEXEC) < 0)
-		exit(105);
+		exit(54);
 
 	pid_t pid = fork();
 	if (pid < 0)
-		exit(106);
+		exit(55);
 
 	if (pid == 0) {
 		setpgid(0, 0);
@@ -416,13 +416,13 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		FILE *f = fopen(file, "we");
 		if (!f) {
 			kill_parent();
-			exit(135);
+			exit(56);
 		}
 		fprintf(f, "%d\n", getpid());
 		fclose(f);
 		if (su("testbit")) {
 			kill_parent();
-			exit(109);
+			exit(57);
 		}
 		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
@@ -430,7 +430,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		close(fd[1]);
 		execvp("fastchess", argv);
 		kill_parent();
-		exit(103);
+		exit(58);
 	}
 	setpgid(pid, pid);
 
@@ -448,7 +448,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		size_t n = strlen(buf);
 		out = realloc(out, size + n + 1);
 		if (!out)
-			exit(151);
+			exit(59);
 		memcpy(out + size, buf, n);
 		out[size + n] = 0;
 		size += n;
@@ -466,7 +466,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			else if (strstr(buf, " (bitbit-old vs bitbit-new): "))
 				white = 0;
 			else
-				exit(151);
+				exit(60);
 
 			int score;
 			if (strstr(buf, ": 1-0 "))
@@ -476,7 +476,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			else if (strstr(buf, ": 0-1 "))
 				score = 0;
 			else
-				exit(152);
+				exit(61);
 
 			stats[white ? score : 2 - score]++;
 		}
@@ -514,19 +514,19 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	/* e = O_CLOEXEC */
 	FILE *f = fopen(pgnfile, "re");
 	if (!f)
-		exit(175);
+		exit(62);
 
 	struct stat st;
 	if (fstat(fileno(f), &st))
-		exit(185);
+		exit(63);
 
 	/* A pgnfile of two games should never be this large. */
 	if (st.st_size > 128 * 1024 * 1024)
-		exit(195);
+		exit(64);
 
 	char *pgn = calloc(st.st_size + 1, 1);
 	if (!pgn)
-		exit(196);
+		exit(65);
 
 	fread(pgn, 1, st.st_size, f);
 	fclose(f);
@@ -535,7 +535,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 
 	char *responseurl = calloc(strlen(url) + 1000, 1);
 	if (!responseurl)
-		exit(160);
+		exit(66);
 	sprintf(responseurl, "%s/test/%d", url, id);
 
 	json = cJSON_CreateObject();

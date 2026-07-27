@@ -71,7 +71,7 @@ void append_cpu(struct cpus *cpus, int cpu) {
 	cpus->n++;
 	cpus->cpus = realloc(cpus->cpus, cpus->n * sizeof(*cpus->cpus));
 	if (!cpus->cpus)
-		exit(124);
+		exit(30);
 	memset(&cpus->cpus[cpus->n - 1], 0, sizeof(*cpus->cpus));
 	cpus->cpus[cpus->n - 1].cpu = cpu;
 }
@@ -84,7 +84,7 @@ int is_performance(int cpu) {
 	struct cpus cpus = { 0 };
 	if (parse_cpus(&cpus, buf, -1)) {
 		free_cpus(&cpus);
-		exit(131);
+		exit(31);
 	}
 
 	int performance = 0;
@@ -131,7 +131,7 @@ int parse_cpus(struct cpus *cpus, const char *str, int prev) {
 void cpuset_cpus_effective(struct cpus *cpus) {
 	char buf[4096];
 	if (cat("/sys/fs/cgroup/cpuset.cpus.effective", buf, sizeof(buf)))
-		exit(130);
+		exit(32);
 	parse_cpus(cpus, buf, -1);
 
 	for (int i = 0; i < cpus->n; i++) {
