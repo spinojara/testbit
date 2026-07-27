@@ -139,8 +139,9 @@ void send_error(CURL *curl, const char *url, int id, int task_id, const char *me
 
 	curl_easy_perform(curl);
 
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
 
 	curl_slist_free_all(headers);
 	cJSON_free(body);
@@ -558,8 +559,9 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 
 	curl_easy_perform(curl);
 
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
 
 	curl_slist_free_all(headers);
 	cJSON_free(body);

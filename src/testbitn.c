@@ -122,6 +122,7 @@ static void *worker(void *arg) {
 		sleep_length = 0;
 		chunk.data = NULL;
 		chunk.size = 0;
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
 		curl_easy_setopt(curl, CURLOPT_URL, taskurl);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
