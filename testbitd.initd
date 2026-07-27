@@ -5,13 +5,13 @@ name="testbitd"
 description="testbitd - A test server for bitbit."
 command="testbitd"
 command_args="--db /var/lib/bitbit/bitbit.sqlite3 \
-	--db-backup /var/lib/bitbit/backup \
-	--stdout /var/log/testbitd.log \
+	--backup /var/lib/bitbit/backup"
+start_stop_daemon_args="--stdout /var/log/testbitd.log \
 	--stderr /var/log/testbitd.err"
 stopsig="SIGINT"
 
 depend() {
-	need net docker
+	need net
 }
 
 start_pre() {

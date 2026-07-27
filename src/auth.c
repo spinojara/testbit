@@ -9,9 +9,6 @@
 #include <unistd.h>
 
 int authorize(const char *user_password) {
-	printf("authorizing\n");
-#warning
-	return 1;
 	struct spwd spwd = { 0 };
 	struct spwd *spwdp = NULL;
 	char buf[4096];

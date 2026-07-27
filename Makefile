@@ -2,6 +2,9 @@ MKDIR_P     = mkdir -p
 RM          = rm
 INSTALL     = install
 
+PREFIX      = /usr/local
+BINDIR      = $(PREFIX)/bin
+
 CC          = gcc
 CXX         = g++
 
@@ -27,6 +30,8 @@ OBJ_TESTBITD = $(patsubst %.c,obj/%.o,$(SRC_TESTBITD)) $(patsubst %.cpp,obj/%.o,
 OBJ_TESTBITN = $(patsubst %.c,obj/%.o,$(SRC_TESTBITN))
 
 DEP          = $(patsubst %.c,dep/%.d,$(SRC_TESTBITD)) $(patsubst %.cpp,dep/%.d,$(SRC_CLOP)) $(patsubst %.c,dep/%.d,$(SRC_TESTBITN))
+
+all: testbitd testbitn
 
 testbitd: $(OBJ_TESTBITD)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDLIBS)
@@ -55,6 +60,14 @@ dep/%.d: clop/%.cpp Makefile
 	@$(MKDIR_P) dep
 	@$(CXX) -MM -MP -MT "$@ $(<:clop/%.cpp=obj/%.o)" $(CXXFLAGS) $< -o $@
 
+install: all
+	$(MKDIR_P) $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m 755 testbitd $(DESTDIR)$(BINDIR)/testbitd
+	$(INSTALL) -m 755 testbitn $(DESTDIR)$(BINDIR)/testbitn
+
+uninstall:
+	$(RM) -f $(DESTDIR)$(BINDIR)/testbitd $(DESTDIR)$(BINDIR)/testbitn
+
 clean:
 	$(RM) -rf obj dep
 
@@ -62,4 +75,4 @@ clean:
 
 .PRECIOUS: dep/%.d
 .SUFFIXES: .c .h .d
-.PHONY: clean
+.PHONY: all install uninstall clean

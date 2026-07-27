@@ -4,15 +4,14 @@ pidfile="/var/run/testbitn.pid"
 name="testbitn"
 description="testbitn - A test server for bitbit."
 command="testbitn"
-command_args="--daemon \
-	--stdin /var/lib/bitbit/private/passphrase \
+start_stop_daemon_args="--stdin /var/lib/bitbit/private/passphrase \
 	--stdout /var/log/testbitn.log \
 	--stderr /var/log/testbitn.err"
 stopsig="SIGINT"
 
 depend() {
-	need net docker dns
-	use testbitd
+	need net
+	use dns testbitd
 }
 
 start_pre() {
