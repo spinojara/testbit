@@ -70,7 +70,6 @@ int matches(int method, const char *path, int method1, const char *path1, int *i
 void handle_request(int fd, const struct http *http) {
 	printf("method: %d\n", http->method);
 	printf("path: '%s'\n", http->path);
-	printf("auth: '%s'\n", http->auth);
 	printf("map\n");
 	for (size_t i = 0; i < http->query.length; i++) {
 		printf("'%s': '%s'\n", http->query.entries[i].key, http->query.entries[i].value);

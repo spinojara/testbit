@@ -18,6 +18,7 @@
 #include "build.h"
 #include "tc.h"
 #include "cgroup.h"
+#include "auth.h"
 
 atomic_int stop;
 int stop_write;
@@ -108,6 +109,9 @@ static void *worker(void *arg) {
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+	curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+	curl_easy_setopt(curl, CURLOPT_USERNAME, "testbit");
+	curl_easy_setopt(curl, CURLOPT_PASSWORD, passphrase);
 	cJSON *json;
 	CURLcode res;
 
@@ -276,6 +280,19 @@ static void cleanup_cpus(void) {
 }
 
 int main(int argc, char **argv) {
+	if (read_passphrase()) {
+		fprintf(stderr, "error: failed to read passphrase\n");
+		return 1;
+	}
+	/* Children we exec inherit fd 0, so do not leave the passphrase file
+	 * readable to git, make and fastchess. Checked because a failed freopen()
+	 * closes stdin, and fd 0 would then be handed out by the next open().
+	 */
+	if (!freopen("/dev/null", "r", stdin)) {
+		fprintf(stderr, "error: failed to reopen stdin\n");
+		return 1;
+	}
+
 	int stop_fd[2];
 	pipe2(stop_fd, O_CLOEXEC);
 	stop_read = stop_fd[0];

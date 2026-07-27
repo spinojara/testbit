@@ -3,6 +3,12 @@
 
 #include <unistd.h>
 
+#define PASSPHRASE_MAX 256
+
+extern char passphrase[PASSPHRASE_MAX];
+
+int read_passphrase(void);
+
 int authorize(const char *user_password);
 
 int su(const char *user);

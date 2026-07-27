@@ -7,6 +7,70 @@
 #include <pwd.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <termios.h>
+#include <errno.h>
+
+char passphrase[PASSPHRASE_MAX];
+
+static void zero(void *p, size_t size) {
+	volatile unsigned char *v = p;
+	while (size--)
+		*v++ = 0;
+}
+
+int read_passphrase(void) {
+	struct termios saved;
+	int tty = isatty(STDIN_FILENO);
+	if (tty) {
+		struct termios noecho;
+		if (tcgetattr(STDIN_FILENO, &saved))
+			return 1;
+		noecho = saved;
+		noecho.c_lflag &= ~ECHO;
+		/* TCSAFLUSH discards anything typed before echo was switched off. */
+		if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &noecho))
+			return 1;
+		fprintf(stderr, "Passphrase: ");
+	}
+
+	size_t n = 0;
+	int error = 0;
+	while (1) {
+		char c;
+		ssize_t r = read(STDIN_FILENO, &c, 1);
+		if (r < 0) {
+			if (errno == EINTR)
+				continue;
+			error = 1;
+			break;
+		}
+		if (r == 0 || c == '\n')
+			break;
+		/* Truncating silently would only turn into a confusing 401. */
+		if (n + 1 >= sizeof(passphrase)) {
+			error = 1;
+			break;
+		}
+		passphrase[n++] = c;
+	}
+
+	if (tty) {
+		tcsetattr(STDIN_FILENO, TCSAFLUSH, &saved);
+		fprintf(stderr, "\n");
+	}
+
+	if (n > 0 && passphrase[n - 1] == '\r')
+		n--;
+
+	passphrase[n] = '\0';
+
+	if (error || n == 0) {
+		zero(passphrase, sizeof(passphrase));
+		return 1;
+	}
+
+	return 0;
+}
 
 int authorize(const char *user_password) {
 	struct spwd spwd = { 0 };
@@ -16,7 +80,6 @@ int authorize(const char *user_password) {
 		printf("getspname?\n");
 		return 0;
 	}
-	printf("%s\n", spwd.sp_pwdp);
 	if (!user_password)
 		return 0;
 	const char *colon = strchr(user_password, ':');
