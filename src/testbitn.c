@@ -70,9 +70,7 @@ static int config_handler(void *user, const char *section, const char *name, con
 			}
 		}
 		else if (!strcmp(name, "host")) {
-#warning
-			cfg->hostname = strdup("http://localhost:3333");
-			//cfg->hostname = strdup(value);
+			cfg->hostname = strdup(value);
 		}
 		else if (!strcmp(name, "syzygy")) {
 			cfg->syzygy = strdup(value);

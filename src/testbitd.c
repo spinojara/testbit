@@ -153,7 +153,7 @@ void handle_connection(int listener) {
 }
 
 int main(int argc, char **argv) {
-	const char *port = "3333";
+	const char *port = "2718";
 	char *db_path = NULL;
 	static struct option opts[] = {
 		{"db", required_argument, 0, 'd' },
