@@ -20,6 +20,8 @@ struct http {
 	cJSON *content;
 };
 
+extern int stop_read;
+
 int send_json_response(int fd, const char *status, cJSON *json);
 
 int send_response(int fd, const char *status, const char *response);

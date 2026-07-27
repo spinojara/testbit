@@ -27,7 +27,6 @@ struct worker {
 	pthread_cond_t cond;
 	int sleep;
 	int fd;
-	int running;
 };
 struct worker *workers = NULL;
 int pool_size = 1;
@@ -36,7 +35,19 @@ int available_workers = 0;
 pthread_mutex_t available_workers_mutex;
 pthread_cond_t available_workers_cond;
 
-volatile int running = 1;
+atomic_int stop;
+
+int stop_read;
+int stop_write;
+
+static void sigint_handler(int signum) {
+	(void)signum;
+	int saved_errno = errno;
+	atomic_store_explicit(&stop, 1, memory_order_relaxed);
+	char c = 1;
+	write(stop_write, &c, 1);
+	errno = saved_errno;
+}
 
 void increase_available_workers(void) {
 	pthread_mutex_lock(&available_workers_mutex);
@@ -45,11 +56,15 @@ void increase_available_workers(void) {
 	pthread_mutex_unlock(&available_workers_mutex);
 }
 
-void stop(void) {
-	running = 0;
+/* Wakes every worker so it notices stop. The signal handler cannot do this
+ * itself, as pthread_mutex_lock and pthread_cond_signal are not
+ * async-signal-safe. Signalling while holding the worker's own mutex is what
+ * keeps a worker sitting between testing stop and calling pthread_cond_wait
+ * from missing the wakeup and sleeping forever.
+ */
+void wake_workers(void) {
 	for (int i = 0; i < pool_size; i++) {
 		pthread_mutex_lock(&workers[i].mutex);
-		workers[i].running = 0;
 		pthread_cond_signal(&workers[i].cond);
 		pthread_mutex_unlock(&workers[i].mutex);
 	}
@@ -65,12 +80,12 @@ void *worker(void *arg) {
 		increase_available_workers();
 
 		pthread_mutex_lock(&w->mutex);
-		while (w->running && w->sleep) {
+		while (!atomic_load_explicit(&stop, memory_order_relaxed) && w->sleep) {
 			printf("Going to sleep\n");
 			pthread_cond_wait(&w->cond, &w->mutex);
 		}
 
-		if (!w->running) {
+		if (atomic_load_explicit(&stop, memory_order_relaxed)) {
 			pthread_mutex_unlock(&w->mutex);
 			break;
 		}
@@ -137,14 +152,6 @@ void handle_connection(int listener) {
 	exit(1);
 }
 
-void handle_stdin(void) {
-	char buf[4096];
-	if (!fgets(buf, sizeof(buf), stdin) || !strcmp(buf, "quit\n")) {
-		stop();
-		return;
-	}
-}
-
 int main(int argc, char **argv) {
 	const char *port = "3333";
 	char *db_path = NULL;
@@ -208,6 +215,16 @@ int main(int argc, char **argv) {
 	clop_init();
 
 	signal(SIGPIPE, SIG_IGN);
+
+	int stop_fd[2];
+	if (pipe(stop_fd)) {
+		fprintf(stderr, "error: failed to create stop pipe\n");
+		exit(1);
+	}
+	stop_read = stop_fd[0];
+	stop_write = stop_fd[1];
+	signal(SIGINT, sigint_handler);
+
 	int listener = get_listener_socket(port);
 	if (listener < 0) {
 		fprintf(stderr, "error: failed to bind\n");
@@ -226,30 +243,29 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < pool_size; i++) {
 		struct worker *w = &workers[i];
 		w->sleep = 1;
-		w->running = 1;
 		pthread_mutex_init(&w->mutex, NULL);
 		pthread_cond_init(&w->cond, NULL);
 		pthread_create(&w->thread, NULL, &worker, w);
 	}
 
 	struct pollfd fds[2] = {
-		{ .fd = STDIN_FILENO, .events = POLLIN },
 		{ .fd = listener, .events = POLLIN },
+		{ .fd = stop_read, .events = POLLIN },
 	};
 
-	while (running) {
+	while (!atomic_load_explicit(&stop, memory_order_relaxed)) {
 		if (poll(fds, 2, -1) <= 0)
 			continue;
 
-		for (int i = 0; i < 2; i++) {
-			if (!(fds[i].revents & POLLIN))
-				continue;
-			if (i == 0)
-				handle_stdin();
-			else
-				handle_connection(listener);
-		}
+		if (fds[1].revents & POLLIN)
+			break;
+
+		if (fds[0].revents & POLLIN)
+			handle_connection(listener);
 	}
+
+	printf("exiting...\n");
+	wake_workers();
 	for (int i = 0; i < pool_size; i++) {
 		struct worker *w = &workers[i];
 		pthread_join(w->thread, NULL);
@@ -261,4 +277,7 @@ int main(int argc, char **argv) {
 	free(workers);
 	db_close();
 	clop_term();
+
+	close(stop_read);
+	close(stop_write);
 }

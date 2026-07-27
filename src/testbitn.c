@@ -254,8 +254,6 @@ end:
 		free(chunk.data);
 		if (sleep_length > 0)
 			interruptable_sleep(sleep_length);
-		printf("break\n");
-		break;
 	}
 	release_cpu(cpu);
 	curl_easy_cleanup(curl);
@@ -265,9 +263,11 @@ end:
 
 static void sigint_handler(int signum) {
 	(void)signum;
+	int saved_errno = errno;
 	atomic_store_explicit(&stop, 1, memory_order_release);
 	char c = 1;
 	write(stop_write, &c, 1);
+	errno = saved_errno;
 }
 
 struct cpus cpus = { 0 };

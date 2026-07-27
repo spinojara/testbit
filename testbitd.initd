@@ -15,11 +15,11 @@ depend() {
 }
 
 start_pre() {
-	if [[ ! -d "/var/lib/bitbit" ]]; then
+	if [ ! -d "/var/lib/bitbit" ]; then
 		eerror "Please create the directory /var/lib/bitbit"
 		return 1
 	fi
-	if [[ ! -d "/var/lib/bitbit/backup" ]]; then
+	if [ ! -d "/var/lib/bitbit/backup" ]; then
 		eerror "Please create the directory /var/lib/bitbit/backup"
 		return 1
 	fi

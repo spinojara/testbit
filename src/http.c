@@ -7,8 +7,37 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <time.h>
+#include <poll.h>
 
 #include "util.h"
+
+static int wait_or_stop(int fd, short events, time_t maxtime) {
+	struct pollfd pfd[2] = {
+		{ .fd = stop_read, .events = POLLIN },
+		{ .fd = fd, .events = events },
+	};
+
+	while (1) {
+		time_t now = time(NULL);
+		if (now >= maxtime)
+			return 1;
+
+		int ret = poll(pfd, 2, (int)(1000 * (maxtime - now)));
+		if (ret < 0) {
+			if (errno == EINTR)
+				continue;
+			return 1;
+		}
+		/* Timed out. */
+		if (ret == 0)
+			return 1;
+		/* Stopping wins over finishing the request. */
+		if (pfd[0].revents & POLLIN)
+			return 1;
+		if (pfd[1].revents)
+			return 0;
+	}
+}
 
 void free_headers(struct http *http) {
 	free(http->path);
@@ -17,9 +46,11 @@ void free_headers(struct http *http) {
 	map_free(&http->query);
 }
 
-static size_t recvlen(struct fdreader *fdr) {
+static size_t recvlen(struct fdreader *fdr, time_t maxtime) {
 	if (fdr->buf[0])
 		return strlen(fdr->buf);
+	if (wait_or_stop(fdr->fd, POLLIN, maxtime))
+		return 0;
 	ssize_t ret = recv(fdr->fd, fdr->buf, BUFLEN - 1, 0);
 	if (ret <= 0)
 		return 0;
@@ -35,10 +66,8 @@ int recvfixed(char *buf, size_t size, struct fdreader *fdr, time_t maxtime) {
 	size_t real_size = size - 1;
 	size_t received = 0;
 	while (received < real_size) {
-		size_t size_to_copy = recvlen(fdr);
+		size_t size_to_copy = recvlen(fdr, maxtime);
 		if (!size_to_copy)
-			return 1;
-		if (time(NULL) > maxtime)
 			return 1;
 		if (received + size_to_copy > real_size)
 			size_to_copy = real_size - received;
@@ -55,10 +84,8 @@ int recvline(char *buf, size_t size, struct fdreader *fdr, time_t maxtime) {
 	size_t real_size = size - 1;
 	size_t received = 0;
 	while (received < real_size) {
-		size_t size_to_copy = recvlen(fdr);
+		size_t size_to_copy = recvlen(fdr, maxtime);
 		if (!size_to_copy)
-			return 1;
-		if (time(NULL) > maxtime)
 			return 1;
 
 		char *newline = strchr(fdr->buf, '\n');
@@ -81,9 +108,9 @@ int recvline(char *buf, size_t size, struct fdreader *fdr, time_t maxtime) {
 int sendexact(int fd, const char *buf, size_t size, time_t maxtime) {
 	size_t sent = 0;
 	while (sent < size) {
-		ssize_t ret = send(fd, &buf[sent], size - sent, 0);
-		if (time(NULL) > maxtime)
+		if (wait_or_stop(fd, POLLOUT, maxtime))
 			return 1;
+		ssize_t ret = send(fd, &buf[sent], size - sent, 0);
 		if (ret <= 0)
 			return 1;
 		sent += ret;
@@ -98,9 +125,9 @@ int sendstr(int fd, const char *str, time_t maxtime) {
 int recvexact(int fd, char *buf, size_t size, time_t maxtime) {
 	size_t received = 0;
 	while (received < size) {
-		ssize_t ret = recv(fd, buf + received, size - received, 0);
-		if (time(NULL) > maxtime)
+		if (wait_or_stop(fd, POLLIN, maxtime))
 			return 1;
+		ssize_t ret = recv(fd, buf + received, size - received, 0);
 		if (ret <= 0)
 			return 1;
 		received += ret;
