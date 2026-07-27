@@ -167,7 +167,7 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		setpgid(0, 0);
 		if (su("testbit")) {
 			kill_parent();
-			exit(45);
+			_exit(45);
 		}
 		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
@@ -175,7 +175,7 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		close(fd[1]);
 		execvp(argv[0], argv);
 		kill_parent();
-		exit(46);
+		_exit(46);
 	}
 	setpgid(pid, pid);
 
@@ -416,13 +416,13 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		FILE *f = fopen(file, "we");
 		if (!f) {
 			kill_parent();
-			exit(56);
+			_exit(56);
 		}
 		fprintf(f, "%d\n", getpid());
 		fclose(f);
 		if (su("testbit")) {
 			kill_parent();
-			exit(57);
+			_exit(57);
 		}
 		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
@@ -430,7 +430,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		close(fd[1]);
 		execvp("fastchess", argv);
 		kill_parent();
-		exit(58);
+		_exit(58);
 	}
 	setpgid(pid, pid);
 
