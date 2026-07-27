@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <string.h>
+#include <strings.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,6 +11,10 @@
 
 int startswith(const char *str, const char *s) {
 	return !strncmp(str, s, strlen(s));
+}
+
+int startswith_nocase(const char *str, const char *s) {
+	return !strncasecmp(str, s, strlen(s));
 }
 
 int endswith(const char *str, const char *s) {

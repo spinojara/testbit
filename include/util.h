@@ -17,6 +17,8 @@ struct fdreader {
 
 int startswith(const char *s1, const char *s2);
 
+int startswith_nocase(const char *s1, const char *s2);
+
 int endswith(const char *s1, const char *s2);
 
 char *base64_decode(const char *s);

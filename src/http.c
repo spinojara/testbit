@@ -246,7 +246,7 @@ int get_headers(int fd, struct http *http) {
 	while (!recvline(buf, sizeof(buf), &fdr, maxtime)) {
 		if (!strcmp(buf, "\r\n"))
 			break;
-		else if (startswith(buf, "Content-Length: ")) {
+		else if (startswith_nocase(buf, "Content-Length: ")) {
 			if (content_length) {
 				bad_request(fd, "bad content length");
 				return 1;
@@ -260,7 +260,7 @@ int get_headers(int fd, struct http *http) {
 				return 1;
 			}
 		}
-		else if (startswith(buf, "Authorization: Basic ")) {
+		else if (startswith_nocase(buf, "Authorization: Basic ")) {
 			if (http->auth) {
 				bad_request(fd, "bad authorization");
 				return 1;

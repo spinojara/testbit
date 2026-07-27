@@ -5,7 +5,8 @@ name="testbitd"
 description="testbitd - A test server for bitbit."
 command="testbitd"
 command_args="--db /var/lib/bitbit/bitbit.sqlite3 \
-	--backup /var/lib/bitbit/backup"
+	--backup /var/lib/bitbit/backup \
+	--pool-size 8"
 start_stop_daemon_args="--stdout /var/log/testbitd.log \
 	--stderr /var/log/testbitd.err"
 stopsig="SIGINT"
