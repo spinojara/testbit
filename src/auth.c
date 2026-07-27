@@ -37,13 +37,15 @@ int authorize(const char *user_password) {
 int su(const char *user) {
 #warning
 	return 0;
-	struct passwd *pwd;
-	if (!(pwd = getpwnam(user))) {
+	struct passwd pwd = { 0 };
+	char buf[16384] = { 0 };
+	struct passwd *result;
+	if (getpwnam_r(user, &pwd, buf, sizeof(buf), &result) || !result) {
 		fprintf(stderr, "error: no user '%s'\n", user);
 		return 1;
 	}
 
-	if (setgid(pwd->pw_gid) || setuid(pwd->pw_uid) || setegid(pwd->pw_gid) || seteuid(pwd->pw_uid)) {
+	if (setgid(pwd.pw_gid) || setuid(pwd.pw_uid) || setegid(pwd.pw_gid) || seteuid(pwd.pw_uid)) {
 		fprintf(stderr, "error: failed to switch user\n");
 		return 1;
 	}

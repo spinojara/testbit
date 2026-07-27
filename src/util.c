@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <string.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -117,28 +118,90 @@ int strisalnum(const char *s) {
 	return 1;
 }
 
-char *read_fd(int fd) {
+char *read_fd(int fd, int stop_fd) {
 	size_t size = 0;
 	char *buf = calloc(size + 1, 1);
 	char chunk[4096];
 	ssize_t n;
-	while ((n = read(fd, chunk, sizeof(chunk))) != 0) {
-		if (n < 0) {
+
+	struct pollfd pfd[] = {
+		{ .fd = stop_fd, .events = POLLIN },
+		{ .fd = fd, .events = POLLIN },
+	};
+
+	//while ((n = read(fd, chunk, sizeof(chunk))) != 0) {
+	while (1) {
+		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
 				continue;
-			else
+			exit(172);
+		}
+		if (pfd[0].revents & POLLIN) {
+			free(buf);
+			return NULL;
+		}
+		if (pfd[1].revents & (POLLIN | POLLHUP | POLLERR)) {
+			n = read(fd, chunk, sizeof(chunk));
+			if (n < 0) {
+				if (errno == EINTR || errno == EAGAIN)
+					continue;
+				break;
+			}
+			if (n == 0)
+				break;
+
+			buf = realloc(buf, size + n + 1);
+			if (!buf)
+				exit(150);
+			memcpy(buf + size, chunk, n);
+			buf[size + n] = 0;
+			size += n;
+			if (size >= 16 * 1024 * 1024)
 				break;
 		}
-
-		buf = realloc(buf, size + n + 1);
-		if (!buf)
-			exit(150);
-		memcpy(buf + size, chunk, n);
-		buf[size + n] = 0;
-		size += n;
-		if (size >= 16 * 1024 * 1024)
-			break;
 	}
 
 	return buf;
+}
+
+void fdtake(struct fdreader *fdr, char *buf, size_t size) {
+	memcpy(buf, fdr->buf, size);
+	memmove(fdr->buf, &fdr->buf[size], BUFLEN - size);
+}
+
+ssize_t fdlen(struct fdreader *fdr, int stop_fd) {
+	if (fdr->buf[0])
+		return strlen(fdr->buf);
+
+	struct pollfd pfd[] = {
+		{ .fd = stop_fd, .events = POLLIN },
+		{ .fd = fdr->fd, .events = POLLIN },
+	};
+
+	ssize_t ret;
+	while (1) {
+		if (poll(pfd, 2, -1) < 0) {
+			if (errno == EINTR)
+				continue;
+			exit(172);
+		}
+		if (pfd[0].revents & POLLIN) {
+			return -1;
+		}
+		if (pfd[1].revents & (POLLIN | POLLHUP | POLLERR)) {
+			ret = read(fdr->fd, fdr->buf, BUFLEN - 1);
+			if (ret < 0) {
+				if (errno == EINTR || errno == EAGAIN)
+					continue;
+				return 0;
+			}
+			if (ret == 0)
+				return 0;
+			break;
+		}
+	}
+	fdr->buf[ret] = 0;
+	if (strlen(fdr->buf) != (size_t)ret)
+		return 0;
+	return ret;
 }

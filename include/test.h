@@ -19,7 +19,7 @@ struct test {
 	char *dir;
 };
 
-int load_test(int id, int task_id, const char *url, CURL *curl, const char **dir);
+int load_test(int id, int task_id, const char *url, CURL *curl, const char **dir, int stop_fd);
 
 void return_test(int id);
 

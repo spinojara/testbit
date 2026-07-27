@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <ini.h>
 #include <errno.h>
@@ -9,12 +10,19 @@
 #include <cJSON.h>
 #include <signal.h>
 #include <stdatomic.h>
+#include <fcntl.h>
 
 #include "test.h"
 #include "util.h"
 #include "build.h"
 #include "tc.h"
 #include "cgroup.h"
+
+pthread_cond_t stop_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t stop_mutex = PTHREAD_MUTEX_INITIALIZER;
+atomic_int stop;
+int stop_write;
+int stop_read;
 
 struct threadinfo {
 	struct config *cfg;
@@ -83,6 +91,18 @@ static int config_handler(void *user, const char *section, const char *name, con
 	return 1;
 }
 
+void interruptable_sleep(int seconds) {
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	ts.tv_sec += seconds;
+
+	pthread_mutex_lock(&stop_mutex);
+	if (!atomic_load_explicit(&stop, memory_order_relaxed))
+		pthread_cond_timedwait(&stop_cond, &stop_mutex, &ts);
+
+	pthread_mutex_unlock(&stop_mutex);
+}
+
 static void *worker(void *arg) {
 	struct threadinfo *ti = arg;
 	struct config *cfg = ti->cfg;
@@ -98,7 +118,10 @@ static void *worker(void *arg) {
 	char *taskurl = calloc(strlen(cfg->hostname) + 1000, 1);
 	sprintf(taskurl, "%s/test/task", cfg->hostname);
 
-	while (1) {
+	int sleep_length;
+
+	while (!atomic_load_explicit(&stop, memory_order_relaxed)) {
+		sleep_length = 0;
 		chunk.data = NULL;
 		chunk.size = 0;
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
@@ -108,10 +131,9 @@ static void *worker(void *arg) {
 		res = curl_easy_perform(curl);
 		if (res != CURLE_OK) {
 			fprintf(stderr, "error: curl: %s\n", curl_easy_strerror(res));
-			free(chunk.data);
 			fprintf(stderr, "sleeping for 300 seconds\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 		long code = 0;
@@ -119,14 +141,14 @@ static void *worker(void *arg) {
 		if (code != 200) {
 			fprintf(stderr, "error: got response code %ld\n", code);
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
 		if (!chunk.data) {
 			fprintf(stderr, "error: got no response\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -135,7 +157,7 @@ static void *worker(void *arg) {
 		if (!json) {
 			fprintf(stderr, "error: bad json '%s'\n", chunk.data);
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -143,20 +165,20 @@ static void *worker(void *arg) {
 		if (!idobject) {
 			fprintf(stderr, "error: no id\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
 		if (cJSON_IsNull(idobject)) {
 			release_cpu(cpu);
-			sleep(10);
+			sleep_length = 10;
 			goto end;
 		}
 
 		if (!cJSON_IsNumber(idobject)) {
 			fprintf(stderr, "error: id is not number\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -164,7 +186,7 @@ static void *worker(void *arg) {
 		if (!taskidobject || !cJSON_IsNumber(taskidobject)) {
 			fprintf(stderr, "error: taskid is not a number\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -174,7 +196,7 @@ static void *worker(void *arg) {
 		if (!tcobject || !cJSON_IsString(tcobject) || parsetc(tcobject->valuestring, &tc)) {
 			fprintf(stderr, "error: bad tc\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -182,7 +204,7 @@ static void *worker(void *arg) {
 		if (!adjudicate || !cJSON_IsString(adjudicate) || (strcmp(adjudicate->valuestring, "none") && strcmp(adjudicate->valuestring, "both") && strcmp(adjudicate->valuestring, "resign") && strcmp(adjudicate->valuestring, "draw"))) {
 			fprintf(stderr, "error: bad adjudicate\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -196,7 +218,7 @@ static void *worker(void *arg) {
 		else if (!cJSON_IsArray(argplusobject)) {
 			fprintf(stderr, "error: argplus is not array\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
@@ -206,12 +228,12 @@ static void *worker(void *arg) {
 		else if (!cJSON_IsArray(argminusobject)) {
 			fprintf(stderr, "error: argminus is not array\n");
 			release_cpu(cpu);
-			sleep(300);
+			sleep_length = 300;
 			goto end;
 		}
 
 		const char *dir;
-		if (load_test(id, taskidobject->valueint, cfg->hostname, curl, &dir) || !dir) {
+		if (load_test(id, taskidobject->valueint, cfg->hostname, curl, &dir, stop_read) || !dir) {
 			fprintf(stderr, "error: failed to load test\n");
 			release_cpu(cpu);
 			goto end;
@@ -224,12 +246,14 @@ static void *worker(void *arg) {
 		tctostr(tcstr, &tc);
 		/* Ok if cpu is already claimed. */
 		claim_cpu(cpu);
-		fastchess(curl, cfg->hostname, id, taskidobject->valueint, cpu, dir, adjudicate->valuestring, cfg->syzygy, tcstr, argplusobject, argminusobject);
+		fastchess(curl, cfg->hostname, id, taskidobject->valueint, cpu, dir, adjudicate->valuestring, cfg->syzygy, tcstr, argplusobject, argminusobject, stop_read);
 
 		return_test(id);
 end:
 		cJSON_Delete(json);
 		free(chunk.data);
+		if (sleep_length > 0)
+			interruptable_sleep(sleep_length);
 		printf("break\n");
 		break;
 	}
@@ -238,10 +262,14 @@ end:
 	return NULL;
 }
 
-#warning make setting stop actually stop all threads
-atomic_int stop;
 static void sigint_handler(int signum) {
-	atomic_store_explicit(&stop, 1, memory_order_relaxed);
+	(void)signum;
+	pthread_mutex_lock(&stop_mutex);
+	atomic_store_explicit(&stop, 1, memory_order_release);
+	char c = 1;
+	write(stop_write, &c, 1);
+	pthread_cond_broadcast(&stop_cond);
+	pthread_mutex_unlock(&stop_mutex);
 }
 
 struct cpus cpus = { 0 };
@@ -254,6 +282,11 @@ static void cleanup_cpus(void) {
 }
 
 int main(int argc, char **argv) {
+	int stop_fd[2];
+	pipe2(stop_fd, O_CLOEXEC);
+	stop_read = stop_fd[0];
+	stop_write = stop_fd[1];
+
 	atexit(cleanup_cpus);
 	signal(SIGINT, sigint_handler);
 	curl_global_init(CURL_GLOBAL_ALL);
@@ -288,4 +321,7 @@ error:
 	curl_global_cleanup();
 	free_config(&cfg);
 	test_term();
+
+	close(stop_read);
+	close(stop_write);
 }

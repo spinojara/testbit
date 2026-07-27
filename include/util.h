@@ -3,8 +3,17 @@
 
 #include <stddef.h>
 #include <cjson/cJSON.h>
+#include <stdlib.h>
 
 #define SIZE(arr) (sizeof(arr) / sizeof(*(arr)))
+
+#define BUFLEN 4096
+
+struct fdreader {
+	int fd;
+	char buf[BUFLEN];
+};
+
 
 int startswith(const char *s1, const char *s2);
 
@@ -37,6 +46,10 @@ void cJSON_AddStringOrNullToObject(cJSON *json, const char *name, const char *st
 
 int strisalnum(const char *s);
 
-char *read_fd(int fd);
+char *read_fd(int fd, int stop_fd);
+
+void fdtake(struct fdreader *fdr, char *buf, size_t size);
+
+ssize_t fdlen(struct fdreader *fdr, int stop_fd);
 
 #endif

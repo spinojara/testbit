@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "build.h"
 
 #include <stdlib.h>
@@ -6,12 +7,74 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/pidfd.h>
+#include <poll.h>
 
 #include "util.h"
 #include "auth.h"
 
+int interruptable_fgets(char *buf, size_t size, struct fdreader *fdr, int stop_fd) {
+	if (size == 0)
+		return 1;
+	size_t real_size = size - 1;
+	size_t received = 0;
+	while (received < real_size) {
+		ssize_t size_to_copy = fdlen(fdr, stop_fd);
+		if (size_to_copy <= 0)
+			return 1;
+
+		char *newline = strchr(fdr->buf, '\n');
+
+		if (newline && size_to_copy + fdr->buf > newline + 1)
+			size_to_copy = newline - fdr->buf + 1;
+
+		if (received + size_to_copy > real_size)
+			size_to_copy = real_size - received;
+
+		fdtake(fdr, buf + received, size_to_copy);
+		received += size_to_copy;
+
+		if (newline)
+			break;
+	}
+	buf[received] = 0;
+	return 0;
+}
+
+int interruptable_waitpid(pid_t pid, int *wstatus, int stop_fd) {
+	int ret = 0;
+	*wstatus = 0;
+	int pidfd = pidfd_open(pid, 0);
+	struct pollfd pfd[2] = {
+		{ .fd = stop_fd, .events = POLLIN },
+		{ .fd = pidfd, .events = POLLIN },
+	};
+	while (1) {
+		if (poll(pfd, 2, -1) < 0) {
+			if (errno == EINTR)
+				continue;
+			exit(171);
+		}
+
+		if (pfd[0].revents & POLLIN) {
+			kill(pid, SIGKILL);
+			ret = 1;
+			break;
+		}
+
+		if (pfd[1].revents & POLLIN)
+			break;
+	}
+
+	while (waitpid(pid, wstatus, 0) < 0)
+		if (errno != EINTR)
+			exit(104);
+
+	close(pidfd);
+	return ret;
+}
+
 void kill_parent(void) {
-	fprintf(stderr, "killing parent\n");
 	pid_t pid = getppid();
 	kill(pid, SIGKILL);
 	while (waitpid(pid, NULL, 0) < 0 && errno == EINTR);
@@ -51,9 +114,9 @@ void send_error(CURL *curl, const char *url, int id, int task_id, const char *me
 }
 
 /* TODO: Add protection for long running commands and cancel them after a timeout. */
-int execvp_wrapper(CURL *curl, const char *url, int id, int task_id, char *const argv[]) {
+int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id, char *const argv[]) {
 	int fd[2];
-	if (pipe(fd) < 0)
+	if (pipe2(fd, O_CLOEXEC) < 0)
 		exit(105);
 
 	printf("executing:");
@@ -80,13 +143,22 @@ int execvp_wrapper(CURL *curl, const char *url, int id, int task_id, char *const
 	}
 
 	close(fd[1]);
-	char *out = read_fd(fd[0]);
+	char *out = read_fd(fd[0], stop_fd);
 	close(fd[0]);
 
+	/* out is only NULL if we are stopping. */
+	int exiting = 0;
+	if (!out) {
+		kill(pid, SIGKILL);
+		exiting = 1;
+	}
+
 	int wstatus;
-	while (waitpid(pid, &wstatus, 0) < 0)
-		if (errno != EINTR)
-			exit(104);
+	if (interruptable_waitpid(pid, &wstatus, stop_fd) || exiting) {
+		free(out);
+		return 1;
+	}
+
 
 	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus)) {
 		send_error(curl, url, id, task_id, out);
@@ -98,7 +170,7 @@ int execvp_wrapper(CURL *curl, const char *url, int id, int task_id, char *const
 	return 0;
 }
 
-int execlp_wrapper(CURL *curl, const char *url, int id, int task_id, ...) {
+int execlp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id, ...) {
 	va_list ap;
 	va_start(ap, task_id);
 
@@ -116,13 +188,13 @@ int execlp_wrapper(CURL *curl, const char *url, int id, int task_id, ...) {
 	va_end(ap);
 
 
-	int ret = execvp_wrapper(curl, url, id, task_id, argv);
+	int ret = execvp_wrapper(stop_fd, curl, url, id, task_id, argv);
 	printf("returning %d\n", ret);
 	free(argv);
 	return ret;
 }
 
-int build_test(struct test *test, int task_id, const char *patch, const char *simd, const char *commit, CURL *curl, const char *url) {
+int build_test(struct test *test, int task_id, const char *patch, const char *simd, const char *commit, int tune, CURL *curl, const char *url, int stop_fd) {
 	int id = test->id;
 	printf("building test\n");
 	char template[] = "/tmp/testbit-XXXXXX";
@@ -137,22 +209,24 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	sprintf(bitbit, "%s/bitbit", template);
 
 	test->dir = strdup(template);
-	if (execlp_wrapper(curl, url, id, task_id, "git", "clone", "https://github.com/spinojara/bitbit.git", test->dir, (char *)NULL))
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "git", "clone", "https://github.com/spinojara/bitbit.git", test->dir, (char *)NULL))
 		return 1;
 
-	if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "checkout", commit, (char *)NULL))
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "git", "-C", test->dir, "checkout", commit, (char *)NULL))
 		return 1;
 
-	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL))
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL))
 		return 1;
 
 	char *realsimd = malloc((simd ? strlen(simd) : 0) + 6);
 	if (!realsimd)
 		exit(112);
 
+	char realtune[16];
+	sprintf(realtune, "TUNE=%s", tune ? "yes" : "");
 	sprintf(realsimd, "SIMD=%s", simd ? simd : "");
 
-	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, realtune, (char *)NULL)) {
 		free(realsimd);
 		return 1;
 	}
@@ -177,14 +251,13 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 	}
 	close(fd);
 
-	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL)) {
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL)) {
 		free(realsimd);
 		unlink(patchfile);
 		return 1;
 	}
 
-	//if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "apply", "--allow-empty", patchfile, (char *)NULL)) {
-	if (execlp_wrapper(curl, url, id, task_id, "git", "-C", test->dir, "apply", patchfile, (char *)NULL)) {
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "git", "-C", test->dir, "apply", "--allow-empty", patchfile, (char *)NULL)) {
 		free(realsimd);
 		unlink(patchfile);
 		return 1;
@@ -192,7 +265,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 
 	unlink(patchfile);
 
-	if (execlp_wrapper(curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, (char *)NULL)) {
+	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "make", "-C", test->dir, "bitbit-pgo", realsimd, realtune, (char *)NULL)) {
 		free(realsimd);
 		return 1;
 	}
@@ -207,7 +280,7 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 }
 
 #define ARG(str) (argv[argc++] = (str))
-int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu *cpu, const char *dir, const char *adjudicate, char *syzygy, char *tc, cJSON *argsplus, cJSON *argsminus) {
+int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu *cpu, const char *dir, const char *adjudicate, char *syzygy, char *tc, cJSON *argsplus, cJSON *argsminus, int stop_fd) {
 	int argc = 0;
 	char *argv[8192];
 	if (argsplus && cJSON_GetArraySize(argsplus) > 2048) {
@@ -232,6 +305,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	char openingfile[256];
 	sprintf(openingfile, "file=%s/etc/book/testbit-50cp5d6m100k.epd", dir);
 	char processname[128];
+	sprintf(processname, "fastchess-%d", cpu->cpu);
 	char old[256];
 	char new[256];
 	sprintf(old, "cmd=%s/bitbit-old", dir);
@@ -290,7 +364,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	/* clang-format: on */
 
 	int fd[2];
-	if (pipe(fd) < 0)
+	if (pipe2(fd, O_CLOEXEC) < 0)
 		exit(105);
 
 	pid_t pid = fork();
@@ -302,7 +376,6 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		sprintf(file, "/sys/fs/cgroup/testbit-%d/cgroup.procs", cpu->cpu);
 		FILE *f = fopen(file, "w");
 		if (!f) {
-			fprintf(stderr, "no cgroup?\n");
 			kill_parent();
 			exit(135);
 		}
@@ -322,9 +395,6 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	}
 
 	close(fd[1]);
-	FILE *f = fdopen(fd[0], "r");
-	if (!f)
-		exit(132);
 
 	int stats[3] = { 0 };
 
@@ -332,7 +402,11 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	size_t size = 0;
 	char *out = calloc(size + 1, 1);
 	int error = 0;
-	while (fgets(buf, sizeof(buf), f)) {
+
+	int exiting = 0;
+
+	struct fdreader fdr = { .fd = fd[0] };
+	while (!interruptable_fgets(buf, sizeof(buf), &fdr, stop_fd)) {
 		size_t n = strlen(buf);
 		out = realloc(out, size + n + 1);
 		if (!out)
@@ -344,6 +418,8 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			error = 1;
 			break;
 		}
+
+		printf("line: %s\n", buf);
 
 		if (strstr(buf, "Finished game ") == buf) {
 			int white;
@@ -367,14 +443,18 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 			stats[white ? score : 2 - score]++;
 		}
 	}
-	fclose(f);
+	close(fd[0]);
+	printf("waitpid\n");
 
 	int wstatus;
-	while (waitpid(pid, &wstatus, 0) < 0)
-		if (errno != EINTR)
-			exit(104);
+	if (interruptable_waitpid(pid, &wstatus, stop_fd)) {
+		free(out);
+		unlink(pgnfile);
+		return 1;
+	}
 
-	if (!WIFEXITED(wstatus)) {
+	if (exiting || !WIFEXITED(wstatus)) {
+		free(out);
 		unlink(pgnfile);
 		return 1;
 	}
@@ -384,6 +464,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	int l = stats[0];
 
 	if (WEXITSTATUS(wstatus) || error || w + d + l != 2) {
+		printf("sending error because: %d, %d, %d\n", WEXITSTATUS(wstatus), error, w + d + l != 2);
 		send_error(curl, url, id, task_id, out);
 		free(out);
 		unlink(pgnfile);
@@ -392,7 +473,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	printf("finished games!\n");
 	free(out);
 
-	f = fopen(pgnfile, "r");
+	FILE *f = fopen(pgnfile, "r");
 	if (!f)
 		exit(175);
 

@@ -10,13 +10,6 @@
 
 #include "util.h"
 
-#define BUFLEN 4096
-
-struct fdreader {
-	int fd;
-	char buf[BUFLEN];
-};
-
 void free_headers(struct http *http) {
 	free(http->path);
 	cJSON_Delete(http->content);
@@ -24,7 +17,7 @@ void free_headers(struct http *http) {
 	map_free(&http->query);
 }
 
-size_t fdlen(struct fdreader *fdr) {
+static size_t recvlen(struct fdreader *fdr) {
 	if (fdr->buf[0])
 		return strlen(fdr->buf);
 	ssize_t ret = recv(fdr->fd, fdr->buf, BUFLEN - 1, 0);
@@ -36,18 +29,13 @@ size_t fdlen(struct fdreader *fdr) {
 	return ret;
 }
 
-void fdtake(struct fdreader *fdr, char *buf, size_t size) {
-	memcpy(buf, fdr->buf, size);
-	memmove(fdr->buf, &fdr->buf[size], BUFLEN - size);
-}
-
 int recvfixed(char *buf, size_t size, struct fdreader *fdr, time_t maxtime) {
 	if (size == 0)
 		return 1;
 	size_t real_size = size - 1;
 	size_t received = 0;
 	while (received < real_size) {
-		size_t size_to_copy = fdlen(fdr);
+		size_t size_to_copy = recvlen(fdr);
 		if (!size_to_copy)
 			return 1;
 		if (time(NULL) > maxtime)
@@ -67,7 +55,7 @@ int recvline(char *buf, size_t size, struct fdreader *fdr, time_t maxtime) {
 	size_t real_size = size - 1;
 	size_t received = 0;
 	while (received < real_size) {
-		size_t size_to_copy = fdlen(fdr);
+		size_t size_to_copy = recvlen(fdr);
 		if (!size_to_copy)
 			return 1;
 		if (time(NULL) > maxtime)

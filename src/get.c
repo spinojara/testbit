@@ -631,7 +631,8 @@ void build_info(int fd, const struct http *http, int id) {
 		"SELECT\n"
 			"patch,\n"
 			"commithash,\n"
-			"simd\n"
+			"simd,\n"
+			"type IN ('clop', 'spsa')\n"
 		"FROM tests\n"
 		"WHERE id = ?",
 		-1, &stmt, NULL);
@@ -648,6 +649,7 @@ void build_info(int fd, const struct http *http, int id) {
 	json_sql_add(root, TYPE_STRING, "patch", stmt, 0);
 	json_sql_add(root, TYPE_STRING, "commit", stmt, 1);
 	json_sql_add(root, TYPE_STRING, "simd", stmt, 2);
+	json_sql_add(root, TYPE_BOOL, "tune", stmt, 3);
 	sqlite3_finalize(stmt);
 	pthread_mutex_unlock(&db_lock);
 
