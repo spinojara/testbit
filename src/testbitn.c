@@ -20,9 +20,9 @@
 #include "cgroup.h"
 #include "auth.h"
 
-atomic_int stop;
-int stop_write;
-int stop_read;
+static atomic_int stop;
+static int stop_write;
+static int stop_read;
 
 struct threadinfo {
 	struct config *cfg;
