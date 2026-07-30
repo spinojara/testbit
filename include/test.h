@@ -27,4 +27,6 @@ void test_init(void);
 
 void test_term(void);
 
+void clear_old_tests(void);
+
 #endif

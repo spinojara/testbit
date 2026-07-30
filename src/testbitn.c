@@ -234,7 +234,7 @@ static void *worker(void *arg) {
 		const char *dir;
 		if (load_test(id, taskidobject->valueint, cfg->hostname, curl, &dir, stop_read) || !dir) {
 			fprintf(stderr, "error: failed to load test\n");
-			release_cpu(cpu);
+			clear_old_tests();
 			goto end;
 		}
 
