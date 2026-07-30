@@ -34,13 +34,12 @@ def main() -> int:
     parser.add_argument("--simd", type=str, help="simd", default="avx2")
     parser.add_argument("--adjudicate", type=str, help="adjudication", default="both")
     parser.add_argument("--tc", type=str, help="time control", default="40/10+0.1")
-    parser.add_argument("--host", type=str, help="host", default="localhost")
-    parser.add_argument("--port", type=int, help="port", default=2718)
+    parser.add_argument("--host", type=str, help="host", default="http://localhost:2718")
     parser.add_argument("--description", type=str, help="description", default="")
     parser.add_argument("--cancel", action="store_true", default=False)
     parser.add_argument("--tune", type=str, nargs="*", help=tune_help, default=[], action="append")
 
-    args, _ = parser.parse_known_args()
+    args = parser.parse_args()
 
     if not args.alpha:
         args.alpha = 0.025 if args.type == "sprt" else 0.602
@@ -152,7 +151,7 @@ def main() -> int:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     try:
         response = requests.post(
-            url="%s:%d/test" % (args.host, args.port),
+            url="%s/testbit/test" % args.host,
             json={
                 "type": args.type,
                 "alpha": args.alpha,
@@ -176,7 +175,7 @@ def main() -> int:
             verify=verify
         )
     except requests.exceptions.ConnectionError:
-        print("Connection to %s:%d refused" % (args.host, args.port))
+        print("Connection to %s refused" % args.host)
         return 1
 
     if response.status_code == 200:
