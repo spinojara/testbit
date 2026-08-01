@@ -210,3 +210,15 @@ ssize_t fdlen(struct fdreader *fdr, int stop_fd) {
 		return 0;
 	return ret;
 }
+
+int is_sha(const char *commit) {
+	size_t len = strlen(commit);
+	for (size_t i = 0; i < len; i++) {
+		char c = commit[i];
+		if ((c < '0' || c > '9') && (c < 'a' || c > 'f'))
+			return 0;
+	}
+
+	return len == 40;
+}
+

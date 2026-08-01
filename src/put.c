@@ -669,3 +669,29 @@ void task_new(int fd, const struct http *http, int unused) {
 	free(adjudicate);
 	free(jsonstr);
 }
+
+void build_data(int fd, const struct http *http, int id) {
+	cJSON *commit = cJSON_GetObjectItemCaseSensitive(http->content, "commit");
+	if (!commit || !cJSON_IsString(commit) || !is_sha(commit->valuestring)) {
+		bad_request(fd, "bad commit");
+		return;
+	}
+
+	pthread_mutex_lock(&db_lock);
+	sqlite3_stmt *stmt;
+	sqlite3_prepare_v2(db,
+		"UPDATE tests\n"
+		"SET commithash = ?\n"
+		"WHERE status = 'running'\n"
+			"AND id = ?;",
+		-1, &stmt, NULL);
+	sqlite3_bind_text(stmt, 1, commit->valuestring, -1, NULL);
+	sqlite3_bind_int(stmt, 2, id);
+
+	sqlite3_step(stmt);
+
+	sqlite3_finalize(stmt);
+	pthread_mutex_unlock(&db_lock);
+
+	send_response(fd, "200 OK", "{\"message\": \"ok\"}");
+}

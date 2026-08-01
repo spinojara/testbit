@@ -54,4 +54,6 @@ void fdtake(struct fdreader *fdr, char *buf, size_t size);
 
 ssize_t fdlen(struct fdreader *fdr, int stop_fd);
 
+int is_sha(const char *commit);
+
 #endif

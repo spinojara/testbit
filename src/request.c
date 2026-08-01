@@ -30,6 +30,7 @@ const struct handler handlers[] = {
 	{HTTP_PUT, 1, "/test/requeue/{id}", &test_requeue},
 	{HTTP_PUT, 1, "/test/error/{id}", &test_error},
 	{HTTP_PUT, 1, "/test/task", &task_new},
+	{HTTP_PUT, 1, "/build/{id}", &build_data},
 
 	{HTTP_GET, 0, "/test/{id}", &test_fetch_single},
 	{HTTP_GET, 0, "/test", &test_fetch_all},

@@ -149,7 +149,38 @@ void send_error(CURL *curl, const char *url, int id, int task_id, const char *me
 	free(errorurl);
 }
 
-/* TODO: Add protection for long running commands and cancel them after a timeout. */
+void send_commit(CURL *curl, const char *url, int id, const char *commit) {
+	char *commiturl = calloc(strlen(url) + 1000, 1);
+	if (!commiturl)
+		exit(42);
+	sprintf(commiturl, "%s/build/%d", url, id);
+
+	cJSON *json = cJSON_CreateObject();
+	cJSON_AddStringToObject(json, "commit", commit);
+	char *body = cJSON_PrintUnformatted(json);
+
+	struct curl_slist *headers = NULL;
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+
+	curl_easy_setopt(curl, CURLOPT_URL, commiturl);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
+
+	curl_easy_perform(curl);
+
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
+
+	curl_slist_free_all(headers);
+	cJSON_free(body);
+	cJSON_Delete(json);
+	free(commiturl);
+}
+
 int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id, char *const argv[]) {
 	int fd[2];
 	if (pipe2(fd, O_CLOEXEC) < 0)
@@ -193,12 +224,69 @@ int execvp_wrapper(int stop_fd, CURL *curl, const char *url, int id, int task_id
 		return 1;
 	}
 
-
 	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus)) {
 		send_error(curl, url, id, task_id, out);
 		free(out);
 		return 1;
 	}
+
+	free(out);
+	return 0;
+}
+
+int rev_parse(int stop_fd, CURL *curl, const char *url, int id, int task_id, const char *dir) {
+	int fd[2];
+	if (pipe2(fd, O_CLOEXEC) < 0)
+		exit(43);
+
+	pid_t pid = fork();
+	if (pid < 0)
+		exit(44);
+
+	if (pid == 0) {
+		setpgid(0, 0);
+		if (su("testbit")) {
+			kill_parent();
+			_exit(45);
+		}
+		close(fd[0]);
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[1]);
+		execlp("git", "git", "-C", dir, "rev-parse", "HEAD", (char *)NULL);
+		kill_parent();
+		_exit(46);
+	}
+	setpgid(pid, pid);
+
+	close(fd[1]);
+	char *out = read_fd(fd[0], stop_fd);
+	close(fd[0]);
+
+	/* out is only NULL if we are stopping. */
+	int exiting = out == NULL;
+
+	int wstatus;
+	if (interruptable_waitpid(pid, &wstatus, stop_fd) || exiting) {
+		free(out);
+		return 1;
+	}
+
+	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus)) {
+		send_error(curl, url, id, task_id, "error: git rev-parse HEAD");
+		free(out);
+		return 1;
+	}
+
+	/* 40 + newline. */
+	if (strlen(out) != 41 || (out[40] = '\0', !is_sha(out))) {
+		char buf[512];
+		sprintf(buf, "error: '%s' is not a commit sha\n", out);
+		send_error(curl, url, id, task_id, buf);
+		free(out);
+		return 1;
+	}
+
+	send_commit(curl, url, id, out);
 
 	free(out);
 	return 0;
@@ -248,6 +336,10 @@ int build_test(struct test *test, int task_id, const char *patch, const char *si
 
 	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "git", "-C", test->dir, "checkout", commit, (char *)NULL))
 		return 1;
+
+	if (!is_sha(commit) && rev_parse(stop_fd, curl, url, id, task_id, test->dir)) {
+		return 1;
+	}
 
 	if (execlp_wrapper(stop_fd, curl, url, id, task_id, "make", "-C", test->dir, "clean", (char *)NULL))
 		return 1;

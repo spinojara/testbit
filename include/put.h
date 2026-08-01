@@ -15,4 +15,6 @@ void test_error(int fd, const struct http *http, int id);
 
 void task_new(int fd, const struct http *http, int id);
 
+void build_data(int fd, const struct http *http, int id);
+
 #endif

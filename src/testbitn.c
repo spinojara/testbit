@@ -151,7 +151,6 @@ static void *worker(void *arg) {
 			goto end;
 		}
 
-		printf("got: '%s'\n", chunk.data);
 		json = cJSON_Parse(chunk.data);
 		if (!json) {
 			fprintf(stderr, "error: bad json '%s'\n", chunk.data);
@@ -237,8 +236,6 @@ static void *worker(void *arg) {
 			clear_old_tests();
 			goto end;
 		}
-
-		printf("got: %s\n", dir);
 
 		adjusttc(&tc, cfg->tcfactor);
 		char tcstr[512];

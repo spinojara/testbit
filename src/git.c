@@ -26,6 +26,7 @@ char *remove_binary(const char *patch) {
 	return smallpatch;
 }
 
+/* https://git-scm.com/docs/git-check-ref-format */
 int check_ref_format(const char *branch) {
 	if (!branch || !*branch)
 		return -1;
@@ -61,6 +62,10 @@ int check_ref_format(const char *branch) {
 
 	if (strchr(branch, '\\'))
 		return 10;
+
+	/* One extra rule */
+	if (*branch == '-')
+		return 11;
 
 	return 0;
 }
