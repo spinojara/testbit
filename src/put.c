@@ -474,7 +474,7 @@ void test_error(int fd, const struct http *http, int id) {
 
 	sqlite3_prepare_v2(db,
 		"UPDATE tests\n"
-		"SET status = 'error', errorlog = ?\n"
+		"SET status = 'error', errorlog = ?, donetime = unixepoch()\n"
 		"WHERE id = ? AND status = 'running';",
 		-1, &stmt, NULL);
 	sqlite3_bind_text(stmt, 1, errorlog->valuestring, -1, NULL);
