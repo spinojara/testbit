@@ -534,6 +534,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	char buf[4096];
 	size_t size = 0;
 	char *out = calloc(size + 1, 1);
+	char msg[64];
 	int error = 0;
 
 	struct fdreader fdr = { .fd = fd[0] };
@@ -552,6 +553,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 
 		printf("line: %s\n", buf);
 
+
 		if (strstr(buf, "Finished game ") == buf) {
 			int white;
 			if (strstr(buf, " (bitbit-new vs bitbit-old): "))
@@ -560,6 +562,31 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 				white = 0;
 			else
 				exit(60);
+
+			/* Only check errors for bitbit-new.
+			 * bitbit-old is allowed to make errors.
+			 *
+			 * See fastchess messages:
+			 * <https://github.com/Disservin/fastchess/blob/master/app/src/matchmaking/match/match.hpp>
+			 */
+			static const char *suffixes[] = {
+				" makes an illegal move",
+				" loses on time",
+				" disconnects",
+				"'s connection stalls",
+			};
+			const char *color = white ? "White" : "Black";
+			for (size_t i = 0; i < SIZE(suffixes); i++) {
+				sprintf(msg, "%s%s", color, suffixes[i]);
+				if (strstr(buf, msg)) {
+					error = 1;
+					break;
+				}
+			}
+			if (error || strstr(buf, "Game interrupted")) {
+				error = 1;
+				break;
+			}
 
 			int score;
 			if (strstr(buf, ": 1-0 "))
@@ -575,7 +602,9 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		}
 	}
 	close(fd[0]);
-	printf("waitpid\n");
+
+	if (error)
+		kill(-pid, SIGKILL);
 
 	int wstatus;
 	if (interruptable_waitpid(pid, &wstatus, stop_fd)) {
@@ -584,7 +613,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 		return 1;
 	}
 
-	if (!WIFEXITED(wstatus)) {
+	if (!WIFEXITED(wstatus) && !error) {
 		free(out);
 		unlink(pgnfile);
 		return 1;
@@ -594,8 +623,7 @@ int fastchess(CURL *curl, const char *url, int id, int task_id, const struct cpu
 	int d = stats[1];
 	int l = stats[0];
 
-	if (WEXITSTATUS(wstatus) || error || w + d + l != 2) {
-		printf("sending error because: %d, %d, %d\n", WEXITSTATUS(wstatus), error, w + d + l != 2);
+	if (error || WEXITSTATUS(wstatus) || w + d + l != 2) {
 		send_error(curl, url, id, task_id, out);
 		free(out);
 		unlink(pgnfile);
