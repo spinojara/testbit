@@ -7,6 +7,7 @@
 #include <utility>
 #include <chrono>
 #include <random>
+#include <cmath>
 
 #include "CParameterCollection.h"
 #include "CResults.h"
@@ -24,6 +25,10 @@ extern "C" {
 }
 
 class CWeightUpdater;
+
+static const double DrawElo = 100.0;
+static const double H = 3.0;
+static const int nMCMC = 1000;
 
 class CExperiment {
 private:
@@ -43,11 +48,18 @@ public:
 		results(paramcol.GetSize()),
 		pf(paramcol.GetSize()),
 		reg(results, pf),
-		me(reg), sp(reg)
+		me(reg), sp(reg, 0, nMCMC)
 	{
 		pthread_mutex_init(&lock_, NULL);
 		sp.Seed(seed);
 		wu = nullptr;
+
+		reg.SetRefreshRate(0.1);
+		reg.SetDrawRating(DrawElo * std::log(10.0) / 400.0);
+		reg.SetLocalizationHeight(H);
+
+		reg.SetMaxWeightIterations(7);
+		pf.SetPriorStrength(1e-2);
 	}
 
 	~CExperiment(void);
@@ -243,15 +255,6 @@ void *clop_load(int id) {
 	cexp->reg.ComputeLocalWeights();
 	printf("computed weights\n");
 
-	cexp->reg.SetRefreshRate(0.1);
-	double DrawElo = 100.0;
-	double DrawRating = DrawElo * log(10.0) / 400.0;
-	cexp->reg.SetDrawRating(DrawRating);
-	cexp->reg.SetLocalizationHeight(3.0);
-
-	cexp->reg.SetMaxWeightIterations(7);
-	cexp->pf.SetPriorStrength(1e-2);
-
 	cexp->wu = new CWeightUpdater(*cexp, id);
 	printf("created cweightupdater\n");
 
@@ -262,6 +265,19 @@ void clop_return(void *clop) {
 	if (!clop)
 		return;
 	((CExperiment *)clop)->unlock();
+}
+
+std::vector<std::pair<std::pair<int, int>, int>> seeds;
+
+void clop_drop_seeds(int id) {
+	pthread_mutex_lock(&clop_seed_lock);
+	for (size_t i = 0; i < seeds.size();) {
+		if (seeds[i].first.first == id)
+			seeds.erase(seeds.begin() + i);
+		else
+			i++;
+	}
+	pthread_mutex_unlock(&clop_seed_lock);
 }
 
 void clop_unload(int id) {
@@ -278,6 +294,7 @@ void clop_unload(int id) {
 	it->second->unlock();
 	delete it->second;
 	clops.erase(it);
+	clop_drop_seeds(id);
 	pthread_mutex_unlock(&global_clop_lock);
 }
 
@@ -313,8 +330,6 @@ cJSON *clop_next_sample(void *e, int *seed, double *weight) {
 
 	return cexp->point_to_json(cexp->results.GetSample(Seed - 1));
 }
-
-std::vector<std::pair<std::pair<int, int>, int>> seeds;
 
 void clop_store_seed(int id, int task_id, int seed) {
 	pthread_mutex_lock(&clop_seed_lock);

@@ -14,7 +14,7 @@ CXXSTANDARD = -std=c++11
 CWARNINGS   = -Wall -Wextra -Wshadow -pedantic -Wno-unused-result -Wvla -Wno-missing-field-initializers
 CXXWARNINGS = -Wall -Wextra -pedantic -Wno-unused-parameter
 COPTIMIZE   = -O2
-CDEBUG      = -g3 -fsanitize=address,undefined
+CDEBUG      =
 INCLUDE     = -Iinclude -Iclop
 
 CFLAGS      = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG) $(INCLUDE) $(shell pkg-config --cflags libcjson libcurl sqlite3 ncurses libcrypt) -pthread
